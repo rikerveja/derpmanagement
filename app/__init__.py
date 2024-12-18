@@ -10,11 +10,11 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # 初始化扩展
+    # 初始化 Flask 插件
     db.init_app(app)
-    mail.init_app(app)  # 确保 Flask-Mail 正确初始化
+    mail.init_app(app)
 
-    # 导入并注册蓝图
+    # 注册蓝图
     from app.routes.user_routes import user_bp
     from app.routes.server_routes import server_bp
     from app.routes.container_routes import container_bp
