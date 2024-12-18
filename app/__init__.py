@@ -14,6 +14,10 @@ def create_app():
     db.init_app(app)
     mail.init_app(app)
 
+    # 自动生成数据库表
+    with app.app_context():
+        db.create_all()  # 创建所有数据库表
+
     # 注册蓝图
     from app.routes.user_routes import user_bp
     from app.routes.server_routes import server_bp
