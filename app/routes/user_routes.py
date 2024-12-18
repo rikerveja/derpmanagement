@@ -3,9 +3,11 @@ from app.models import User
 from app.utils.auth import hash_password, check_password, generate_jwt
 from app.utils.email_utils import send_verification_email, validate_verification_code
 from app import db
+import logging
 
 # 定义蓝图
 user_bp = Blueprint('user', __name__)
+logging.basicConfig(level=logging.ERROR)
 
 # 添加用户
 @user_bp.route('/api/add_user', methods=['POST'])
@@ -20,7 +22,6 @@ def add_user():
     password = data.get('password')
     verification_code = data.get('verification_code')
 
-    # 检查字段是否完整
     if not username or not email or not password or not verification_code:
         return jsonify({"success": False, "message": "Missing required fields"}), 400
 
@@ -42,6 +43,7 @@ def add_user():
         db.session.commit()
         return jsonify({"success": True, "message": "User added successfully", "user_id": user.id}), 201
     except Exception as e:
+        logging.error(f"Database error while adding user: {e}")
         db.session.rollback()
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
 
@@ -58,14 +60,13 @@ def login():
     email = data.get('email')
     password = data.get('password')
 
-    # 检查字段是否完整
     if not email or not password:
         return jsonify({"success": False, "message": "Missing email or password"}), 400
 
     # 验证用户邮箱和密码
     user = User.query.filter_by(email=email).first()
     if not user or not check_password(password, user.password):
-        return jsonify({"success": False, "message": "Invalid email or password"}), 401
+        return jsonify({"success": False, "message": "Invalid credentials"}), 401
 
     # 生成 JWT 令牌
     token = generate_jwt({"user_id": user.id})
@@ -82,7 +83,6 @@ def send_verification_email_route():
     data = request.json
     email = data.get('email')
 
-    # 检查邮箱是否提供
     if not email:
         return jsonify({"success": False, "message": "Email is required"}), 400
 
@@ -95,4 +95,6 @@ def send_verification_email_route():
     success = send_verification_email(email)
     if success:
         return jsonify({"success": True, "message": "Verification email sent successfully"}), 200
+
+    logging.error(f"Failed to send verification email to {email}")
     return jsonify({"success": False, "message": "Failed to send email"}), 500
