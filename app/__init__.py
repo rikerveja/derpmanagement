@@ -10,8 +10,9 @@ mail = Mail()
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
-    db.init_app(app)
-    mail.init_app(app)
+    mail.init_app(app)  # 确保 Flask-Mail 正确初始化
+    return app
+
 
     from app.routes.user_routes import user_bp
     from app.routes.server_routes import server_bp
