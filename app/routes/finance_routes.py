@@ -1,29 +1,42 @@
-# app/routes/finance_routes.py
-from flask import Blueprint, request, jsonify
-from app.models.finance import SerialNumber
+from flask import Blueprint, jsonify, request
+from app.models import User, SerialNumber
+from datetime import datetime
+from sqlalchemy import func
 from app import db
-import random
-import string
 
 finance_bp = Blueprint('finance', __name__)
 
-# Éú³ÉĞòÁĞºÅ
-@finance_bp.route('/api/generate_serial', methods=['POST'])
-def generate_serial():
-    data = request.json
-    duration_days = data.get('duration_days')
+@finance_bp.route('/statistics', methods=['GET'])
+def finance_statistics():
+    """
+    è·å–è´¢åŠ¡ç»Ÿè®¡æ•°æ®
+    """
+    # ç¤ºä¾‹æ•°æ®ï¼šè®¡ç®—æ€»æ”¶ç›Š
+    total_revenue = SerialNumber.query.with_entities(func.sum(SerialNumber.duration_days)).scalar() or 0
+    return jsonify({
+        "success": True,
+        "total_revenue": total_revenue,
+        "timestamp": datetime.utcnow().isoformat()
+    }), 200
 
-    if not duration_days or not isinstance(duration_days, int):
-        return jsonify({"success": False, "message": "Invalid duration"}), 400
 
-    # Éú³ÉËæ»úĞòÁĞºÅ
-    serial_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
-    serial = SerialNumber(code=serial_code, duration_days=duration_days)
+@finance_bp.route('/orders/<int:user_id>', methods=['GET'])
+def user_orders(user_id):
+    """
+    è·å–ç”¨æˆ·è®¢å•è®°å½•
+    """
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 404
 
-    db.session.add(serial)
-    try:
-        db.session.commit()
-        return jsonify({"success": True, "message": "Serial generated successfully", "serial_code": serial_code}), 201
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
+    orders = [
+        {
+            "serial_number": sn.code,
+            "status": sn.status,
+            "duration_days": sn.duration_days,
+            "created_at": sn.created_at.isoformat(),
+            "used_at": sn.used_at.isoformat() if sn.used_at else None
+        }
+        for sn in user.serial_numbers
+    ]
+    return jsonify({"success": True, "orders": orders}), 200
