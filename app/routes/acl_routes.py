@@ -119,3 +119,23 @@ def download_acl(username):
     except Exception as e:
         logging.error(f"Error downloading ACL file for user {username}: {e}")
         return jsonify({"success": False, "message": f"Error downloading ACL: {str(e)}"}), 500
+
+
+# 验证用户对服务器的权限
+@acl_bp.route('/api/acl/validate', methods=['POST'])
+def validate_acl():
+    """
+    验证用户对指定服务器的访问权限
+    """
+    data = request.json
+    user_id = data.get('user_id')
+    server_id = data.get('server_id')
+
+    acl_config = acl_store.get(user_id)
+    if not acl_config:
+        return jsonify({"success": False, "message": "No ACL configuration found for this user"}), 404
+
+    server_access = any(server['id'] == server_id for server in acl_config['servers'])
+    if server_access:
+        return jsonify({"success": True, "message": "Access granted"}), 200
+    return jsonify({"success": False, "message": "Access denied"}), 403
