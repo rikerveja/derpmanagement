@@ -106,5 +106,14 @@ class MonitoringLog(db.Model):
     value = db.Column(db.Float, nullable=False)  # 指标值
     timestamp = db.Column(db.DateTime, default=func.now())  # 记录时间
     server_id = db.Column(db.Integer, db.ForeignKey('servers.id'), nullable=True)  # 关联服务器（可选）
-
     server = relationship('Server', backref='monitoring_logs')  # 反向关联服务器
+
+# 系统告警模型
+class SystemAlert(db.Model):
+    __tablename__ = 'system_alerts'
+    id = db.Column(db.Integer, primary_key=True)
+    alert_type = db.Column(db.String(50), nullable=False)  # 告警类型
+    severity = db.Column(db.String(20), nullable=False)  # 告警级别（info, warning, critical）
+    message = db.Column(db.String(255), nullable=False)  # 告警信息
+    timestamp = db.Column(db.DateTime, default=func.now())  # 告警时间
+    resolved = db.Column(db.Boolean, default=False)  # 是否已解决
