@@ -3,6 +3,7 @@ from flask_mail import Message
 from app import mail, db
 from app.models import User
 from datetime import datetime, timedelta
+from app.utils.notifications_utils import send_email
 import logging
 
 notifications_bp = Blueprint('notifications', __name__)
@@ -25,18 +26,22 @@ def send_reminder():
         logging.info("No users with expiring rentals found.")
         return jsonify({"success": True, "message": "No users with expiring rentals"}), 200
 
+    failed_emails = []
     for user in expiring_users:
-        try:
-            msg = Message(
-                subject="Your rental service is expiring soon",
-                sender="noreply@example.com",
-                recipients=[user.email],
-                body=f"Dear {user.username},\n\nYour rental service will expire on {user.rental_expiry}. Please renew your service to avoid interruptions."
-            )
-            mail.send(msg)
-            logging.info(f"Reminder sent to {user.email}")
-        except Exception as e:
-            logging.error(f"Failed to send email to {user.email}: {str(e)}")
-            return jsonify({"success": False, "message": f"Failed to send email to {user.email}: {str(e)}"}), 500
+        email_subject = "Your rental service is expiring soon"
+        email_body = (
+            f"Dear {user.username},\n\n"
+            f"Your rental service will expire on {user.rental_expiry.strftime('%Y-%m-%d %H:%M:%S')} UTC. "
+            f"Please renew your service to avoid interruptions.\n\n"
+            f"Thank you for using our service."
+        )
+        # 使用通用邮件发送工具
+        if not send_email(user.email, email_subject, email_body):
+            failed_emails.append(user.email)
 
+    if failed_emails:
+        logging.error(f"Failed to send reminder to: {', '.join(failed_emails)}")
+        return jsonify({"success": False, "message": f"Failed to send reminders to some users: {failed_emails}"}), 500
+
+    logging.info("Reminder emails sent successfully.")
     return jsonify({"success": True, "message": "Reminder emails sent successfully"}), 200
