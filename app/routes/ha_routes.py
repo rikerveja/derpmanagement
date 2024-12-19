@@ -1,16 +1,37 @@
 from flask import Blueprint, jsonify
-from app.models import Server
+import random
 
+# 定义蓝图
 ha_bp = Blueprint('ha', __name__)
 
-@ha_bp.route('/load_balancing', methods=['GET'])
-def load_balancing():
+# 模拟服务器状态
+server_health = {
+    "server_1": "healthy",
+    "server_2": "healthy",
+    "server_3": "unhealthy"
+}
+
+# 查看服务器运行状态
+@ha_bp.route('/api/ha/health', methods=['GET'])
+def check_server_health():
     """
-    ��ȡ���з������ĸ�����Ϣ
+    查看服务器健康状态
     """
-    servers = Server.query.all()
-    server_loads = [
-        {"server_id": server.id, "ip": server.ip, "region": server.region, "load": server.load}
-        for server in servers
-    ]
-    return jsonify({"success": True, "servers": server_loads}), 200
+    return jsonify({"success": True, "server_health": server_health}), 200
+
+
+# 故障切换
+@ha_bp.route('/api/ha/failover', methods=['POST'])
+def failover():
+    """
+    故障切换服务到备用服务器
+    """
+    unhealthy_servers = [key for key, status in server_health.items() if status == "unhealthy"]
+    if not unhealthy_servers:
+        return jsonify({"success": False, "message": "No unhealthy servers detected"}), 200
+
+    # 模拟切换到备用服务器
+    for server in unhealthy_servers:
+        server_health[server] = "switched"
+
+    return jsonify({"success": True, "message": "Failover completed", "updated_health": server_health}), 200
