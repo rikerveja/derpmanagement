@@ -34,3 +34,32 @@ def stop_container(container_name):
         logging.info(f"Container {container_name} stopped and removed.")
     except Exception as e:
         logging.error(f"Failed to stop/remove container {container_name}: {e}")
+
+def get_container_status(container_name):
+    """
+    获取容器状态
+    """
+    try:
+        container = client.containers.get(container_name)
+        status = container.status
+        logging.info(f"Container {container_name} status: {status}")
+        return status
+    except docker.errors.NotFound:
+        logging.error(f"Container {container_name} not found.")
+        return "not_found"
+    except Exception as e:
+        logging.error(f"Failed to get container status for {container_name}: {e}")
+        return "error"
+
+def list_containers():
+    """
+    列出所有容器
+    """
+    try:
+        containers = client.containers.list(all=True)
+        container_info = [{"id": container.id, "name": container.name, "status": container.status} for container in containers]
+        logging.info(f"Listed {len(containers)} containers.")
+        return container_info
+    except Exception as e:
+        logging.error(f"Failed to list containers: {e}")
+        return []
