@@ -6,6 +6,7 @@ import logging
 
 # 设置日志级别
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("auth_utils")
 
 # 加密密码
 def hash_password(password):
@@ -16,7 +17,7 @@ def hash_password(password):
         hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         return hashed
     except Exception as e:
-        logging.error(f"Error hashing password: {e}")
+        logger.error(f"Error hashing password: {e}")
         raise
 
 # 验证密码
@@ -27,7 +28,7 @@ def check_password(password, hashed_password):
     try:
         return bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
     except Exception as e:
-        logging.error(f"Error checking password: {e}")
+        logger.error(f"Error checking password: {e}")
         return False
 
 # 生成 JWT
@@ -41,7 +42,7 @@ def generate_jwt(payload, expiration_hours=24):
         token = jwt.encode(payload, Config.SECRET_KEY, algorithm="HS256")
         return token
     except Exception as e:
-        logging.error(f"Error generating JWT: {e}")
+        logger.error(f"Error generating JWT: {e}")
         raise
 
 # 解码 JWT
@@ -53,8 +54,8 @@ def decode_jwt(token):
         decoded = jwt.decode(token, Config.SECRET_KEY, algorithms=["HS256"])
         return decoded
     except jwt.ExpiredSignatureError:
-        logging.warning("JWT has expired.")
+        logger.warning("JWT has expired.")
         return None
     except jwt.InvalidTokenError as e:
-        logging.warning(f"Invalid JWT: {e}")
+        logger.warning(f"Invalid JWT: {e}")
         return None
