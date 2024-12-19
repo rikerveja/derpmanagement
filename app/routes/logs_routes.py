@@ -30,3 +30,21 @@ def get_system_logs():
         } for log in logs
     ]
     return jsonify({"success": True, "logs": log_data}), 200
+
+@logs_bp.route('/api/logs/user_by_time', methods=['GET'])
+def get_user_logs_by_time():
+    """
+    按时间范围查询用户日志
+    """
+    start_time = request.args.get('start_time')
+    end_time = request.args.get('end_time')
+
+    try:
+        start = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+        end = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+        logs = UserLog.query.filter(UserLog.timestamp.between(start, end)).all()
+        result = [{"id": log.id, "user_id": log.user_id, "action": log.action, "timestamp": log.timestamp} for log in logs]
+        return jsonify({"success": True, "logs": result}), 200
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Error parsing time or querying logs: {str(e)}"}), 500
+
