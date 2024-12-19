@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from app.models import User
+from app.models import User, UserHistory
 from app.utils.auth_utils import hash_password, check_password, generate_jwt
 from app.utils.email_utils import send_verification_email, validate_verification_code
 from app import db
@@ -9,7 +9,6 @@ import logging
 # 定义蓝图
 user_bp = Blueprint('user', __name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 
 # 添加用户
 @user_bp.route('/api/add_user', methods=['POST'])
@@ -125,3 +124,43 @@ def send_verification_email_route():
 
     log_operation(None, "send_verification_email", "failed", f"Failed to send verification email to {email}")
     return jsonify({"success": False, "message": "Failed to send email"}), 500
+
+
+# 用户租赁信息展示
+@user_bp.route('/api/user/rental_info', methods=['GET'])
+def rental_info():
+    """
+    返回当前用户的租赁信息
+    """
+    user_id = request.args.get('user_id')
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 404
+
+    rental_info = {
+        "username": user.username,
+        "email": user.email,
+        "rental_expiry": user.rental_expiry,
+        "total_traffic": sum(container.upload_traffic + container.download_traffic for container in user.containers),
+    }
+    return jsonify({"success": True, "rental_info": rental_info}), 200
+
+
+# 用户历史记录接口
+@user_bp.route('/api/user/history/<int:user_id>', methods=['GET'])
+def user_history(user_id):
+    """
+    获取用户租赁历史记录
+    """
+    history = UserHistory.query.filter_by(user_id=user_id).all()
+    if not history:
+        return jsonify({"success": False, "message": "No history found"}), 404
+
+    history_data = [
+        {
+            "rental_start": record.rental_start,
+            "rental_end": record.rental_end,
+            "total_traffic": record.total_traffic,
+        } for record in history
+    ]
+    return jsonify({"success": True, "history": history_data}), 200
