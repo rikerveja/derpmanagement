@@ -68,3 +68,22 @@ def generate_serial():
     except Exception as e:
         db.session.rollback()
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
+
+
+@finance_bp.route('/serial_numbers', methods=['GET'])
+def list_serial_numbers():
+    """
+    查看所有序列号
+    """
+    serial_numbers = SerialNumber.query.all()
+    result = [
+        {
+            "code": sn.code,
+            "duration_days": sn.duration_days,
+            "status": sn.status,
+            "created_at": sn.created_at.isoformat(),
+            "used_at": sn.used_at.isoformat() if sn.used_at else None
+        }
+        for sn in serial_numbers
+    ]
+    return jsonify({"success": True, "serial_numbers": result}), 200
