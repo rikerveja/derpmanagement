@@ -2,6 +2,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_mail import Mail
 from flask_migrate import Migrate
+from celery import Celery
 from app.config import Config
 import logging
 from logging.handlers import RotatingFileHandler
@@ -10,6 +11,8 @@ from logging.handlers import RotatingFileHandler
 db = SQLAlchemy()
 mail = Mail()
 migrate = Migrate()
+celery = None
+
 
 def setup_logging(app):
     """设置日志记录"""
@@ -20,6 +23,20 @@ def setup_logging(app):
     )
     handler.setFormatter(formatter)
     app.logger.addHandler(handler)
+
+
+def make_celery(app):
+    """
+    初始化 Celery
+    """
+    celery_instance = Celery(
+        app.import_name,
+        backend=app.config['CELERY_RESULT_BACKEND'],
+        broker=app.config['CELERY_BROKER_URL']
+    )
+    celery_instance.conf.update(app.config)
+    return celery_instance
+
 
 def create_app():
     app = Flask(__name__)
@@ -33,6 +50,10 @@ def create_app():
         db.init_app(app)
         mail.init_app(app)
         migrate.init_app(app, db)
+
+        # 初始化 Celery
+        global celery
+        celery = make_celery(app)
     except Exception as e:
         app.logger.error(f"Initialization error: {e}")
         raise
@@ -47,9 +68,9 @@ def create_app():
     from app.routes.logs_routes import logs_bp
     from app.routes.ha_routes import ha_bp
     from app.routes.notifications_routes import notifications_bp
-    from app.routes.admin_routes import admin_bp  # 新增管理员模块
-    from app.routes.traffic_routes import traffic_bp  # 新增流量管理模块
-    from app.routes.alerts_routes import alerts_bp  # 新增告警模块
+    from app.routes.admin_routes import admin_bp  # 管理员模块
+    from app.routes.traffic_routes import traffic_bp  # 流量模块
+    from app.routes.alerts_routes import alerts_bp  # 告警模块
 
     # 蓝图注册到 Flask 应用
     app.register_blueprint(user_bp, url_prefix='/api/user')
