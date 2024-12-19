@@ -22,6 +22,7 @@ class User(db.Model):
     serial_numbers = db.relationship('SerialNumber', backref='user', lazy='dynamic')  # 序列号绑定
     servers = relationship('Server', secondary=user_server_association, back_populates='users')  # 用户绑定服务器
     containers = relationship('UserContainer', back_populates='user')  # 容器关联
+    logs = relationship('UserLog', back_populates='user', lazy='dynamic')  # 用户日志关联
 
     @validates('email')
     def validate_email(self, key, address):
@@ -51,6 +52,7 @@ class Server(db.Model):
     updated_at = db.Column(db.DateTime, default=func.now(), onupdate=func.now())  # 更新时间
     users = relationship('User', secondary=user_server_association, back_populates='servers')  # 用户绑定
     containers = relationship('UserContainer', back_populates='server')  # 容器关联
+    logs = relationship('ServerLog', back_populates='server', lazy='dynamic')  # 服务器日志关联
 
 # 用户容器模型
 class UserContainer(db.Model):
@@ -65,3 +67,21 @@ class UserContainer(db.Model):
     created_at = db.Column(db.DateTime, default=func.now())  # 创建时间
     user = relationship('User', back_populates='containers')  # 反向关联用户
     server = relationship('Server', back_populates='containers')  # 反向关联服务器
+
+# 用户日志模型
+class UserLog(db.Model):
+    __tablename__ = 'user_logs'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # 用户 ID
+    action = db.Column(db.String(255), nullable=False)  # 用户操作描述
+    timestamp = db.Column(db.DateTime, default=func.now())  # 操作时间
+    user = relationship('User', back_populates='logs')  # 反向关联用户
+
+# 服务器日志模型
+class ServerLog(db.Model):
+    __tablename__ = 'server_logs'
+    id = db.Column(db.Integer, primary_key=True)
+    server_id = db.Column(db.Integer, db.ForeignKey('servers.id'), nullable=False)  # 服务器 ID
+    event = db.Column(db.String(255), nullable=False)  # 服务器事件描述
+    timestamp = db.Column(db.DateTime, default=func.now())  # 事件时间
+    server = relationship('Server', back_populates='logs')  # 反向关联服务器
