@@ -1,6 +1,7 @@
 from app import db
 from sqlalchemy.orm import relationship, validates
 from sqlalchemy.sql import func
+from datetime import timedelta
 
 # 用户与服务器的关联表（多对多关系）
 user_server_association = db.Table(
@@ -41,6 +42,11 @@ class SerialNumber(db.Model):
     created_at = db.Column(db.DateTime, default=func.now())  # 创建时间
     used_at = db.Column(db.DateTime, nullable=True, onupdate=func.now())  # 使用时间
 
+    def update_user_rental_expiry(self):
+        if self.status == 'active' and self.user:
+            self.user.rental_expiry = self.used_at + timedelta(days=self.duration_days)
+            db.session.commit()
+
 # 服务器模型
 class Server(db.Model):
     __tablename__ = 'servers'
@@ -67,6 +73,11 @@ class UserContainer(db.Model):
     created_at = db.Column(db.DateTime, default=func.now())  # 创建时间
     user = relationship('User', back_populates='containers')  # 反向关联用户
     server = relationship('Server', back_populates='containers')  # 反向关联服务器
+
+    def update_traffic(self, upload, download):
+        self.upload_traffic += upload
+        self.download_traffic += download
+        db.session.commit()
 
 # 用户日志模型
 class UserLog(db.Model):
