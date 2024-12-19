@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship, validates
 from sqlalchemy.sql import func
 from datetime import timedelta
 
+
 # 用户与服务器的关联表（多对多关系）
 user_server_association = db.Table(
     'user_server_association',
@@ -11,13 +12,15 @@ user_server_association = db.Table(
     db.UniqueConstraint('user_id', 'server_id', name='uq_user_server')  # 定义唯一约束
 )
 
+
 # 用户模型
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     password = db.Column(db.String(200), nullable=False)
+    role = db.Column(db.String(20), default='user')  # 用户角色（user, admin）
     rental_expiry = db.Column(db.DateTime, nullable=True)  # 租赁到期时间
     created_at = db.Column(db.DateTime, default=func.now())  # 用户创建时间
     serial_numbers = db.relationship('SerialNumber', backref='user', lazy='dynamic')  # 序列号绑定
@@ -30,6 +33,7 @@ class User(db.Model):
         if '@' not in address:
             raise ValueError("Invalid email address")
         return address
+
 
 # 序列号模型
 class SerialNumber(db.Model):
@@ -47,6 +51,7 @@ class SerialNumber(db.Model):
             self.user.rental_expiry = self.used_at + timedelta(days=self.duration_days)
             db.session.commit()
 
+
 # 服务器模型
 class Server(db.Model):
     __tablename__ = 'servers'
@@ -60,6 +65,7 @@ class Server(db.Model):
     users = relationship('User', secondary=user_server_association, back_populates='servers')  # 用户绑定
     containers = relationship('UserContainer', back_populates='server')  # 容器关联
     logs = relationship('ServerLog', back_populates='server', lazy='dynamic')  # 服务器日志关联
+
 
 # 用户容器模型
 class UserContainer(db.Model):
@@ -79,41 +85,3 @@ class UserContainer(db.Model):
         self.upload_traffic += upload
         self.download_traffic += download
         db.session.commit()
-
-# 用户日志模型
-class UserLog(db.Model):
-    __tablename__ = 'user_logs'
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # 用户 ID
-    action = db.Column(db.String(255), nullable=False)  # 用户操作描述
-    timestamp = db.Column(db.DateTime, default=func.now())  # 操作时间
-    user = relationship('User', back_populates='logs')  # 反向关联用户
-
-# 服务器日志模型
-class ServerLog(db.Model):
-    __tablename__ = 'server_logs'
-    id = db.Column(db.Integer, primary_key=True)
-    server_id = db.Column(db.Integer, db.ForeignKey('servers.id'), nullable=False)  # 服务器 ID
-    event = db.Column(db.String(255), nullable=False)  # 服务器事件描述
-    timestamp = db.Column(db.DateTime, default=func.now())  # 事件时间
-    server = relationship('Server', back_populates='logs')  # 反向关联服务器
-
-# 系统监控日志模型
-class MonitoringLog(db.Model):
-    __tablename__ = 'monitoring_logs'
-    id = db.Column(db.Integer, primary_key=True)
-    metric = db.Column(db.String(255), nullable=False)  # 监控指标名称
-    value = db.Column(db.Float, nullable=False)  # 指标值
-    timestamp = db.Column(db.DateTime, default=func.now())  # 记录时间
-    server_id = db.Column(db.Integer, db.ForeignKey('servers.id'), nullable=True)  # 关联服务器（可选）
-    server = relationship('Server', backref='monitoring_logs')  # 反向关联服务器
-
-# 系统告警模型
-class SystemAlert(db.Model):
-    __tablename__ = 'system_alerts'
-    id = db.Column(db.Integer, primary_key=True)
-    alert_type = db.Column(db.String(50), nullable=False)  # 告警类型
-    severity = db.Column(db.String(20), nullable=False)  # 告警级别（info, warning, critical）
-    message = db.Column(db.String(255), nullable=False)  # 告警信息
-    timestamp = db.Column(db.DateTime, default=func.now())  # 告警时间
-    resolved = db.Column(db.Boolean, default=False)  # 是否已解决
