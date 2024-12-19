@@ -41,10 +41,14 @@ def create_app():
     from app.routes.user_routes import user_bp
     from app.routes.server_routes import server_bp
     from app.routes.container_routes import container_bp
+    from app.routes.acl_routes import acl_bp  # 新增的 ACL 路由
+    from app.routes.finance_routes import finance_bp  # 新增的财务路由
 
     app.register_blueprint(user_bp)
     app.register_blueprint(server_bp)
     app.register_blueprint(container_bp)
+    app.register_blueprint(acl_bp, url_prefix='/api/acl')  # 注册 ACL 路由，添加 URL 前缀
+    app.register_blueprint(finance_bp, url_prefix='/api/finance')  # 注册财务路由，添加 URL 前缀
 
     app.logger.info("App successfully created and initialized.")
     return app
