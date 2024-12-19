@@ -3,7 +3,6 @@ from sqlalchemy.orm import relationship, validates
 from sqlalchemy.sql import func
 from datetime import timedelta
 
-
 # 用户与服务器的关联表（多对多关系）
 user_server_association = db.Table(
     'user_server_association',
@@ -11,7 +10,6 @@ user_server_association = db.Table(
     db.Column('server_id', db.Integer, db.ForeignKey('servers.id'), primary_key=True),
     db.UniqueConstraint('user_id', 'server_id', name='uq_user_server')  # 定义唯一约束
 )
-
 
 # 用户模型
 class User(db.Model):
@@ -27,13 +25,13 @@ class User(db.Model):
     servers = relationship('Server', secondary=user_server_association, back_populates='users')  # 用户绑定服务器
     containers = relationship('UserContainer', back_populates='user')  # 容器关联
     logs = relationship('UserLog', back_populates='user', lazy='dynamic')  # 用户日志关联
+    histories = relationship('UserHistory', backref='user', lazy='dynamic')  # 用户历史记录
 
     @validates('email')
     def validate_email(self, key, address):
         if '@' not in address:
             raise ValueError("Invalid email address")
         return address
-
 
 # 序列号模型
 class SerialNumber(db.Model):
@@ -51,7 +49,6 @@ class SerialNumber(db.Model):
             self.user.rental_expiry = self.used_at + timedelta(days=self.duration_days)
             db.session.commit()
 
-
 # 服务器模型
 class Server(db.Model):
     __tablename__ = 'servers'
@@ -65,7 +62,6 @@ class Server(db.Model):
     users = relationship('User', secondary=user_server_association, back_populates='servers')  # 用户绑定
     containers = relationship('UserContainer', back_populates='server')  # 容器关联
     logs = relationship('ServerLog', back_populates='server', lazy='dynamic')  # 服务器日志关联
-
 
 # 用户容器模型
 class UserContainer(db.Model):
@@ -85,3 +81,23 @@ class UserContainer(db.Model):
         self.upload_traffic += upload
         self.download_traffic += download
         db.session.commit()
+
+# 用户历史记录模型
+class UserHistory(db.Model):
+    __tablename__ = 'user_history'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # 用户 ID
+    rental_start = db.Column(db.DateTime, nullable=False)  # 租赁开始时间
+    rental_end = db.Column(db.DateTime, nullable=False)  # 租赁结束时间
+    total_traffic = db.Column(db.Float, default=0.0)  # 总流量
+    created_at = db.Column(db.DateTime, default=func.now())  # 记录时间
+
+# ACL 日志记录模型
+class ACLLog(db.Model):
+    __tablename__ = 'acl_logs'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=False)  # 用户 ID
+    ip_address = db.Column(db.String(50), nullable=False)  # 用户 IP 地址
+    location = db.Column(db.String(255), nullable=True)  # 地理位置
+    acl_version = db.Column(db.String(50), nullable=False)  # ACL 版本号
+    created_at = db.Column(db.DateTime, default=func.now())  # 生成时间
