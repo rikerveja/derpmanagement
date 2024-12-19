@@ -3,6 +3,8 @@ from app.models import User, SerialNumber
 from datetime import datetime
 from sqlalchemy import func
 from app import db
+import random
+import string
 
 finance_bp = Blueprint('finance', __name__)
 
@@ -11,7 +13,6 @@ def finance_statistics():
     """
     获取财务统计数据
     """
-    # 示例数据：计算总收益
     total_revenue = SerialNumber.query.with_entities(func.sum(SerialNumber.duration_days)).scalar() or 0
     return jsonify({
         "success": True,
@@ -40,3 +41,30 @@ def user_orders(user_id):
         for sn in user.serial_numbers
     ]
     return jsonify({"success": True, "orders": orders}), 200
+
+
+@finance_bp.route('/generate_serial', methods=['POST'])
+def generate_serial():
+    """
+    管理员生成序列号
+    """
+    data = request.json
+    duration_days = data.get('duration_days')
+    count = data.get('count', 1)
+
+    if not duration_days:
+        return jsonify({"success": False, "message": "Missing duration_days"}), 400
+
+    serial_numbers = []
+    for _ in range(count):
+        code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
+        serial_number = SerialNumber(code=code, duration_days=duration_days)
+        db.session.add(serial_number)
+        serial_numbers.append(code)
+
+    try:
+        db.session.commit()
+        return jsonify({"success": True, "serial_numbers": serial_numbers}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
