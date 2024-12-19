@@ -6,9 +6,6 @@ from app.utils.logging_utils import log_operation
 # 定义蓝图
 alerts_bp = Blueprint('alerts', __name__)
 
-# 模拟当前告警状态存储
-current_alerts = []
-
 
 # 实时告警
 @alerts_bp.route('/api/alerts/realtime', methods=['GET'])
@@ -16,10 +13,23 @@ def get_realtime_alerts():
     """
     获取实时系统告警
     """
-    if not current_alerts:
+    active_alerts = SystemAlert.query.filter_by(status="active").all()
+    alert_data = [
+        {
+            "id": alert.id,
+            "server_id": alert.server_id,
+            "alert_type": alert.alert_type,
+            "message": alert.message,
+            "timestamp": alert.timestamp,
+            "status": alert.status
+        }
+        for alert in active_alerts
+    ]
+
+    if not alert_data:
         return jsonify({"success": True, "message": "No active alerts"}), 200
 
-    return jsonify({"success": True, "alerts": current_alerts}), 200
+    return jsonify({"success": True, "alerts": alert_data}), 200
 
 
 # 添加告警
@@ -36,25 +46,19 @@ def add_alert():
     if not server_id:
         return jsonify({"success": False, "message": "Missing server_id"}), 400
 
-    alert = {
-        "server_id": server_id,
-        "alert_type": alert_type,
-        "message": message,
-        "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-    }
-    current_alerts.append(alert)
-
-    # 记录告警到数据库
-    db_alert = SystemAlert(
-        server_id=server_id,
-        alert_type=alert_type,
-        message=message,
-        timestamp=datetime.utcnow()
-    )
-    db.session.add(db_alert)
     try:
+        # 添加告警到数据库
+        db_alert = SystemAlert(
+            server_id=server_id,
+            alert_type=alert_type,
+            message=message,
+            timestamp=datetime.utcnow(),
+            status="active"
+        )
+        db.session.add(db_alert)
         db.session.commit()
-        log_operation(user_id=None, operation="add_alert", status="success", details=f"Alert added: {alert}")
+
+        log_operation(user_id=None, operation="add_alert", status="success", details=f"Alert added for server {server_id}")
         return jsonify({"success": True, "message": "Alert added successfully"}), 201
     except Exception as e:
         db.session.rollback()
@@ -67,16 +71,19 @@ def add_alert():
 def get_alert_history():
     """
     查询历史告警记录
-    支持按服务器 ID 和告警类型过滤
+    支持按服务器 ID、告警类型和状态过滤
     """
     server_id = request.args.get('server_id')
     alert_type = request.args.get('alert_type')
+    status = request.args.get('status')  # 筛选告警状态（如 active, cleared, resolved）
 
     query = SystemAlert.query
     if server_id:
         query = query.filter_by(server_id=server_id)
     if alert_type:
         query = query.filter_by(alert_type=alert_type)
+    if status:
+        query = query.filter_by(status=status)
 
     alerts = query.all()
     alert_data = [
@@ -85,7 +92,8 @@ def get_alert_history():
             "server_id": alert.server_id,
             "alert_type": alert.alert_type,
             "message": alert.message,
-            "timestamp": alert.timestamp
+            "timestamp": alert.timestamp,
+            "status": alert.status
         }
         for alert in alerts
     ]
@@ -97,27 +105,21 @@ def get_alert_history():
 @alerts_bp.route('/api/alerts/clear', methods=['POST'])
 def clear_alerts():
     """
-    清除实时告警
+    清除实时告警或特定服务器的告警
     """
     data = request.json
     server_id = data.get('server_id')
 
-    if server_id:
-        global current_alerts
-        current_alerts = [alert for alert in current_alerts if alert['server_id'] != server_id]
-        db_alerts = SystemAlert.query.filter_by(server_id=server_id).all()
-
-        # 从数据库中删除
-        for alert in db_alerts:
-            db.session.delete(alert)
-    else:
-        # 清除所有告警
-        current_alerts = []
-        db_alerts = SystemAlert.query.all()
-        for alert in db_alerts:
-            db.session.delete(alert)
-
     try:
+        query = SystemAlert.query.filter_by(status="active")
+        if server_id:
+            query = query.filter_by(server_id=server_id)
+
+        # 标记告警为已清除
+        alerts = query.all()
+        for alert in alerts:
+            alert.status = "cleared"
+
         db.session.commit()
         log_operation(user_id=None, operation="clear_alerts", status="success", details=f"Cleared alerts for server: {server_id or 'all'}")
         return jsonify({"success": True, "message": "Alerts cleared successfully"}), 200
@@ -140,25 +142,19 @@ def manual_trigger_alert():
     if not server_id:
         return jsonify({"success": False, "message": "Missing server_id"}), 400
 
-    alert = {
-        "server_id": server_id,
-        "alert_type": "Manual",
-        "message": message,
-        "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-    }
-    current_alerts.append(alert)
-
-    # 添加到数据库
-    db_alert = SystemAlert(
-        server_id=server_id,
-        alert_type="Manual",
-        message=message,
-        timestamp=datetime.utcnow()
-    )
-    db.session.add(db_alert)
     try:
+        # 添加到数据库
+        db_alert = SystemAlert(
+            server_id=server_id,
+            alert_type="Manual",
+            message=message,
+            timestamp=datetime.utcnow(),
+            status="active"
+        )
+        db.session.add(db_alert)
         db.session.commit()
-        log_operation(user_id=None, operation="manual_trigger_alert", status="success", details=f"Manual alert triggered: {alert}")
+
+        log_operation(user_id=None, operation="manual_trigger_alert", status="success", details=f"Manual alert triggered for server {server_id}")
         return jsonify({"success": True, "message": "Manual alert triggered successfully"}), 201
     except Exception as e:
         db.session.rollback()
