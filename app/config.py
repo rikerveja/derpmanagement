@@ -23,5 +23,12 @@ class Config:
     MAIL_USE_TLS = os.getenv('MAIL_USE_TLS', 'True').lower() in ['true', '1']
     MAIL_USE_SSL = os.getenv('MAIL_USE_SSL', 'False').lower() in ['true', '1']
 
+    # Redis 配置
+    REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
+    REDIS_PORT = int(os.getenv('REDIS_PORT', 6379))
+
     # 日志级别（可选）
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')  # 默认日志级别为 INFO
+
+    # JWT 配置
+    JWT_EXPIRATION_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', 24))
