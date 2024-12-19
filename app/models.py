@@ -37,7 +37,7 @@ class SerialNumber(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     code = db.Column(db.String(255), unique=True, nullable=False)  # 序列号代码
     duration_days = db.Column(db.Integer, nullable=False)  # 有效时长（天）
-    status = db.Column(db.String(50), default='unused')  # 状态（unused, used）
+    status = db.Column(db.String(50), default='unused')  # 状态（unused, used, expired）
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # 绑定用户
     created_at = db.Column(db.DateTime, default=func.now())  # 创建时间
     used_at = db.Column(db.DateTime, nullable=True, onupdate=func.now())  # 使用时间
@@ -54,6 +54,7 @@ class Server(db.Model):
     ip = db.Column(db.String(255), unique=True, nullable=False)  # 服务器 IP 地址
     region = db.Column(db.String(100), nullable=False)  # 服务器地区
     load = db.Column(db.Float, default=0.0)  # 当前服务器负载
+    status = db.Column(db.String(50), default='healthy')  # 服务器状态（healthy, unhealthy）
     created_at = db.Column(db.DateTime, default=func.now())  # 创建时间
     updated_at = db.Column(db.DateTime, default=func.now(), onupdate=func.now())  # 更新时间
     users = relationship('User', secondary=user_server_association, back_populates='servers')  # 用户绑定
@@ -96,3 +97,14 @@ class ServerLog(db.Model):
     event = db.Column(db.String(255), nullable=False)  # 服务器事件描述
     timestamp = db.Column(db.DateTime, default=func.now())  # 事件时间
     server = relationship('Server', back_populates='logs')  # 反向关联服务器
+
+# 系统监控日志模型
+class MonitoringLog(db.Model):
+    __tablename__ = 'monitoring_logs'
+    id = db.Column(db.Integer, primary_key=True)
+    metric = db.Column(db.String(255), nullable=False)  # 监控指标名称
+    value = db.Column(db.Float, nullable=False)  # 指标值
+    timestamp = db.Column(db.DateTime, default=func.now())  # 记录时间
+    server_id = db.Column(db.Integer, db.ForeignKey('servers.id'), nullable=True)  # 关联服务器（可选）
+
+    server = relationship('Server', backref='monitoring_logs')  # 反向关联服务器
