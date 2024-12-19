@@ -15,7 +15,8 @@ def release_expired_resources():
 
     for user in expired_users:
         for container in user.containers:
-            stop_container(container.id)
+            container_name = f"container_{user.id}_{container.server_id}"
+            stop_container(container_name)
             db.session.delete(container)
 
         history = UserHistory(
