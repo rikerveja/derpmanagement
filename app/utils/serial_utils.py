@@ -1,12 +1,19 @@
 import random
 import string
+import logging
 
-def generate_serial_numbers(count, duration_days):
+logging.basicConfig(level=logging.INFO)
+
+def generate_serial_number(length=12):
     """
-    生成指定数量的序列号
+    生成序列号
     """
-    serials = []
-    for _ in range(count):
-        code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
-        serials.append({"code": code, "duration_days": duration_days, "status": "unused"})
-    return serials
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
+
+def generate_bulk_serial_numbers(count, length=12):
+    """
+    批量生成序列号
+    """
+    serial_numbers = [generate_serial_number(length) for _ in range(count)]
+    logging.info(f"Generated {count} serial numbers.")
+    return serial_numbers
