@@ -49,6 +49,7 @@ def create_app():
     from app.routes.notifications_routes import notifications_bp
     from app.routes.admin_routes import admin_bp  # 新增管理员模块
     from app.routes.traffic_routes import traffic_bp  # 新增流量管理模块
+    from app.routes.alerts_routes import alerts_bp  # 新增告警模块
 
     # 蓝图注册到 Flask 应用
     app.register_blueprint(user_bp, url_prefix='/api/user')
@@ -62,6 +63,7 @@ def create_app():
     app.register_blueprint(notifications_bp, url_prefix='/api/notifications')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')  # 管理员模块
     app.register_blueprint(traffic_bp, url_prefix='/api/traffic')  # 流量模块
+    app.register_blueprint(alerts_bp, url_prefix='/api/alerts')  # 告警模块
 
     app.logger.info("App successfully created and initialized.")
     return app
