@@ -17,6 +17,7 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
+    rental_expiry = db.Column(db.DateTime, nullable=True)  # 租赁到期时间
     created_at = db.Column(db.DateTime, default=func.now())  # 用户创建时间
     serial_numbers = db.relationship('SerialNumber', backref='user', lazy='dynamic')  # 序列号绑定
     servers = relationship('Server', secondary=user_server_association, back_populates='users')  # 用户绑定服务器
@@ -59,6 +60,8 @@ class UserContainer(db.Model):
     server_id = db.Column(db.Integer, db.ForeignKey('servers.id'), nullable=False)  # 服务器 ID
     port = db.Column(db.Integer, nullable=False)  # DERP 端口
     stun_port = db.Column(db.Integer, nullable=False)  # STUN 端口
+    upload_traffic = db.Column(db.Float, default=0.0)  # 上传流量
+    download_traffic = db.Column(db.Float, default=0.0)  # 下载流量
     created_at = db.Column(db.DateTime, default=func.now())  # 创建时间
     user = relationship('User', back_populates='containers')  # 反向关联用户
     server = relationship('Server', back_populates='containers')  # 反向关联服务器
