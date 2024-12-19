@@ -1,34 +1,61 @@
-# app/routes/acl_routes.py
-from flask import Blueprint, request, jsonify
-from app.models import ACLConfig, User, Server
-from app import db
+from flask import Blueprint, jsonify, request
+import json
+import os
+from app.models import User, Server
 from datetime import datetime, timedelta
 
 acl_bp = Blueprint('acl', __name__)
 
-# ¶¯Ì¬Éú³É ACL ÅäÖÃ
-@acl_bp.route('/api/generate_acl', methods=['POST'])
+# ä¸´æ—¶å­˜å‚¨ ACL é…ç½®ï¼ˆç”Ÿäº§ç¯å¢ƒå»ºè®®å­˜å…¥æ•°æ®åº“ï¼‰
+acl_store = {}
+
+@acl_bp.route('/generate', methods=['POST'])
 def generate_acl():
+    """
+    åŠ¨æ€ç”Ÿæˆç”¨æˆ· ACL é…ç½®
+    """
     data = request.json
     user_id = data.get('user_id')
-    server_id = data.get('server_id')
-    duration_days = data.get('duration_days', 30)  # Ä¬ÈÏÓĞĞ§ÆÚ 30 Ìì
+    device_id = data.get('device_id')
 
     user = User.query.get(user_id)
-    server = Server.query.get(server_id)
-    if not user or not server:
-        return jsonify({"success": False, "message": "User or Server not found"}), 404
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 404
 
-    # Ä£ÄâÉú³É ACL ÅäÖÃ
-    acl_data = f"# ACL for User {user_id} on Server {server_id}\nallow-all"
+    # æ¨¡æ‹Ÿç»‘å®šä¸‰å°æœåŠ¡å™¨ï¼ŒåŠ¨æ€ç”Ÿæˆ ACL é…ç½®
+    servers = Server.query.limit(3).all()
+    acl = {
+        "user_id": user.id,
+        "device_id": device_id,
+        "servers": [{"ip": server.ip, "region": server.region} for server in servers],
+        "expires_at": (datetime.utcnow() + timedelta(days=32)).isoformat()
+    }
 
-    # ´´½¨ ACLConfig ¶ÔÏó
-    expires_at = datetime.utcnow() + timedelta(days=duration_days)
-    acl = ACLConfig(user_id=user_id, server_id=server_id, config_data=acl_data, expires_at=expires_at)
-    db.session.add(acl)
-    try:
-        db.session.commit()
-        return jsonify({"success": True, "message": "ACL generated successfully", "acl_id": acl.id}), 200
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
+    # ä¿å­˜åˆ°ä¸´æ—¶å­˜å‚¨
+    acl_store[user_id] = acl
+    return jsonify({"success": True, "acl": acl}), 200
+
+
+@acl_bp.route('/update/<int:user_id>', methods=['POST'])
+def update_acl(user_id):
+    """
+    ç®¡ç†å‘˜æ‰‹åŠ¨æ›´æ–° ACL é…ç½®
+    """
+    acl = acl_store.get(user_id)
+    if not acl:
+        return jsonify({"success": False, "message": "ACL not found for user"}), 404
+
+    acl["expires_at"] = (datetime.utcnow() + timedelta(days=32)).isoformat()
+    acl_store[user_id] = acl
+    return jsonify({"success": True, "message": "ACL updated successfully", "acl": acl}), 200
+
+
+@acl_bp.route('/fetch/<int:user_id>', methods=['GET'])
+def fetch_acl(user_id):
+    """
+    è·å–ç”¨æˆ· ACL é…ç½®
+    """
+    acl = acl_store.get(user_id)
+    if not acl:
+        return jsonify({"success": False, "message": "ACL not found for user"}), 404
+    return jsonify({"success": True, "acl": acl}), 200
