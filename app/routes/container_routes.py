@@ -1,21 +1,15 @@
 from flask import Blueprint, request, jsonify
 from app.models import UserContainer, User, Server
+from app.utils.docker_utils import create_container, stop_container
 from app import db
 
 container_bp = Blueprint('container', __name__)
 
-# 添加用户容器
-@container_bp.route('/api/add_user_container', methods=['POST'])
-def add_user_container():
+# 动态分配容器
+@container_bp.route('/api/container/allocate', methods=['POST'])
+def allocate_container():
     """
-    添加用户容器
-    请求参数:
-        - user_id: 用户 ID
-        - server_id: 服务器 ID
-        - port: DERP 端口
-        - stun_port: STUN 端口
-    返回:
-        - 成功或失败信息
+    为用户动态分配容器
     """
     data = request.json
     user_id = data.get('user_id')
@@ -23,31 +17,81 @@ def add_user_container():
     port = data.get('port')
     stun_port = data.get('stun_port')
 
-    # 检查请求参数是否完整
-    if not all([user_id, server_id, port, stun_port]):
+    if not user_id or not server_id or not port or not stun_port:
         return jsonify({"success": False, "message": "Missing required fields"}), 400
 
-    # 检查用户和服务器是否存在
     user = User.query.get(user_id)
     server = Server.query.get(server_id)
 
-    if not user:
-        return jsonify({"success": False, "message": "User not found"}), 404
+    if not user or not server:
+        return jsonify({"success": False, "message": "Invalid user or server ID"}), 404
 
-    if not server:
-        return jsonify({"success": False, "message": "Server not found"}), 404
+    # 创建容器
+    container_name = f"container_{user.id}_{server.id}"
+    image = "derp-container-image"  # 替换为实际镜像名称
+    ports = {f"{port}/tcp": port, f"{stun_port}/udp": stun_port}
+    container = create_container(image=image, name=container_name, ports=ports)
 
-    # 检查端口是否冲突
-    existing_container = UserContainer.query.filter_by(server_id=server_id, port=port).first()
-    if existing_container:
-        return jsonify({"success": False, "message": "Port already in use on this server"}), 400
+    if not container:
+        return jsonify({"success": False, "message": "Failed to create container"}), 500
 
-    # 创建用户容器
-    container = UserContainer(user_id=user_id, server_id=server_id, port=port, stun_port=stun_port)
-    db.session.add(container)
+    # 保存到数据库
+    user_container = UserContainer(
+        user_id=user.id,
+        server_id=server.id,
+        port=port,
+        stun_port=stun_port,
+    )
+    db.session.add(user_container)
     try:
         db.session.commit()
-        return jsonify({"success": True, "message": "User container added successfully", "container_id": container.id}), 201
+        return jsonify({"success": True, "message": "Container allocated successfully"}), 201
     except Exception as e:
         db.session.rollback()
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
+
+
+# 查看容器状态
+@container_bp.route('/api/container/status/<int:container_id>', methods=['GET'])
+def container_status(container_id):
+    """
+    查看容器状态
+    """
+    container = UserContainer.query.get(container_id)
+
+    if not container:
+        return jsonify({"success": False, "message": "Container not found"}), 404
+
+    return jsonify({
+        "success": True,
+        "container": {
+            "id": container.id,
+            "user_id": container.user_id,
+            "server_id": container.server_id,
+            "port": container.port,
+            "stun_port": container.stun_port,
+            "upload_traffic": container.upload_traffic,
+            "download_traffic": container.download_traffic,
+        }
+    }), 200
+
+
+# 释放容器
+@container_bp.route('/api/container/release/<int:container_id>', methods=['DELETE'])
+def release_container(container_id):
+    """
+    释放容器资源
+    """
+    container = UserContainer.query.get(container_id)
+
+    if not container:
+        return jsonify({"success": False, "message": "Container not found"}), 404
+
+    try:
+        stop_container(container_id)
+        db.session.delete(container)
+        db.session.commit()
+        return jsonify({"success": True, "message": "Container released successfully"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": f"Failed to release container: {str(e)}"}), 500
