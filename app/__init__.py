@@ -71,6 +71,9 @@ def create_app():
     from app.routes.admin_routes import admin_bp  # 管理员模块
     from app.routes.traffic_routes import traffic_bp  # 流量模块
     from app.routes.alerts_routes import alerts_bp  # 告警模块
+    from app.routes.monitoring_routes import monitoring_bp  # 新增：监控模块
+    from app.routes.serial_routes import serial_bp  # 新增：序列号管理模块
+    from app.routes.security_routes import security_bp  # 新增：安全与设备绑定模块
 
     # 蓝图注册到 Flask 应用
     app.register_blueprint(user_bp, url_prefix='/api/user')
@@ -85,6 +88,9 @@ def create_app():
     app.register_blueprint(admin_bp, url_prefix='/api/admin')  # 管理员模块
     app.register_blueprint(traffic_bp, url_prefix='/api/traffic')  # 流量模块
     app.register_blueprint(alerts_bp, url_prefix='/api/alerts')  # 告警模块
+    app.register_blueprint(monitoring_bp, url_prefix='/api/monitoring')  # 新增：监控模块
+    app.register_blueprint(serial_bp, url_prefix='/api/serial')  # 新增：序列号管理模块
+    app.register_blueprint(security_bp, url_prefix='/api/security')  # 新增：安全与设备绑定模块
 
     app.logger.info("App successfully created and initialized.")
     return app
