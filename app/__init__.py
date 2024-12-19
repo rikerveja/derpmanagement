@@ -43,20 +43,25 @@ def create_app():
     from app.routes.container_routes import container_bp
     from app.routes.acl_routes import acl_bp
     from app.routes.finance_routes import finance_bp
-    from app.routes.rental_routes import rental_bp  # 新增租赁管理模块
-    from app.routes.logs_routes import logs_bp  # 新增日志与审计模块
-    from app.routes.ha_routes import ha_bp  # 新增高可用模块
-    from app.routes.notifications_routes import notifications_bp  # 新增通知模块
+    from app.routes.rental_routes import rental_bp
+    from app.routes.logs_routes import logs_bp
+    from app.routes.ha_routes import ha_bp
+    from app.routes.notifications_routes import notifications_bp
+    from app.routes.admin_routes import admin_bp  # 新增管理员模块
+    from app.routes.traffic_routes import traffic_bp  # 新增流量管理模块
 
-    app.register_blueprint(user_bp)
-    app.register_blueprint(server_bp)
-    app.register_blueprint(container_bp)
+    # 蓝图注册到 Flask 应用
+    app.register_blueprint(user_bp, url_prefix='/api/user')
+    app.register_blueprint(server_bp, url_prefix='/api/server')
+    app.register_blueprint(container_bp, url_prefix='/api/container')
     app.register_blueprint(acl_bp, url_prefix='/api/acl')
     app.register_blueprint(finance_bp, url_prefix='/api/finance')
-    app.register_blueprint(rental_bp, url_prefix='/api/rental')  # 注册租赁蓝图
-    app.register_blueprint(logs_bp, url_prefix='/api/logs')  # 注册日志蓝图
-    app.register_blueprint(ha_bp, url_prefix='/api/ha')  # 注册高可用蓝图
-    app.register_blueprint(notifications_bp, url_prefix='/api/notifications')  # 注册通知蓝图
+    app.register_blueprint(rental_bp, url_prefix='/api/rental')
+    app.register_blueprint(logs_bp, url_prefix='/api/logs')
+    app.register_blueprint(ha_bp, url_prefix='/api/ha')
+    app.register_blueprint(notifications_bp, url_prefix='/api/notifications')
+    app.register_blueprint(admin_bp, url_prefix='/api/admin')  # 管理员模块
+    app.register_blueprint(traffic_bp, url_prefix='/api/traffic')  # 流量模块
 
     app.logger.info("App successfully created and initialized.")
     return app
