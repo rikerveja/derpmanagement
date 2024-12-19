@@ -5,10 +5,9 @@ logging.basicConfig(level=logging.INFO)
 
 def get_server_status(ip):
     """
-    模拟获取服务器状态
+    获取服务器状态
     """
     try:
-        # 示例：通过 ping 或 REST API 检测服务器状态
         response = requests.get(f"http://{ip}/health")
         if response.status_code == 200:
             return {"status": "healthy", "details": response.json()}
@@ -22,7 +21,6 @@ def monitor_server_health():
     """
     批量监控所有服务器健康
     """
-    # 假设从数据库中获取所有服务器信息
     from app.models import Server
     servers = Server.query.all()
     results = []
