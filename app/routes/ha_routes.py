@@ -74,3 +74,41 @@ def load_balance():
 
     log_operation(user_id=None, operation="load_balance", status="success", details=f"Load balanced for: {high_load_servers}")
     return jsonify({"success": True, "message": "Load balancing completed", "updated_health": server_health}), 200
+
+
+# 灾备恢复
+@ha_bp.route('/api/ha/disaster_recovery', methods=['POST'])
+def disaster_recovery():
+    """
+    模拟灾备恢复功能
+    """
+    affected_servers = request.json.get("affected_servers", [])
+    if not affected_servers:
+        return jsonify({"success": False, "message": "No affected servers provided"}), 400
+
+    # 模拟恢复数据和状态
+    for server in affected_servers:
+        if server in server_health:
+            server_health[server]['status'] = "healthy"
+            server_health[server]['load'] = random.uniform(10, 30)  # 恢复后随机负载
+
+    log_operation(user_id=None, operation="disaster_recovery", status="success", details=f"Disaster recovery performed for: {affected_servers}")
+    return jsonify({"success": True, "message": "Disaster recovery completed", "updated_health": server_health}), 200
+
+
+# 系统监控与告警
+@ha_bp.route('/api/ha/monitoring', methods=['GET'])
+def system_monitoring():
+    """
+    模拟系统监控与告警
+    """
+    alerts = []
+    for server, info in server_health.items():
+        if info['status'] == "unhealthy" or info['load'] > 80:
+            alerts.append({"server": server, "status": info['status'], "load": info['load']})
+
+    if not alerts:
+        return jsonify({"success": True, "message": "All systems are operational"}), 200
+
+    log_operation(user_id=None, operation="monitoring", status="warning", details=f"Alerts generated: {alerts}")
+    return jsonify({"success": True, "alerts": alerts}), 200
