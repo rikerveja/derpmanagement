@@ -30,7 +30,6 @@ def add_server():
         db.session.rollback()
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
 
-
 # 获取服务器状态
 @server_bp.route('/api/server/status/<int:server_id>', methods=['GET'])
 def server_status(server_id):
@@ -40,7 +39,6 @@ def server_status(server_id):
 
     status = get_server_status(server.ip)
     return jsonify({"success": True, "status": status}), 200
-
 
 # 监控服务器健康
 @server_bp.route('/api/server/health_check', methods=['GET'])
