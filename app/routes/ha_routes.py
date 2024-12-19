@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 import random
 from app.utils.logging_utils import log_operation
+from app.utils.monitoring_utils import generate_alerts, analyze_server_load
 
 # 定义蓝图
 ha_bp = Blueprint('ha', __name__)
@@ -102,11 +103,7 @@ def system_monitoring():
     """
     模拟系统监控与告警
     """
-    alerts = []
-    for server, info in server_health.items():
-        if info['status'] == "unhealthy" or info['load'] > 80:
-            alerts.append({"server": server, "status": info['status'], "load": info['load']})
-
+    alerts = generate_alerts(server_health)  # 调用监控工具生成告警
     if not alerts:
         return jsonify({"success": True, "message": "All systems are operational"}), 200
 
