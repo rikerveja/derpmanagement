@@ -109,3 +109,28 @@ def system_monitoring():
 
     log_operation(user_id=None, operation="monitoring", status="warning", details=f"Alerts generated: {alerts}")
     return jsonify({"success": True, "alerts": alerts}), 200
+
+from flask import Blueprint, jsonify
+from app.utils.monitoring_utils import generate_alerts, analyze_server_load
+
+ha_bp = Blueprint('ha', __name__)
+
+@ha_bp.route('/api/ha/load_analysis', methods=['GET'])
+def load_analysis():
+    """
+    返回服务器负载分析结果
+    """
+    results = analyze_server_load()
+    return jsonify({"success": True, "load_analysis": results}), 200
+
+@ha_bp.route('/api/ha/generate_alerts', methods=['POST'])
+def alerts():
+    """
+    生成告警
+    """
+    try:
+        generate_alerts()
+        return jsonify({"success": True, "message": "Alerts generated successfully"}), 200
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
