@@ -12,8 +12,12 @@ class Config:
     SECRET_KEY = os.getenv('SECRET_KEY', 'default_secret_key')
 
     # 数据库配置
-    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URI', 'sqlite:///app.db')
-    SQLALCHEMY_TRACK_MODIFICATIONS = False  # 禁用追踪修改以提高性能
+    # 获取当前项目的根目录路径
+    BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
+    # 数据库配置：使用绝对路径，确保数据库文件 app.db 在项目根目录下
+    SQLALCHEMY_DATABASE_URI = f'sqlite:///{os.path.join(BASE_DIR, "app.db")}'  
+    SQLALCHEMY_TRACK_MODIFICATIONS = False  # 关闭对象修改追踪（可选）
 
     # 邮件服务器配置
     MAIL_SERVER = os.getenv('MAIL_SERVER', 'smtp.example.com')
