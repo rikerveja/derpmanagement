@@ -8,8 +8,6 @@ import logging
 from logging.handlers import RotatingFileHandler
 from dotenv import load_dotenv
 import os
-from app import models
-
 
 # 加载环境变量
 load_dotenv()
