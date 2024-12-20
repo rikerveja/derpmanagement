@@ -4,6 +4,7 @@ flask>=2.3.0,<3.0  # Flask 框架
 # 数据库支持
 flask-sqlalchemy>=3.0.0,<4.0  # SQLAlchemy 集成
 sqlalchemy>=2.0.0,<3.0  # 数据库 ORM 支持
+flask-migrate>=3.0.0  # 数据库迁移支持
 
 # 邮件发送支持
 flask-mail==0.9.1  # 邮件功能
@@ -15,6 +16,9 @@ PyJWT>=2.3.0,<3.0  # JSON Web Token，用于认证
 # 环境变量管理
 python-dotenv>=1.0.0  # 加载 .env 文件
 
+# HTTP 请求处理（如果项目需要与外部 API 交互）
+requests>=2.28.0,<3.0  # HTTP 请求库
+
 # 其他依赖（根据需要添加）
 werkzeug>=2.3.0,<3.0  # Flask 的依赖组件
 itsdangerous>=2.0.0,<3.0  # 用于签名和安全令牌
@@ -23,4 +27,6 @@ itsdangerous>=2.0.0,<3.0  # 用于签名和安全令牌
 pytest>=7.0.0  # 单元测试工具
 pytest-flask>=1.2.0  # 用于 Flask 项目的测试集成
 
-flask-migrate
+# Celery 和任务队列支持（如果使用异步任务）
+celery>=5.0.0,<6.0  # 异步任务队列
+redis>=4.0.0,<5.0  # Celery 使用的消息代理
