@@ -91,3 +91,13 @@ def send_bulk_notifications(users, subject, body_template):
             logging.info(f"Notification sent to {user.email}")
         else:
             logging.error(f"Failed to send notification to {user.email}")
+
+def send_notification_email(recipient, subject, body):
+    """
+    发送通知邮件（提供简单封装）
+    :param recipient: 收件人邮箱
+    :param subject: 邮件主题
+    :param body: 邮件内容
+    :return: bool (True 表示发送成功，False 表示失败)
+    """
+    return send_email(recipient, subject, body)
