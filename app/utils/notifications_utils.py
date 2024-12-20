@@ -91,31 +91,3 @@ def send_bulk_notifications(users, subject, body_template):
             logging.info(f"Notification sent to {user.email}")
         else:
             logging.error(f"Failed to send notification to {user.email}")
-
-
-from flask_mail import Message
-from app import mail
-import logging
-import os
-
-logging.basicConfig(level=logging.INFO)
-
-def send_notification_email(recipient, subject, body):
-    """
-    发送通知邮件
-    :param recipient: 收件人邮箱
-    :param subject: 邮件主题
-    :param body: 邮件内容
-    """
-    try:
-        msg = Message(
-            subject=subject,
-            sender=os.getenv("MAIL_USERNAME"),
-            recipients=[recipient]
-        )
-        msg.body = body
-        mail.send(msg)
-        logging.info(f"Notification email sent to {recipient}")
-    except Exception as e:
-        logging.error(f"Failed to send notification email to {recipient}: {e}")
-
