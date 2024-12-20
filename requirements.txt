@@ -28,3 +28,5 @@ pytest-flask>=1.2.0  # 用于 Flask 项目的测试集成
 # Celery 和任务队列支持
 celery>=5.0.0,<6.0  # 异步任务队列
 redis>=4.0.0,<5.0  # Celery 使用的消息代理
+
+docker>=6.0.0,<7.0
