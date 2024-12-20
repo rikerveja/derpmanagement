@@ -44,22 +44,19 @@ def get_container_status(container_name):
         status = container.status
         logging.info(f"Container {container_name} status: {status}")
         return status
-    except docker.errors.NotFound:
-        logging.error(f"Container {container_name} not found.")
-        return "not_found"
     except Exception as e:
-        logging.error(f"Failed to get container status for {container_name}: {e}")
-        return "error"
+        logging.error(f"Failed to get status for container {container_name}: {e}")
+        return None
 
-def list_containers():
+def list_containers(all=False):
     """
-    列出所有容器
+    列出容器
     """
     try:
-        containers = client.containers.list(all=True)
-        container_info = [{"id": container.id, "name": container.name, "status": container.status} for container in containers]
-        logging.info(f"Listed {len(containers)} containers.")
-        return container_info
+        containers = client.containers.list(all=all)
+        container_list = [{'name': c.name, 'status': c.status} for c in containers]
+        logging.info(f"Retrieved container list: {container_list}")
+        return container_list
     except Exception as e:
         logging.error(f"Failed to list containers: {e}")
         return []
