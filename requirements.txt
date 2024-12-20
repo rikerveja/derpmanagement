@@ -1,5 +1,7 @@
 # Flask 核心依赖
 flask>=2.3.0,<3.0  # Flask 框架
+werkzeug>=2.3.0,<3.0  # Flask 的依赖组件
+itsdangerous>=2.0.0,<3.0  # 用于签名和安全令牌
 
 # 数据库支持
 flask-sqlalchemy>=3.0.0,<4.0  # SQLAlchemy 集成
@@ -19,14 +21,10 @@ python-dotenv>=1.0.0  # 加载 .env 文件
 # HTTP 请求处理（如果项目需要与外部 API 交互）
 requests>=2.28.0,<3.0  # HTTP 请求库
 
-# 其他依赖（根据需要添加）
-werkzeug>=2.3.0,<3.0  # Flask 的依赖组件
-itsdangerous>=2.0.0,<3.0  # 用于签名和安全令牌
-
 # 测试工具（如果需要）
 pytest>=7.0.0  # 单元测试工具
 pytest-flask>=1.2.0  # 用于 Flask 项目的测试集成
 
-# Celery 和任务队列支持（如果使用异步任务）
+# Celery 和任务队列支持
 celery>=5.0.0,<6.0  # 异步任务队列
 redis>=4.0.0,<5.0  # Celery 使用的消息代理
