@@ -97,24 +97,7 @@ def disaster_recovery():
     return jsonify({"success": True, "message": "Disaster recovery completed", "updated_health": server_health}), 200
 
 
-# 系统监控与告警
-@ha_bp.route('/api/ha/monitoring', methods=['GET'])
-def system_monitoring():
-    """
-    模拟系统监控与告警
-    """
-    alerts = generate_alerts(server_health)  # 调用监控工具生成告警
-    if not alerts:
-        return jsonify({"success": True, "message": "All systems are operational"}), 200
-
-    log_operation(user_id=None, operation="monitoring", status="warning", details=f"Alerts generated: {alerts}")
-    return jsonify({"success": True, "alerts": alerts}), 200
-
-from flask import Blueprint, jsonify
-from app.utils.monitoring_utils import generate_alerts, analyze_server_load
-
-ha_bp = Blueprint('ha', __name__)
-
+# 负载分析
 @ha_bp.route('/api/ha/load_analysis', methods=['GET'])
 def load_analysis():
     """
@@ -123,6 +106,8 @@ def load_analysis():
     results = analyze_server_load()
     return jsonify({"success": True, "load_analysis": results}), 200
 
+
+# 生成系统告警
 @ha_bp.route('/api/ha/generate_alerts', methods=['POST'])
 def alerts():
     """
@@ -133,4 +118,3 @@ def alerts():
         return jsonify({"success": True, "message": "Alerts generated successfully"}), 200
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
-
