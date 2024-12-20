@@ -22,3 +22,5 @@ itsdangerous>=2.0.0,<3.0  # 用于签名和安全令牌
 # 测试工具（如果需要）
 pytest>=7.0.0  # 单元测试工具
 pytest-flask>=1.2.0  # 用于 Flask 项目的测试集成
+
+flask-migrate
