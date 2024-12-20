@@ -103,3 +103,75 @@ def create_app():
 
     app.logger.info("App successfully created and initialized.")
     return app
+
+
+    
+    from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+from flask_mail import Mail
+from flask_migrate import Migrate
+from celery import Celery
+from app.config import Config
+import logging
+from logging.handlers import RotatingFileHandler
+from dotenv import load_dotenv
+import os
+
+# Load environment variables
+load_dotenv()
+
+# Initialize extensions
+db = SQLAlchemy()
+mail = Mail()
+migrate = Migrate()
+celery = None
+
+def setup_logging(app):
+    """Set up logging."""
+    handler = RotatingFileHandler("app.log", maxBytes=100000, backupCount=3)
+    handler.setLevel(logging.INFO)
+    formatter = logging.Formatter(
+        "[%(asctime)s] %(levelname)s in %(module)s: %(message)s"
+    )
+    handler.setFormatter(formatter)
+    app.logger.addHandler(handler)
+
+def make_celery(app):
+    """
+    Initialize Celery.
+    """
+    celery_instance = Celery(
+        app.import_name,
+        backend=app.config['CELERY_RESULT_BACKEND'],
+        broker=app.config['CELERY_BROKER_URL']
+    )
+    celery_instance.conf.update(app.config)
+    return celery_instance
+
+def create_app():
+    app = Flask(__name__)
+    app.config.from_object(Config)
+
+    # Initialize extensions with app
+    db.init_app(app)
+    mail.init_app(app)
+    migrate.init_app(app, db)
+
+    # Set up logging
+    setup_logging(app)
+
+    # Initialize Celery
+    global celery
+    celery = make_celery(app)
+
+    # Register blueprints
+    from app.routes.user_routes import user_bp
+    from app.routes.server_routes import server_bp
+    from app.routes.container_routes import container_bp
+
+    app.register_blueprint(user_bp)
+    app.register_blueprint(server_bp)
+    app.register_blueprint(container_bp)
+
+    return app
+
