@@ -101,3 +101,14 @@ class ACLLog(db.Model):
     location = db.Column(db.String(255), nullable=True)  # 地理位置
     acl_version = db.Column(db.String(50), nullable=False)  # ACL 版本号
     created_at = db.Column(db.DateTime, default=func.now())  # 生成时间
+
+# 系统日志模型
+class SystemLog(db.Model):
+    __tablename__ = 'system_logs'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=True)  # 操作者的用户 ID，可为空
+    operation = db.Column(db.String(255), nullable=False)  # 操作名称
+    status = db.Column(db.String(50), nullable=False)  # 操作状态（如 success, failed）
+    ip_address = db.Column(db.String(50), nullable=True)  # 操作者的 IP 地址
+    details = db.Column(db.Text, nullable=True)  # 操作的详细信息
+    timestamp = db.Column(db.DateTime, default=func.now())  # 操作时间
