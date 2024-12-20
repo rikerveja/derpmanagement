@@ -6,6 +6,11 @@ from celery import Celery
 from app.config import Config
 import logging
 from logging.handlers import RotatingFileHandler
+from dotenv import load_dotenv
+import os
+
+# 加载环境变量
+load_dotenv()
 
 # 初始化插件
 db = SQLAlchemy()
@@ -44,6 +49,10 @@ def create_app():
 
     # 设置日志
     setup_logging(app)
+
+    # 设置 FLASK_APP 环境变量
+    if not os.getenv("FLASK_APP"):
+        os.environ["FLASK_APP"] = "app"
 
     try:
         # 初始化插件
