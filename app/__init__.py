@@ -21,8 +21,9 @@ celery = None
 
 def setup_logging(app):
     """设置日志记录"""
-    handler = RotatingFileHandler("app.log", maxBytes=100000, backupCount=3)
-    handler.setLevel(logging.INFO)
+    log_file = app.config['LOG_FILE']
+    handler = RotatingFileHandler(log_file, maxBytes=100000000, backupCount=3)
+    handler.setLevel(logging.INFO)  # 设置日志级别
     formatter = logging.Formatter(
         "[%(asctime)s] %(levelname)s in %(module)s: %(message)s"
     )
@@ -45,7 +46,7 @@ def make_celery(app):
 
 def create_app():
     app = Flask(__name__)
-    app.config.from_object(Config)
+    app.config.from_object(Config)  # 从配置类加载配置
 
     # 设置日志
     setup_logging(app)
@@ -63,6 +64,7 @@ def create_app():
         # 初始化 Celery
         global celery
         celery = make_celery(app)
+
     except Exception as e:
         app.logger.error(f"Initialization error: {e}")
         raise
