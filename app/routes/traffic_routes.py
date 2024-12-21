@@ -13,7 +13,7 @@ traffic_data = {}
 @traffic_bp.route('/api/traffic/realtime', methods=['GET'])
 def realtime_traffic():
     """
-    模拟实时流量监控
+    获取所有容器的实时流量监控
     """
     traffic_data = [
         {
@@ -22,10 +22,10 @@ def realtime_traffic():
             "port": container.port,
             "stun_port": container.stun_port,
             "realtime_rate": round(random.uniform(1.0, 100.0), 2),  # Mbps
+            "timestamp": datetime.utcnow().isoformat()  # 流量更新时间戳
         }
         for container in UserContainer.query.all()
     ]
-
     return jsonify({"success": True, "traffic_data": traffic_data}), 200
 
 
@@ -35,26 +35,27 @@ def get_realtime_traffic(container_id):
     """
     获取容器的实时流量数据
     """
-    # 模拟实时流量数据
+    # 获取容器实时流量数据，模拟数据
     traffic = traffic_data.get(container_id, {"upload": random.randint(0, 500), "download": random.randint(0, 500)})
-    return jsonify({"success": True, "traffic": traffic}), 200
+    timestamp = datetime.utcnow().isoformat()
+    return jsonify({"success": True, "traffic": traffic, "timestamp": timestamp}), 200
 
 
 # 用户流量历史统计
 @traffic_bp.route('/api/traffic/history/<int:user_id>', methods=['GET'])
 def traffic_history(user_id):
     """
-    模拟用户流量历史统计
+    获取用户的流量历史统计
     """
     # 模拟历史流量数据（最近7天）
     history_data = [
         {
             "date": (datetime.utcnow() - timedelta(days=i)).strftime("%Y-%m-%d"),
             "traffic_used": round(random.uniform(0.5, 10.0), 2),  # GB
+            "peak_traffic": round(random.uniform(1.0, 5.0), 2),  # 高峰流量（GB）
         }
         for i in range(7)
     ]
-
     return jsonify({"success": True, "user_id": user_id, "history_data": history_data}), 200
 
 
@@ -72,7 +73,10 @@ def get_traffic_stats():
         # 按用户统计流量
         user_containers = UserContainer.query.filter_by(user_id=user_id).all()
         user_traffic = {
-            container.id: traffic_data.get(container.id, {"upload": random.randint(0, 500), "download": random.randint(0, 500)})
+            container.id: {
+                "upload": random.randint(0, 500),
+                "download": random.randint(0, 500)
+            }
             for container in user_containers
         }
         return jsonify({"success": True, "user_traffic": user_traffic}), 200
@@ -81,7 +85,10 @@ def get_traffic_stats():
         # 按服务器统计流量
         server_containers = UserContainer.query.filter_by(server_id=server_id).all()
         server_traffic = {
-            container.id: traffic_data.get(container.id, {"upload": random.randint(0, 500), "download": random.randint(0, 500)})
+            container.id: {
+                "upload": random.randint(0, 500),
+                "download": random.randint(0, 500)
+            }
             for container in server_containers
         }
         return jsonify({"success": True, "server_traffic": server_traffic}), 200
