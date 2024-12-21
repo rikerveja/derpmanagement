@@ -768,6 +768,7 @@
 | `upload_traffic`   | DECIMAL(10,2)  | 上行流量（MB）                            |
 | `download_traffic` | DECIMAL(10,2)  | 下行流量（MB）                            |
 | `timestamp`        | DATETIME       | 流量记录时间                              |
+                    
 
 ### 5. ACL 管理模块
 #### **5.1 ACL 配置表**
@@ -797,7 +798,7 @@
 | `status`           | ENUM('success', 'fail') | 校验状态（成功、失败）                  |
 | `timestamp`        | DATETIME       | 校验时间                                  |
 
-根据您的需求，以下是更新后的 **监控与告警模块** 数据表设计。这个更新将更贴合您的需求：**监控服务器可用性**（通过心跳检测和 Ping 时延），以及 **流量统计**，并移除了负载和内存使用等信息。
+
 
 ### 6. 监控与告警模块
 
