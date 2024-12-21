@@ -45,7 +45,7 @@ class SerialNumber(db.Model):
     used_at = db.Column(db.DateTime, nullable=True, onupdate=func.now())  # 使用时间
 
     def update_user_rental_expiry(self):
-        if self.status == 'active' and self.user:
+        if self.status == 'used' and self.user:
             self.user.rental_expiry = self.used_at + timedelta(days=self.duration_days)
             db.session.commit()
 
@@ -146,7 +146,3 @@ class SystemAlert(db.Model):
     __tablename__ = 'system_alerts'
     id = db.Column(db.Integer, primary_key=True)
     alert_type = db.Column(db.String(50), nullable=False)  # 告警类型
-    severity = db.Column(db.String(20), nullable=False)  # 严重程度（info, warning, critical）
-    message = db.Column(db.String(255), nullable=False)  # 告警信息
-    timestamp = db.Column(db.DateTime, default=func.now())  # 时间戳
-    resolved = db.Column(db.Boolean, default=False)  # 是否已解决
