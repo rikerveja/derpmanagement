@@ -1,8 +1,8 @@
-以下是 **DERP 服务器租赁与管理系统** 的 **完整需求分析**：
+以下是 **DERP 服务器租赁与管理系统** 的完整需求文档，包括所有模块、功能、数据结构和接口需求的细节：
 
 ---
 
-## **DERP 服务器租赁与管理系统 需求分析**
+## **DERP 服务器租赁与管理系统 需求文档**
 
 ### **1. 用户管理模块**
 
@@ -177,10 +177,33 @@
 #### **12.1 Docker 容器健康状态表 (`docker_health_status`)**
 - 用于记录每个 **Docker 容器** 的健康状况，包括 **DERP 服务的健康状态** 和 **其他监控指标**（如容器负载等）。
 
-#### **12.2 服务器负载监控表 (`server
 
-_load_status`)**
+
+#### **12.2 服务器负载监控表 (`server_load_status`)**
 - 用于记录每台服务器的负载情况，包括当前运行的 Docker 容器数量、CPU 使用率、内存使用情况等。
+
+---
+
+### **13. SSH 链接服务器开 Docker 容器并部署 DERP 服务**
+
+#### **13.1 SSH 链接与 Docker 容器部署**
+- 系统通过 **SSH 连接服务器**，自动 **创建 Docker 容器** 并在其中部署 **DERP 服务**。
+- 用户通过生成的 **ACL 配置** 来访问部署在容器中的 DERP 服务。
+
+#### **13.2 目标与要求**
+- 容器配置与 **DERP 服务** 自动化部署。
+- 用户可以 **测试容器中的 DERP 服务**，并生成 **ACL 文本**。
+
+---
+
+### **14. 服务器类别管理模块**
+
+#### **14.1 服务器类别**
+- **ECS 服务器（按年租赁）**：按 **1 年租赁**，用户购买后使用指定期限。
+- **ECS 服务器（按时按量后结算）**：按 **时计费**，价格为 **0.108 元/小时**，按实际使用时间计费。
+
+#### **14.2 数据需求**
+- **服务器类型表**：记录 **ECS 服务器** 的不同计费方式及资源配置。
 
 ---
 
@@ -197,74 +220,3 @@ _load_status`)**
 3. **测试与调试**：逐步实现各个功能模块，并进行功能测试，确保数据流和功能逻辑正确。
 
 ---
-
-如果您有任何问题或需要进一步帮助，请随时告诉我！
-### **数据库表设计**
-
-根据系统需求，以下是数据库表结构的初步设计：
-
-| 表名                 | 字段                                   | 类型             | 描述                                                     |
-|----------------------|---------------------------------------|------------------|----------------------------------------------------------|
-| `users`              | `id`                                 | Integer (PK)     | 用户 ID                                                  |
-|                      | `username`                           | String (unique)  | 用户名                                                   |
-|                      | `email`                              | String (unique)  | 邮箱地址                                                 |
-|                      | `password`                           | String           | 密码                                                     |
-|                      | `role`                               | String           | 用户角色（如 `user`, `admin`）                           |
-|                      | `rental_expiry`                      | DateTime         | 租赁到期时间                                             |
-|                      | `created_at`                         | DateTime         | 用户创建时间                                             |
-| `serial_numbers`     | `id`                                 | Integer (PK)     | 序列号 ID                                                |
-|                      | `code`                               | String (unique)  | 序列号代码                                               |
-|                      | `duration_days`                      | Integer          | 有效天数                                                 |
-|                      | `status`                             | String           | 序列号状态（`unused`, `used`, `expired`）                |
-|                      | `user_id`                            | Integer (FK)     | 用户 ID（外键）                                          |
-|                      | `created_at`                         | DateTime         | 序列号创建时间                                           |
-|                      | `used_at`                            | DateTime         | 序列号使用时间                                           |
-| `servers`            | `id`                                 | Integer (PK)     | 服务器 ID                                                |
-|                      | `ip`                                 | String           | IP 地址                                                  |
-|                      | `region`                             | String           | 服务器所在地区                                           |
-|                      | `load`                               | Float            | 当前负载                                                 |
-|                      | `status`                             | String           | 服务器状态（`healthy`, `unhealthy`）                     |
-|                      | `created_at`                         | DateTime         | 创建时间                                                 |
-|                      | `updated_at`                         | DateTime         | 更新时间                                                 |
-| `acl_logs`           | `id`                                 | Integer (PK)     | 日志 ID                                                  |
-|                      | `user_id`                            | Integer (FK)     | 用户 ID（外键）                                          |
-|                      | `ip_address`                         | String           | 用户 IP 地址                                             |
-|                      | `location`                           | String           | 地理位置                                                 |
-|                      | `acl_version`                        | String           | ACL 版本号                                               |
-|                      | `created_at`                         | DateTime         | 创建时间                                                 |
-| `monitoring_logs`    | `id`                                 | Integer (PK)     | 日志 ID                                                  |
-|                      | `server_id`                          | Integer (FK)     | 服务器 ID（外键）                                        |
-|                      | `metric`                             | String           | 监控指标                                                 |
-|                      | `value`                              | Float            | 监控值                                                   |
-|                      | `timestamp`                          | DateTime         | 时间戳                                                   |
-| `system_alerts`      | `id`                                 | Integer (PK)     | 告警 ID                                                  |
-|                      | `alert_type`                         | String           | 告警类型                                                 |
-|                      | `severity`                           | String           | 严重程度（`info`, `warning`, `critical`）                |
-|                      | `message`                            | String           | 告警信息                                                 |
-|                      | `resolved`                           | Boolean          | 是否已解决                                               |
-
----
-
-### **API 接口设计**
-
-以下是主要 API 的设计概要：
-
-| 模块                  | 路由                                     | 方法   | 描述                                   | 请求参数                                   | 返回值示例                                      |
-|-----------------------|------------------------------------------|--------|----------------------------------------|-------------------------------------------|-----------------------------------------------|
-| 用户模块              | `/api/user/register`                    | POST   | 用户注册                               | `{ "username": "test", "email": "...", ...}` | `{ "success": true, "user_id": 1 }`           |
-|                       | `/api/user/login`                       | POST   | 用户登录                               | `{ "email": "...", "password": "..." }`    | `{ "success": true, "token": "..." }`         |
-| 序列号管理模块        | `/api/serial/generate`                  |
-
- POST   | 管理员生成序列号                       | `{ "duration_days": 30 }`                  | `{ "success": true, "serial_numbers": ["..."] }` |
-| 服务器管理模块        | `/api/server/add`                       | POST   | 添加服务器                             | `{ "ip": "...", "region": "..." }`         | `{ "success": true, "server_id": 1 }`         |
-| 容器管理模块          | `/api/container/allocate`               | POST   | 分配容器                               | `{ "user_id": 1, "server_id": 1, ... }`    | `{ "success": true, "container_id": 1 }`      |
-| ACL 管理模块          | `/api/acl/generate`                     | POST   | 生成 ACL 配置                          | `{ "user_id": 1, "server_ids": [1, 2] }`   | `{ "success": true, "acl": { ... } }`         |
-| 高可用模块            | `/api/ha/failover`                      | POST   | 故障切换                               | 无                                         | `{ "success": true, "message": "..." }`       |
-| 日志管理模块          | `/api/logs/system`                      | GET    | 查询系统日志                           | 无                                         | `{ "success": true, "logs": [ ... ] }`        |
-| 财务模块              | `/api/finance/statistics`               | GET    | 获取财务统计数据                       | 无                                         | `{ "success": true, "total_revenue": 1000 }`  |
-| 监控模块              | `/api/monitoring/load_analysis`         | GET    | 分析服务器负载                         | 无                                         | `{ "success": true, "load_analysis": [...] }` |
-| 通知模块              | `/api/notifications/send`               | POST   | 发送通知                               | `{ "user_id": 1, "subject": "...", ... }`  | `{ "success": true, "message": "Sent" }`      |
-
----
-
-#
