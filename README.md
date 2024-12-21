@@ -214,9 +214,435 @@
 
 ---
 
-### **接下来的步骤**
-1. **补充数据库设计**：根据更新后的需求，进一步完善数据库表结构，确保字段和关系合理。
-2. **完善 API 接口**：根据接口需求开发相应的 API 路由，确保每个模块功能正常。
-3. **测试与调试**：逐步实现各个功能模块，并进行功能测试，确保数据流和功能逻辑正确。
+根据您提供的需求，以下是 **DERP 服务器租赁与管理系统** 的 **API 接口及说明** 和 **数据库结构表及说明**。
+
+---
+
+## **1. 用户管理模块**
+
+### **1.1 用户管理功能**
+
+#### **API 接口**
+- **用户注册**
+  - **URL**: `/api/user/register`
+  - **方法**: `POST`
+  - **请求参数**:
+    ```json
+    {
+      "username": "string",
+      "email": "string",
+      "password": "string",
+      "verification_code": "string"
+    }
+    ```
+  - **返回**:
+    ```json
+    {
+      "success": true,
+      "message": "User registered successfully"
+    }
+    ```
+
+- **用户登录**
+  - **URL**: `/api/user/login`
+  - **方法**: `POST`
+  - **请求参数**:
+    ```json
+    {
+      "email": "string",
+      "password": "string"
+    }
+    ```
+  - **返回**:
+    ```json
+    {
+      "success": true,
+      "message": "Login successful",
+      "token": "string"
+    }
+    ```
+
+- **续费管理**
+  - **URL**: `/api/user/renew`
+  - **方法**: `POST`
+  - **请求参数**:
+    ```json
+    {
+      "user_id": "int",
+      "serial_code": "string"
+    }
+    ```
+  - **返回**:
+    ```json
+    {
+      "success": true,
+      "message": "Subscription renewed successfully",
+      "new_expiry_time": "datetime"
+    }
+    ```
+
+#### **数据库表结构**
+- **用户表 (`users`)**
+  ```sql
+  CREATE TABLE users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username VARCHAR(80) UNIQUE NOT NULL,
+      email VARCHAR(120) UNIQUE NOT NULL,
+      password VARCHAR(200) NOT NULL,
+      role VARCHAR(20) DEFAULT 'user',
+      rental_expiry DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  ```
+
+---
+
+## **2. 序列号管理模块**
+
+### **2.1 序列号管理功能**
+
+#### **API 接口**
+- **序列号生成**
+  - **URL**: `/api/serial/generate`
+  - **方法**: `POST`
+  - **请求参数**:
+    ```json
+    {
+      "count": "int",
+      "duration_days": "int"
+    }
+    ```
+  - **返回**:
+    ```json
+    {
+      "success": true,
+      "serial_numbers": ["string"]
+    }
+    ```
+
+- **序列号激活**
+  - **URL**: `/api/serial/activate`
+  - **方法**: `POST`
+  - **请求参数**:
+    ```json
+    {
+      "user_id": "int",
+      "serial_code": "string"
+    }
+    ```
+  - **返回**:
+    ```json
+    {
+      "success": true,
+      "message": "Serial number activated successfully"
+    }
+    ```
+
+#### **数据库表结构**
+- **序列号表 (`serial_numbers`)**
+  ```sql
+  CREATE TABLE serial_numbers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code VARCHAR(255) UNIQUE NOT NULL,
+      duration_days INTEGER NOT NULL,
+      status VARCHAR(50) DEFAULT 'unused',
+      user_id INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      used_at DATETIME,
+      expires_at DATETIME,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+  ```
+
+---
+
+## **3. 服务器管理模块**
+
+### **3.1 服务器管理功能**
+
+#### **API 接口**
+- **添加服务器**
+  - **URL**: `/api/server/add`
+  - **方法**: `POST`
+  - **请求参数**:
+    ```json
+    {
+      "ip": "string",
+      "region": "string",
+      "load": "float"
+    }
+    ```
+  - **返回**:
+    ```json
+    {
+      "success": true,
+      "server_id": "int",
+      "message": "Server added successfully"
+    }
+    ```
+
+- **查看服务器状态**
+  - **URL**: `/api/server/status/{server_id}`
+  - **方法**: `GET`
+  - **返回**:
+    ```json
+    {
+      "success": true,
+      "server_status": "healthy"
+    }
+    ```
+
+#### **数据库表结构**
+- **服务器表 (`servers`)**
+  ```sql
+  CREATE TABLE servers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ip VARCHAR(255) UNIQUE NOT NULL,
+      region VARCHAR(100) NOT NULL,
+      load FLOAT DEFAULT 0.0,
+      status VARCHAR(50) DEFAULT 'healthy',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  ```
+
+---
+
+## **4. 容器管理模块**
+
+### **4.1 容器管理功能**
+
+#### **API 接口**
+- **容器分配**
+  - **URL**: `/api/container/allocate`
+  - **方法**: `POST`
+  - **请求参数**:
+    ```json
+    {
+      "user_id": "int",
+      "server_id": "int",
+      "port": "int"
+    }
+    ```
+  - **返回**:
+    ```json
+    {
+      "success": true,
+      "container_id": "int"
+    }
+    ```
+
+- **容器流量查看**
+  - **URL**: `/api/container/traffic/{container_id}`
+  - **方法**: `GET`
+  - **返回**:
+    ```json
+    {
+      "success": true,
+      "upload_traffic": "float",
+      "download_traffic": "float"
+    }
+    ```
+
+#### **数据库表结构**
+- **用户容器表 (`user_containers`)**
+  ```sql
+  CREATE TABLE user_containers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      server_id INTEGER NOT NULL,
+      port INTEGER NOT NULL,
+      upload_traffic FLOAT DEFAULT 0.0,
+      download_traffic FLOAT DEFAULT 0.0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      status VARCHAR(50) DEFAULT 'active',
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (server_id) REFERENCES servers(id)
+  );
+  ```
+
+---
+
+## **5. ACL 管理模块**
+
+### **5.1 ACL 配置管理**
+
+#### **API 接口**
+- **生成 ACL 配置**
+  - **URL**: `/api/acl/generate`
+  - **方法**: `POST`
+  - **请求参数**:
+    ```json
+    {
+      "user_id": "int",
+      "server_ids": ["int"]
+    }
+    ```
+  - **返回**:
+    ```json
+    {
+      "success": true,
+      "acl_code": "string"
+    }
+    ```
+
+- **下载 ACL 配置**
+  - **URL**: `/api/acl/download/{acl_code}`
+  - **方法**: `GET`
+  - **返回**:
+    ```json
+    {
+      "success": true,
+      "acl_file": "base64_encoded_string"
+    }
+    ```
+
+#### **数据库表结构**
+- **ACL 配置表 (`acl_config`)**
+  ```sql
+  CREATE TABLE acl_config (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      server_ids TEXT,  -- JSON 数组格式存储服务器 ID
+      acl_code VARCHAR(255) UNIQUE NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+  ```
+
+---
+
+## **6. 监控与告警模块**
+
+### **6.1 监控功能**
+
+#### **API 接口**
+- **服务器健康监控**
+  - **URL**: `/api/monitoring/health/{server_id}`
+  - **方法**: `GET`
+  - **返回**:
+    ```json
+    {
+      "success": true,
+      "cpu_usage": "float",
+      "memory_usage": "float",
+      "ping_latency": "float"
+    }
+    ```
+
+#### **数据库表结构**
+- **服务器健康状态表 (`server_health_status`)**
+  ```sql
+  CREATE TABLE server_health_status (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      server_id INTEGER NOT NULL,
+      cpu_usage FLOAT DEFAULT 0.0,
+      memory_usage FLOAT DEFAULT 0.0,
+      ping_latency FLOAT DEFAULT 0.0,
+      status VARCHAR(50) DEFAULT 'healthy',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (server_id) REFERENCES servers(id)
+  );
+  ```
+
+---
+
+## **7. 财务管理模块**
+
+### **7.1 财务统计功能**
+
+#### **API 接口**
+- **查看财务统计**
+  - **URL**: `/api/finance/statistics`
+  - **方法**: `GET`
+  - **返回**:
+    ```json
+    {
+      "success": true,
+      "total_revenue": "float",
+      "total_users": "int"
+    }
+    ```
+
+#### **数据库表结构**
+- **财务表 (`finance_stats`)**
+  ```sql
+  CREATE TABLE finance_stats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      revenue FLOAT NOT NULL,
+      users_served INTEGER NOT NULL,
+      period_start DATETIME NOT NULL,
+      period_end DATETIME NOT
+
+ NULL
+  );
+  ```
+
+---
+
+## **8. 高可用模块**
+
+### **8.1 故障切换功能**
+
+#### **API 接口**
+- **故障切换接口**
+  - **URL**: `/api/ha/failover`
+  - **方法**: `POST`
+  - **请求参数**:
+    ```json
+    {
+      "server_id": "int"
+    }
+    ```
+  - **返回**:
+    ```json
+    {
+      "success": true,
+      "message": "Failover completed"
+    }
+    ```
+
+---
+
+### **9. 流量管理模块**
+
+#### **API 接口**
+- **实时流量监控**
+  - **URL**: `/api/traffic/realtime`
+  - **方法**: `GET`
+  - **返回**:
+    ```json
+    {
+      "success": true,
+      "traffic_data": [
+        {
+          "container_id": "int",
+          "upload_traffic": "float",
+          "download_traffic": "float"
+        }
+      ]
+    }
+    ```
+
+#### **数据库表结构**
+- **流量使用记录表 (`traffic_usage`)**
+  ```sql
+  CREATE TABLE traffic_usage (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      container_id INTEGER NOT NULL,
+      upload_traffic FLOAT DEFAULT 0.0,
+      download_traffic FLOAT DEFAULT 0.0,
+      month DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (container_id) REFERENCES user_containers(id)
+  );
+  ```
+
+---
+
+### **总结**
+该系统涵盖了 **用户管理、序列号管理、服务器管理、容器管理、ACL 配置、监控与告警、财务管理、高可用、流量管理等模块**。每个模块的功能需求、数据需求和接口需求都已明确，确保了系统的核心功能可以逐步开发和测试。
+
+如果您有任何问题或进一步的需求修改，请随时告诉我！
 
 ---
