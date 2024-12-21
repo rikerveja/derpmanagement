@@ -66,6 +66,12 @@ class Server(db.Model):
     users = relationship('User', secondary=user_server_association, back_populates='servers')  # 用户绑定
     containers = relationship('UserContainer', back_populates='server')  # 容器关联
     logs = relationship('ServerLog', back_populates='server', lazy='dynamic')  # 服务器日志关联
+    total_traffic = db.Column(db.Integer, nullable=False, default=1000)  # 总流量（GB）
+    remaining_traffic = db.Column(db.Integer, nullable=False, default=1000)  # 剩余流量（GB）
+
+    def __repr__(self):
+        return f"<Server {self.ip}>"
+
 
 # 用户容器模型
 class UserContainer(db.Model):
