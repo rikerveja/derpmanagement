@@ -59,7 +59,6 @@ class Server(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ip = db.Column(db.String(255), unique=True, nullable=False)  # 服务器 IP 地址
     region = db.Column(db.String(100), nullable=False)  # 服务器地区
-    load = db.Column(db.Float, default=0.0)  # 当前服务器负载
     status = db.Column(db.String(50), default='healthy')  # 服务器状态（healthy, unhealthy）
     created_at = db.Column(db.DateTime, default=func.now())  # 创建时间
     updated_at = db.Column(db.DateTime, default=func.now(), onupdate=func.now())  # 更新时间
@@ -148,18 +147,26 @@ class SystemLog(db.Model):
     details = db.Column(db.Text, nullable=True)  # 操作的详细信息
     timestamp = db.Column(db.DateTime, default=func.now())  # 操作时间
 
-# 监控日志模型
+# 监控日志模型（更新）
 class MonitoringLog(db.Model):
     __tablename__ = 'monitoring_logs'
     id = db.Column(db.Integer, primary_key=True)
     server_id = db.Column(db.Integer, db.ForeignKey('servers.id'), nullable=True)  # 关联的服务器
-    metric = db.Column(db.String(255), nullable=False)  # 监控指标名称
-    value = db.Column(db.Float, nullable=False)  # 监控值
+    is_reachable = db.Column(db.Boolean, nullable=False)  # 服务器是否可用
+    ping_latency = db.Column(db.Float, nullable=False)  # Ping 时延（毫秒）
+    total_traffic = db.Column(db.Float, nullable=False)  # 总流量（MB）
+    download_traffic = db.Column(db.Float, nullable=False)  # 下载流量（MB）
+    upload_traffic = db.Column(db.Float, nullable=False)  # 上传流量（MB）
     timestamp = db.Column(db.DateTime, default=func.now())  # 时间戳
     server = relationship('Server', backref='monitoring_logs')  # 关联服务器
 
-# 系统告警模型
+# 系统告警模型（更新）
 class SystemAlert(db.Model):
     __tablename__ = 'system_alerts'
     id = db.Column(db.Integer, primary_key=True)
     alert_type = db.Column(db.String(50), nullable=False)  # 告警类型
+    severity = db.Column(db.Enum('low', 'medium', 'high'), default='low')  # 告警严重性
+    message = db.Column(db.Text, nullable=False)  # 告警消息
+    resolved = db.Column(db.Boolean, default=False)  # 是否已解决
+    created_at = db.Column(db.DateTime, default=func.now())  # 创建时间
+    updated_at = db.Column(db.DateTime, default=func.now(), onupdate=func.now())  # 更新时间
