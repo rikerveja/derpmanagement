@@ -45,11 +45,13 @@ class SerialNumber(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # 绑定用户
     created_at = db.Column(db.DateTime, default=func.now())  # 创建时间
     used_at = db.Column(db.DateTime, nullable=True, onupdate=func.now())  # 使用时间
+    expires_at = db.Column(db.DateTime, nullable=False)  # 序列号过期时间（新增字段）
 
     def update_user_rental_expiry(self):
         if self.status == 'used' and self.user:
             self.user.rental_expiry = self.used_at + timedelta(days=self.duration_days)
             db.session.commit()
+
 
 # 服务器模型
 class Server(db.Model):
