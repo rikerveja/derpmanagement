@@ -92,6 +92,13 @@ class UserContainer(db.Model):
         self.download_traffic += download
         db.session.commit()
 
+    def check_traffic_limit(self, upload_limit, download_limit):
+        if self.upload_traffic > upload_limit or self.download_traffic > download_limit:
+            # 触发流量限制
+            return True
+        return False
+
+
 # 用户日志模型
 class UserLog(db.Model):
     __tablename__ = 'user_logs'
