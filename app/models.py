@@ -18,9 +18,10 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     password = db.Column(db.String(200), nullable=False)
-    role = db.Column(db.String(20), default='user')  # 用户角色（user, admin）
+    role = db.Column(db.Enum('user', 'admin', 'distributor', name='role_enum'), default='user')  # 改为枚举类型
     rental_expiry = db.Column(db.DateTime, nullable=True)  # 租赁到期时间
-    created_at = db.Column(db.DateTime, default=func.now())  # 用户创建时间
+    created_at = db.Column(db.DateTime, default=func.now())  # 创建时间
+    updated_at = db.Column(db.DateTime, default=func.now(), onupdate=func.now())  # 更新时间
     serial_numbers = relationship('SerialNumber', backref='user', lazy='dynamic')  # 序列号绑定
     servers = relationship('Server', secondary=user_server_association, back_populates='users')  # 用户绑定服务器
     containers = relationship('UserContainer', back_populates='user')  # 容器关联
@@ -32,6 +33,7 @@ class User(db.Model):
         if '@' not in address:
             raise ValueError("Invalid email address")
         return address
+
 
 # 序列号模型
 class SerialNumber(db.Model):
