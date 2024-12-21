@@ -14,10 +14,11 @@ def hash_password(password):
     使用 bcrypt 对密码进行加密。
     """
     try:
-        hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(12)).decode('utf-8')  # 控制复杂度
+        logger.info("Password hashed successfully.")
         return hashed
     except Exception as e:
-        logger.error(f"Error hashing password: {e}")
+        logger.exception("Error hashing password.")  # 更详细的日志记录
         raise
 
 # 验证密码
@@ -26,9 +27,11 @@ def check_password(password, hashed_password):
     验证用户提供的密码是否与存储的哈希密码匹配。
     """
     try:
-        return bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
+        result = bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
+        logger.info(f"Password check {'succeeded' if result else 'failed'}.")
+        return result
     except Exception as e:
-        logger.error(f"Error checking password: {e}")
+        logger.exception("Error checking password.")  # 更详细的日志记录
         return False
 
 # 生成 JWT
@@ -40,9 +43,10 @@ def generate_jwt(payload, expiration_hours=24):
     try:
         payload['exp'] = datetime.utcnow() + timedelta(hours=expiration_hours)
         token = jwt.encode(payload, Config.SECRET_KEY, algorithm="HS256")
+        logger.info("JWT generated successfully.")
         return token
     except Exception as e:
-        logger.error(f"Error generating JWT: {e}")
+        logger.exception("Error generating JWT.")  # 更详细的日志记录
         raise
 
 # 解码 JWT
@@ -52,10 +56,11 @@ def decode_jwt(token):
     """
     try:
         decoded = jwt.decode(token, Config.SECRET_KEY, algorithms=["HS256"])
+        logger.info("JWT decoded successfully.")
         return decoded
     except jwt.ExpiredSignatureError:
-        logger.warning("JWT has expired.")
-        return None
+        logger.warning("JWT has expired.")  # 专门处理过期情况
+        return {"error": "Token has expired"}
     except jwt.InvalidTokenError as e:
-        logger.warning(f"Invalid JWT: {e}")
-        return None
+        logger.warning(f"Invalid JWT: {e}")  # 捕获更多异常
+        return {"error": f"Invalid token: {e}"}
