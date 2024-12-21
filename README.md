@@ -797,28 +797,33 @@
 | `status`           | ENUM('success', 'fail') | 校验状态（成功、失败）                  |
 | `timestamp`        | DATETIME       | 校验时间                                  |
 
+根据您的需求，以下是更新后的 **监控与告警模块** 数据表设计。这个更新将更贴合您的需求：**监控服务器可用性**（通过心跳检测和 Ping 时延），以及 **流量统计**，并移除了负载和内存使用等信息。
+
 ### 6. 监控与告警模块
+
 #### **6.1 监控日志表**
-记录服务器和容器的监控数据。
+此表记录服务器的监控数据，包括 **Ping 可用性** 和 **Ping 时延**，以及 **流量统计**。监控信息可以定时收集并保存到数据库中。
 
 | 字段               | 类型           | 描述                                      |
 |--------------------|----------------|-------------------------------------------|
 | `id`               | INT (PK)       | 记录 ID，主键，自增长                     |
 | `server_id`        | INT (FK)       | 服务器 ID，外键，指向服务器表             |
-| `cpu_usage`        | DECIMAL(5,2)   | CPU 使用率                                |
-| `memory_usage`     | DECIMAL(5,2)   | 内存使用率                                |
-| `disk_usage`       | DECIMAL(5,2)   | 磁盘使用率                                |
-| `network_usage`    | DECIMAL(5,2)   | 网络带宽使用率                            |
-| `timestamp`        | DATETIME       | 监控时间                                  |
+| `is_reachable`     | BOOLEAN        | 服务器是否可用（Ping 是否通）             |
+| `ping_latency`     | DECIMAL(10, 2) | Ping 时延，单位：毫秒                     |
+| `total_traffic`    | DECIMAL(10, 2) | 总流量（单位：MB）                        |
+| `download_traffic` | DECIMAL(10, 2) | 下载流量（单位：MB）                      |
+| `upload_traffic`   | DECIMAL(10, 2) | 上传流量（单位：MB）                      |
+| `timestamp`        | DATETIME       | 记录时间                                  |
+
 
 #### **6.2 告警表**
-记录告警信息。
+此表记录系统中生成的告警信息，包括告警类型、严重性、消息内容、解决状态等。
 
 | 字段               | 类型           | 描述                                      |
 |--------------------|----------------|-------------------------------------------|
 | `id`               | INT (PK)       | 告警 ID，主键，自增长                     |
 | `alert_type`       | VARCHAR(255)    | 告警类型                                  |
-| `severity`         | ENUM('low', 'medium', 'high') | 告警严重程度（低、中、高）         |
+| `severity`         | ENUM('low', 'medium', 'high') | 告警严重程度（低、中、高） |
 | `message`          | TEXT           | 告警消息                                  |
 | `resolved`         | BOOLEAN        | 是否已解决                                |
 | `created_at`       | DATETIME       | 告警创建时间                              |
