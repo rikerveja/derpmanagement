@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from app.models import User, UserHistory
-from app.utils.auth_utils import hash_password, check_password, generate_jwt
+from app.utils.auth_utils import hash_password, check_password, generate_jwt, generate_refresh_token
 from app.utils.email_utils import send_verification_email, validate_verification_code
 from app import db
 from app.utils.logging_utils import log_operation  # 引入统一日志记录工具
@@ -86,10 +86,12 @@ def login():
         log_operation(None, "login", "failed", f"Invalid credentials for email: {email}")
         return jsonify({"success": False, "message": "Invalid credentials"}), 401
 
-    # 生成 JWT 令牌
+    # 生成 JWT 令牌和刷新令牌
     token = generate_jwt({"user_id": user.id})
+    refresh_token = generate_refresh_token({"user_id": user.id})
     log_operation(user.id, "login", "success", f"Login successful for email: {email}")
-    return jsonify({"success": True, "message": "Login successful", "token": token}), 200
+    
+    return jsonify({"success": True, "message": "Login successful", "token": token, "refresh_token": refresh_token}), 200
 
 
 # 发送邮箱验证码
@@ -142,6 +144,7 @@ def rental_info():
         "email": user.email,
         "rental_expiry": user.rental_expiry,
         "total_traffic": sum(container.upload_traffic + container.download_traffic for container in user.containers),
+        "server_list": [server.ip for server in user.servers],  # 新增：列出用户绑定的服务器
     }
     return jsonify({"success": True, "rental_info": rental_info}), 200
 
