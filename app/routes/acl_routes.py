@@ -24,16 +24,20 @@ def generate_acl():
     user_id = data.get('user_id')
     server_ids = data.get('server_ids')
 
+    # 检查必需字段
     if not user_id or not server_ids:
         log_operation(user_id=None, operation="generate_acl", status="failed", details="Missing required fields")
         return jsonify({"success": False, "message": "Missing required fields"}), 400
 
     user = User.query.get(user_id)
-    servers = Server.query.filter(Server.id.in_(server_ids)).all()
+    if not user:
+        log_operation(user_id=user_id, operation="generate_acl", status="failed", details="User not found")
+        return jsonify({"success": False, "message": "User not found"}), 404
 
-    if not user or not servers:
-        log_operation(user_id=user_id, operation="generate_acl", status="failed", details="Invalid user or server IDs")
-        return jsonify({"success": False, "message": "Invalid user or server IDs"}), 404
+    servers = Server.query.filter(Server.id.in_(server_ids)).all()
+    if not servers:
+        log_operation(user_id=user_id, operation="generate_acl", status="failed", details="Invalid server IDs")
+        return jsonify({"success": False, "message": "Invalid server IDs"}), 404
 
     # 动态生成 Tailscale Access Control 配置代码
     access_control_code = {
@@ -84,6 +88,7 @@ def update_acl():
     user_id = data.get('user_id')
     server_ids = data.get('server_ids')
 
+    # 检查必需字段
     if not user_id or not server_ids:
         log_operation(user_id=None, operation="update_acl", status="failed", details="Missing required fields")
         return jsonify({"success": False, "message": "Missing required fields"}), 400
