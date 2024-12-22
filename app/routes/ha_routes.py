@@ -1,7 +1,11 @@
 from flask import Blueprint, jsonify, request
 import random
+from datetime import datetime
 from app.utils.logging_utils import log_operation
-from app.utils.monitoring_utils import generate_alerts, analyze_server_load
+from app.utils.monitoring_utils import generate_alerts, analyze_server_load, check_server_health
+from app.utils.docker_utils import check_docker_health, get_docker_traffic, update_docker_container
+from app.models import SystemAlert, Server, User, db
+from app.utils.notifications_utils import send_notification_email
 
 # 定义蓝图
 ha_bp = Blueprint('ha', __name__)
@@ -53,6 +57,22 @@ def failover():
         server_health[server]['status'] = "switched"
         server_health[server]['load'] = 0  # 清空负载
 
+        # 触发告警并通知管理员
+        alert = SystemAlert(
+            server_id=server,
+            alert_type="Server Failure",
+            message=f"Server {server} has failed over to a backup server.",
+            timestamp=datetime.utcnow(),
+            status="active"
+        )
+        db.session.add(alert)
+        db.session.commit()
+
+        # 获取管理员的联系方式并发送邮件
+        admins = User.query.filter_by(role="admin").all()
+        for admin in admins:
+            send_notification_email(admin.email, "Server Failure Notification", f"Server {server} has failed over and is now operating on a backup server.")
+
     log_operation(user_id=None, operation="failover", status="success", details=f"Failover completed for: {unhealthy_servers}")
     return jsonify({"success": True, "message": "Failover completed", "updated_health": server_health}), 200
 
@@ -97,24 +117,78 @@ def disaster_recovery():
     return jsonify({"success": True, "message": "Disaster recovery completed", "updated_health": server_health}), 200
 
 
-# 负载分析
-@ha_bp.route('/api/ha/load_analysis', methods=['GET'])
-def load_analysis():
+# 故障检测并自动更新容器（服务器故障或容器故障）
+@ha_bp.route('/api/ha/replace_container', methods=['POST'])
+def replace_docker_container():
     """
-    返回服务器负载分析结果
+    根据故障类型自动更新容器
+    - 服务器故障：更新该服务器上的所有容器
+    - 容器故障：更新单个容器并修改端口
     """
-    results = analyze_server_load()
-    return jsonify({"success": True, "load_analysis": results}), 200
+    data = request.json
+    container_id = data.get("container_id")
+    server_id = data.get("server_id")
+    failure_type = data.get("failure_type", "container")  # default to container failure
 
+    if not container_id or not server_id:
+        return jsonify({"success": False, "message": "Missing container_id or server_id"}), 400
 
-# 生成系统告警
-@ha_bp.route('/api/ha/generate_alerts', methods=['POST'])
-def alerts():
-    """
-    生成告警
-    """
-    try:
-        generate_alerts()
-        return jsonify({"success": True, "message": "Alerts generated successfully"}), 200
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
+    if failure_type == "server":
+        # 服务器故障，更新所有该服务器上的容器
+        server = Server.query.get(server_id)
+        if not server:
+            return jsonify({"success": False, "message": "Server not found"}), 404
+
+        containers = server.containers
+        for container in containers:
+            # 替换容器
+            update_docker_container(container.id)
+            # 更新 ACL 文件
+            acl_config = update_acl_for_server(server)
+            # 记录告警并通知
+            alert = SystemAlert(
+                server_id=server_id,
+                alert_type="Server Failure",
+                message=f"All containers on server {server_id} are being replaced.",
+                timestamp=datetime.utcnow(),
+                status="active"
+            )
+            db.session.add(alert)
+            db.session.commit()
+
+            # 发送邮件通知管理员
+            admins = User.query.filter_by(role="admin").all()
+            for admin in admins:
+                send_notification_email(admin.email, "Server Failure Notification", f"All containers on server {server_id} have been replaced.")
+        
+        log_operation(user_id=None, operation="replace_docker_container", status="success", details=f"All containers on server {server_id} replaced.")
+        return jsonify({"success": True, "message": f"All containers on server {server_id} replaced successfully"}), 200
+
+    else:
+        # 容器故障，更新单个容器并修改端口
+        container_status = check_docker_health(container_id)
+        if container_status != "running":
+            # 替换容器并更新 ACL
+            update_docker_container(container_id)
+            # 更新 ACL 文件
+            acl_config = update_acl_for_container(container_id)
+            # 记录告警并通知
+            alert = SystemAlert(
+                server_id=None,
+                alert_type="Docker Container Issue",
+                message=f"Docker container {container_id} is not running. Replacing container.",
+                timestamp=datetime.utcnow(),
+                status="active"
+            )
+            db.session.add(alert)
+            db.session.commit()
+
+            # 发送邮件通知管理员
+            admins = User.query.filter_by(role="admin").all()
+            for admin in admins:
+                send_notification_email(admin.email, "Docker Container Issue", f"Docker container {container_id} on server {server_id} is not running. It is being replaced.")
+            
+            log_operation(user_id=None, operation="replace_docker_container", status="success", details=f"Docker container {container_id} replaced.")
+            return jsonify({"success": True, "message": f"Docker container {container_id} replaced successfully"}), 200
+
+    return jsonify({"success": False, "message": "Invalid failure type"}), 400
