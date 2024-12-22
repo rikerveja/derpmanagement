@@ -31,6 +31,7 @@ def log_operation_to_db(user_id, operation, status, details=None):
     except Exception as e:
         logger.error(f"Failed to log operation to DB: {e}")
         db.session.rollback()
+        # 捕获日志写入失败的错误，避免系统崩溃
 
 
 def log_operation_to_file(operation, message, level="INFO"):
@@ -59,7 +60,11 @@ def log_operation(user_id, operation, status, details=None, to_file=False):
     :param details: 操作详细信息
     :param to_file: 是否写入日志文件
     """
-    if to_file:
-        log_operation_to_file(operation, f"User {user_id}, Status {status}, Details: {details}", level="INFO")
-    else:
-        log_operation_to_db(user_id, operation, status, details)
+    try:
+        if to_file:
+            log_operation_to_file(operation, f"User {user_id}, Status {status}, Details: {details}", level="INFO")
+        else:
+            log_operation_to_db(user_id, operation, status, details)
+    except Exception as e:
+        # 捕获日志记录的异常，避免日志记录错误导致系统崩溃
+        logger.error(f"Error in log_operation: {str(e)}")
