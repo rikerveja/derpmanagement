@@ -2,6 +2,7 @@ from app import db
 from sqlalchemy.orm import relationship, validates
 from sqlalchemy.sql import func
 from datetime import timedelta
+from datetime import datetime
 import re
 
 # 用户与服务器的关联表（多对多关系）
@@ -173,3 +174,18 @@ class SystemAlert(db.Model):
     created_at = db.Column(db.DateTime, default=func.now())  # 创建时间
     updated_at = db.Column(db.DateTime, default=func.now(), onupdate=func.now())  # 更新时间
     resolved_at = db.Column(db.DateTime, nullable=True)  # 解决时间（新增字段）
+
+class NotificationLog(db.Model):
+    __tablename__ = 'notification_logs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # 关联用户
+    user = db.relationship('User', backref=db.backref('notifications', lazy=True))
+    subject = db.Column(db.String(255), nullable=False)  # 邮件主题
+    body = db.Column(db.Text, nullable=False)  # 邮件内容
+    sent_at = db.Column(db.DateTime, default=datetime.utcnow)  # 发送时间
+    status = db.Column(db.String(20), nullable=False)  # 发送状态：成功或失败
+    error_message = db.Column(db.String(255), nullable=True)  # 错误信息（如果有）
+
+    def __repr__(self):
+        return f"<NotificationLog {self.id} - {self.status}>"
