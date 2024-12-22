@@ -1,7 +1,8 @@
-from app import db
+from app import db 
 from sqlalchemy.orm import relationship, validates
 from sqlalchemy.sql import func
 from datetime import timedelta
+import re
 
 # 用户与服务器的关联表（多对多关系）
 user_server_association = db.Table(
@@ -30,7 +31,8 @@ class User(db.Model):
 
     @validates('email')
     def validate_email(self, key, address):
-        if '@' not in address:
+        email_regex = r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
+        if not re.match(email_regex, address):
             raise ValueError("Invalid email address")
         return address
 
@@ -65,8 +67,8 @@ class Server(db.Model):
     users = relationship('User', secondary=user_server_association, back_populates='servers')  # 用户绑定
     containers = relationship('UserContainer', back_populates='server')  # 容器关联
     logs = relationship('ServerLog', back_populates='server', lazy='dynamic')  # 服务器日志关联
-    total_traffic = db.Column(db.Integer, nullable=False, default=1000)  # 总流量（GB）
-    remaining_traffic = db.Column(db.Integer, nullable=False, default=1000)  # 剩余流量（GB）
+    total_traffic = db.Column(db.Float, nullable=False, default=1000.0)  # 总流量（GB）
+    remaining_traffic = db.Column(db.Float, nullable=False, default=1000.0)  # 剩余流量（GB）
 
     def __repr__(self):
         return f"<Server {self.ip}>"
@@ -170,3 +172,4 @@ class SystemAlert(db.Model):
     resolved = db.Column(db.Boolean, default=False)  # 是否已解决
     created_at = db.Column(db.DateTime, default=func.now())  # 创建时间
     updated_at = db.Column(db.DateTime, default=func.now(), onupdate=func.now())  # 更新时间
+    resolved_at = db.Column(db.DateTime, nullable=True)  # 解决时间（新增字段）
