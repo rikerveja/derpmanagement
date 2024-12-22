@@ -224,3 +224,46 @@ def check_docker_container_status():
         return jsonify({"success": True, "message": "Docker container issue alert triggered"}), 200
 
     return jsonify({"success": True, "message": "Docker container is running normally"}), 200
+
+
+# 删除告警
+@alerts_bp.route('/api/alerts/delete/<int:id>', methods=['DELETE'])
+def delete_alert(id):
+    """
+    删除指定告警
+    """
+    alert = SystemAlert.query.get(id)
+    if not alert:
+        return jsonify({"success": False, "message": "Alert not found"}), 404
+
+    try:
+        db.session.delete(alert)
+        db.session.commit()
+        log_operation(user_id=None, operation="delete_alert", status="success", details=f"Alert {id} deleted successfully")
+        return jsonify({"success": True, "message": "Alert deleted successfully"}), 200
+    except Exception as e:
+        db.session.rollback()
+        log_operation(user_id=None, operation="delete_alert", status="failed", details=f"Error deleting alert: {str(e)}")
+        return jsonify({"success": False, "message": f"Error deleting alert: {str(e)}"}), 500
+
+
+# 查询所有告警
+@alerts_bp.route('/api/alerts', methods=['GET'])
+def get_all_alerts():
+    """
+    查询所有告警
+    """
+    alerts = SystemAlert.query.all()
+    alert_data = [
+        {
+            "id": alert.id,
+            "server_id": alert.server_id,
+            "alert_type": alert.alert_type,
+            "message": alert.message,
+            "timestamp": alert.timestamp,
+            "status": alert.status
+        }
+        for alert in alerts
+    ]
+
+    return jsonify({"success": True, "alerts": alert_data}), 200
