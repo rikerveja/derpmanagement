@@ -645,33 +645,33 @@
 
 根据您的需求和描述，我们可以进一步完善和丰富数据库设计。以下是基于您提供的需求分析，详细的数据库结构设计。每个模块的表和字段都会考虑到系统的多种功能、数据管理、扩展性和性能优化。
 
-### 1. 用户管理模块
-#### **1.1 用户表**
-存储用户的基本信息。
+### **1. 用户管理模块（User Management）**
+#### **1.1 用户表 (users)**
+| 字段             | 类型            | 描述                          |
+|------------------|-----------------|-------------------------------|
+| `id`             | `INTEGER` (PK)   | 用户 ID，主键                  |
+| `username`       | `VARCHAR(255)`    | 用户名（唯一）                 |
+| `email`          | `VARCHAR(255)`    | 用户邮箱（唯一）               |
+| `password`       | `VARCHAR(255)`    | 用户密码                       |
+| `role`           | `ENUM('user', 'admin', 'distributor')` | 用户角色（如 `admin`, `user`, `distributor`）|
+| `rental_expiry`  | `DATETIME`        | 租赁到期时间                   |
+| `created_at`     | `DATETIME`        | 用户创建时间                   |
+| `updated_at`     | `DATETIME`        | 用户更新时间                   |
+| `is_banned`      | `BOOLEAN`         | 用户是否被封禁（防止暴力攻击） |
+| `last_login`     | `DATETIME`        | 用户最后登录时间               |
 
-| 字段               | 类型           | 描述                                      |
-|--------------------|----------------|-------------------------------------------|
-| `id`               | INT (PK)       | 用户 ID，主键，自增长                     |
-| `username`         | VARCHAR(255)    | 用户名，唯一                              |
-| `email`            | VARCHAR(255)    | 邮箱地址，唯一                            |
-| `password`         | VARCHAR(255)    | 密码                                      |
-| `role`             | ENUM('user', 'admin', 'distributor', 'super_admin') | 用户角色                                  |
-| `rental_expiry`    | DATETIME       | 租赁到期时间                              |
-| `created_at`       | DATETIME       | 用户注册时间                              |
-| `updated_at`       | DATETIME       | 用户信息更新时间                          |
-
-#### **1.2 租赁表**
-记录每个用户的租赁状态，管理租赁时间和状态。
-
-| 字段               | 类型           | 描述                                      |
-|--------------------|----------------|-------------------------------------------|
-| `id`               | INT (PK)       | 租赁记录 ID，主键，自增长                 |
-| `user_id`          | INT (FK)       | 用户 ID，外键，指向用户表                 |
-| `status`           | ENUM('active', 'expired', 'paused') | 租赁状态（活动、过期、暂停）       |
-| `start_date`       | DATETIME       | 租赁开始时间                              |
-| `end_date`         | DATETIME       | 租赁结束时间                              |
-| `created_at`       | DATETIME       | 租赁记录创建时间                          |
-| `updated_at`       | DATETIME       | 租赁记录更新时间                          |
+#### **1.2 租赁表 (rentals)**
+| 字段             | 类型            | 描述                          |
+|------------------|-----------------|-------------------------------|
+| `id`             | `INTEGER` (PK)   | 租赁 ID，主键                  |
+| `user_id`        | `INTEGER` (FK)   | 用户 ID，外键，关联到 `users` 表 |
+| `status`         | `ENUM('active', 'expired')` | 租赁状态（如 `active`, `expired`）|
+| `start_date`     | `DATETIME`        | 租赁开始日期                   |
+| `end_date`       | `DATETIME`        | 租赁结束日期                   |
+| `server_ids`     | `JSON`            | 租赁期间使用的服务器 IDs      |
+| `container_ids`  | `JSON`            | 租赁期间使用的容器 IDs        |
+| `created_at`     | `DATETIME`        | 租赁记录创建时间               |
+| `updated_at`     | `DATETIME`        | 租赁记录更新时间               |
 
 #### **1.3 续费通知表**
 记录续费通知的发送历史。
@@ -684,92 +684,134 @@
 | `sent_at`          | DATETIME       | 通知发送时间                              |
 
 ### 2. 序列号管理模块
-#### **2.1 序列号表**
-记录每个序列号的状态和有效期，关联用户和租赁服务。
+#### **序列号表 (serial_numbers)**
+| 字段             | 类型            | 描述                          |
+|------------------|-----------------|-------------------------------|
+| `id`             | `INTEGER` (PK)   | 序列号 ID，主键                |
+| `code`           | `VARCHAR(255)`    | 序列号（唯一）                 |
+| `status`         | `ENUM('unused', 'used', 'expired')` | 序列号状态（未使用、已使用、已过期） |
+| `user_id`        | `INTEGER` (FK)   | 使用该序列号的用户 ID，外键，指向 `users` 表 |
+| `valid_days`     | `INTEGER`         | 序列号的有效期（天数）         |
+| `start_date`     | `DATETIME`        | 序列号激活时间                 |
+| `end_date`       | `DATETIME`        | 序列号到期时间                 |
+| `created_at`     | `DATETIME`        | 序列号生成时间                 |
+| `used_at`        | `DATETIME`        | 序列号使用时间                 |
+| `expires_at`     | `DATETIME`        | 序列号过期时间                 |
 
-| 字段               | 类型           | 描述                                      |
-|--------------------|----------------|-------------------------------------------|
-| `id`               | INT (PK)       | 序列号 ID，主键，自增长                   |
-| `code`             | VARCHAR(255)    | 序列号代码，唯一                          |
-| `status`           | ENUM('unused', 'used', 'expired') | 序列号状态（未使用、已使用、已过期）|
-| `user_id`          | INT (FK)       | 使用该序列号的用户 ID                    |
-| `valid_days`       | INT            | 序列号的有效期（天数）                    |
-| `start_date`       | DATETIME       | 序列号激活时间                            |
-| `end_date`         | DATETIME       | 序列号到期时间                            |
-| `created_at`       | DATETIME       | 序列号生成时间                            |
-| `used_at`          | DATETIME       | 序列号使用时间                            |
-| `expires_at`       | DATETIME       | 序列号过期时间                            |
+#### **用户与序列号关联表 (user_serial_association)**
+| 字段             | 类型            | 描述                          |
+|------------------|-----------------|-------------------------------|
+| `id`             | `INTEGER` (PK)   | 关联 ID，主键，自增长          |
+| `user_id`        | `INTEGER` (FK)   | 用户 ID，外键，指向 `users` 表 |
+| `serial_number_id`| `INTEGER` (FK)  | 序列号 ID，外键，指向 `serial_numbers` 表 |
+| `updated_rental_expiry` | `DATETIME` | 更新后的租赁到期时间           |
+| `created_at`     | `DATETIME`        | 记录创建时间                   |
 
-#### **2.2 序列号与用户租赁时间关联表**
-记录序列号激活时，如何影响用户的租赁到期时间。
+### **3. 服务器与容器管理模块（Server and Container Management）**
+#### **服务器表 (servers)**
+| 字段             | 类型            | 描述                          |
+|------------------|-----------------|-------------------------------|
+| `id`             | `INTEGER` (PK)   | 服务器 ID，主键                |
+| `ip`             | `VARCHAR(255)`    | 服务器 IP 地址（唯一）         |
+| `region`         | `VARCHAR(100)`    | 服务器所在地区                 |
+| `status`         | `ENUM('healthy', 'unhealthy')` | 服务器状态（如 `healthy`, `unhealthy`）|
+| `total_traffic`  | `INTEGER`         | 总流量                         |
+| `remaining_traffic` | `INTEGER`       | 剩余流量                       |
+| `created_at`     | `DATETIME`        | 服务器创建时间                 |
+| `updated_at`     | `DATETIME`        | 服务器更新时间                 |
 
-| 字段               | 类型           | 描述                                      |
-|--------------------|----------------|-------------------------------------------|
-| `id`               | INT (PK)       | 关联 ID，主键，自增长                     |
-| `user_id`          | INT (FK)       | 用户 ID，外键，指向用户表                 |
-| `serial_number_id` | INT (FK)       | 序列号 ID，外键，指向序列号表             |
-| `updated_rental_expiry` | DATETIME   | 更新后的租赁到期时间                      |
-| `created_at`       | DATETIME       | 记录创建时间                              |
 
-### 3. 服务器管理模块
-#### **3.1 服务器表**
-记录服务器的基本信息、硬件配置和当前状态。
 
-| 字段               | 类型           | 描述                                      |
-|--------------------|----------------|-------------------------------------------|
-| `id`               | INT (PK)       | 服务器 ID，主键，自增长                   |
-| `ip`               | VARCHAR(255)    | 服务器 IP 地址                            |
-| `region`           | VARCHAR(255)    | 服务器所在地区                            |
-| `status`           | ENUM('active', 'inactive', 'maintenance') | 服务器状态（活动、停用、维护） |
-| `cpu`              | VARCHAR(255)    | CPU 配置                                  |
-| `memory`           | VARCHAR(255)    | 内存配置                                  |
-| `storage`          | VARCHAR(255)    | 存储配置                                  |
-| `bandwidth`        | VARCHAR(255)    | 带宽配置                                  |
-| `created_at`       | DATETIME       | 服务器创建时间                            |
-| `updated_at`       | DATETIME       | 服务器更新时间                            |
+#### **容器表 (containers)**
+| 字段             | 类型            | 描述                          |
+|------------------|-----------------|-------------------------------|
+| `id`             | `INTEGER` (PK)   | 容器 ID，主键                  |
+| `server_id`      | `INTEGER` (FK)   | 服务器 ID，外键，关联到 `servers` 表 |
+| `user_id`        | `INTEGER` (FK)   | 用户 ID，外键，关联到 `users` 表 |
+| `port`           | `INTEGER`         | 容器普通端口                   |
+| `stun_port`      | `INTEGER`         | 容器 STUN 端口                 |
+| `status`         | `ENUM('running', 'stopped', 'paused')` | 容器状态（如 `running`, `stopped`, `paused`）|
+| `upload_traffic` | `DECIMAL(10,2)`   | 容器上传流量（单位：MB）       |
+| `download_traffic`| `DECIMAL(10,2)`  | 容器下载流量（单位：MB）       |
+| `max_upload_traffic`| `DECIMAL(10,2)` | 容器最大上传流量（单位：MB）   |
+| `max_download_traffic`| `DECIMAL(10,2)` | 容器最大下载流量（单位：MB）   |
+| `created_at`     | `DATETIME`        | 容器创建时间                   |
+| `updated_at`     | `DATETIME`        | 容器更新时间                   |
 
-#### **3.2 服务器负载监控表**
-记录每台服务器的负载情况。
+#### **容器流量统计表（container_traffic_stats）**
+| 字段             | 类型            | 描述                          |
+|------------------|-----------------|-------------------------------|
+| `id`             | `INTEGER` (PK)   | 记录 ID，主键，自增长           |
+| `container_id`   | `INTEGER` (FK)   | 容器 ID，外键，指向用户容器表   |
+| `upload_traffic` | `DECIMAL(10,2)`   | 上行流量（MB）                 |
+| `download_traffic`| `DECIMAL(10,2)`  | 下行流量（MB）                 |
+| `timestamp`      | `DATETIME`        | 流量记录时间                   |
 
-| 字段               | 类型           | 描述                                      |
-|--------------------|----------------|-------------------------------------------|
-| `id`               | INT (PK)       | 记录 ID，主键，自增长                     |
-| `server_id`        | INT (FK)       | 服务器 ID，外键，指向服务器表             |
-| `cpu_usage`        | DECIMAL(5, 2)  | CPU 使用率                                |
-| `memory_usage`     | DECIMAL(5, 2)  | 内存使用率                                |
-| `disk_usage`       | DECIMAL(5, 2)  | 磁盘使用率                                |
-| `network_usage`    | DECIMAL(5, 2)  | 网络带宽使用率                            |
-| `timestamp`        | DATETIME       | 监控时间                                  |
-
-### 4. 容器管理模块
-#### **4.1 用户容器表**
-记录每个用户的 Docker 容器信息，包括容器状态、端口、流量等。
-
-| 字段               | 类型           | 描述                                      |
-|--------------------|----------------|-------------------------------------------|
-| `id`               | INT (PK)       | 容器 ID，主键，自增长                     |
-| `user_id`          | INT (FK)       | 用户 ID，外键，指向用户表                 |
-| `server_id`        | INT (FK)       | 服务器 ID，外键，指向服务器表             |
-| `container_id`     | VARCHAR(255)    | Docker 容器 ID                            |
-| `port`             | INT            | 容器端口                                  |
-| `status`           | ENUM('running', 'stopped', 'paused') | 容器状态（运行、停止、暂停）       |
-| `created_at`       | DATETIME       | 容器创建时间                              |
-| `updated_at`       | DATETIME       | 容器更新时间                              |
-| `traffic_usage`    | DECIMAL(10,2)  | 流量使用情况（MB）                        |
-| `max_traffic`      | DECIMAL(10,2)  | 最大流量限制（MB）                        |
-
-#### **4.2 容器流量统计表**
-记录每个容器的流量统计信息。
-
-| 字段               | 类型           | 描述                                      |
-|--------------------|----------------|-------------------------------------------|
-| `id`               | INT (PK)       | 记录 ID，主键，自增长                     |
-| `container_id`     | INT (FK)       | 容器 ID，外键，指向用户容器表             |
-| `upload_traffic`   | DECIMAL(10,2)  | 上行流量（MB）                            |
-| `download_traffic` | DECIMAL(10,2)  | 下行流量（MB）                            |
-| `timestamp`        | DATETIME       | 流量记录时间                              |
+---
                     
+### **4. 告警管理模块（Alert Management）**
+#### **告警表 (alerts)**
+| 字段             | 类型            | 描述                          |
+|------------------|-----------------|-------------------------------|
+| `id`             | `INTEGER` (PK)   | 告警 ID，主键                  |
+| `server_id`      | `INTEGER` (FK)   | 服务器 ID，外键，关联到 `servers` 表 |
+| `alert_type`     | `VARCHAR(255)`    | 告警类型（如 `server_error`, `docker_error`, `traffic_error`）|
+| `message`        | `TEXT`            | 告警消息                       |
+| `status`         | `ENUM('active', 'cleared', 'resolved')` | 告警状态（如 `active`, `cleared`, `resolved`）|
+| `timestamp`      | `DATETIME`        | 告警生成时间                   |
 
+---
+
+### **5. 高可用模块（High Availability）**
+#### **高可用日志表 (ha_logs)**
+| 字段             | 类型            | 描述                          |
+|------------------|-----------------|-------------------------------|
+| `id`             | `INTEGER` (PK)   | 日志 ID，主键                  |
+| `operation`      | `VARCHAR(255)`    | 操作类型（如 `failover`, `load_balance`）|
+| `status`         |
+
+ `ENUM('success', 'failed')` | 操作状态（如 `success`, `failed`）|
+| `details`        | `TEXT`            | 操作详情                       |
+| `timestamp`      | `DATETIME`        | 操作时间                       |
+
+---
+
+### **6. ACL 配置模块（Access Control List）**
+#### **ACL 配置表 (acl_configs)**
+| 字段             | 类型            | 描述                          |
+|------------------|-----------------|-------------------------------|
+| `id`             | `INTEGER` (PK)   | 配置 ID，主键                  |
+| `user_id`        | `INTEGER` (FK)   | 用户 ID，外键，关联到 `users` 表 |
+| `server_ids`     | `JSON`           | 关联的服务器 ID 列表           |
+| `container_ids`  | `JSON`           | 关联的容器 ID 列表             |
+| `acl_data`       | `JSON`           | 存储 ACL 配置的 JSON 数据      |
+| `version`        | `VARCHAR(50)`     | 配置版本号                     |
+| `created_at`     | `DATETIME`        | 配置生成时间                   |
+| `updated_at`     | `DATETIME`        | 配置更新时间                   |
+
+#### **ACL 校验记录表（acl_verification_logs）**
+| 字段             | 类型            | 描述                          |
+|------------------|-----------------|-------------------------------|
+| `id`             | `INTEGER` (PK)   | 记录 ID，主键，自增长           |
+| `user_id`        | `INTEGER` (FK)   | 用户 ID，外键，关联到 `users` 表 |
+| `acl_id`         | `INTEGER` (FK)   | ACL 配置 ID，外键，指向 `acl_configs` 表 |
+| `ip_address`     | `VARCHAR(50)`     | 用户请求的 IP 地址             |
+| `location`       | `VARCHAR(255)`    | 用户的地理位置（可选）         |
+| `status`         | `ENUM('approved', 'denied')` | 校验状态（如 `approved`, `denied`）|
+| `timestamp`      | `DATETIME`        | 校验时间                       |
+
+---
+
+### **7. 日志记录模块（Logging）**
+#### **系统日志表 (system_logs)**
+| 字段             | 类型            | 描述                          |
+|------------------|-----------------|-------------------------------|
+| `id`             | `INTEGER` (PK)   | 日志 ID，主键                  |
+| `user_id`        | `INTEGER` (FK)   | 用户 ID，外键，关联到 `users` 表 |
+| `operation`      | `VARCHAR(255)`    | 操作类型（如 `user_login`, `add_alert`）|
+| `status`         | `ENUM('success', 'failed')` | 操作状态（如 `success`, `failed`）|
+| `details`        | `TEXT`            | 操作详细信息                   |
+| `timestamp`      | `DATETIME`        | 操作时间                       |
 ### 5. ACL 管理模块
 #### **5.1 ACL 配置表**
 记录每个用户的 ACL 配置，包括其访问权限。
@@ -1001,4 +1043,11 @@
 | `created_at`       | DATETIME       | 创建时间                                  |
 
 ---
-
+### **数据库关系概述**：
+- **用户表（`users`）** 和 **续费通知表（`renewal_notifications`）** 通过 **`user_id`** 关联。
+- **用户表（`users`）** 和 **序列号表（`serial_numbers`）** 通过 **`user_id`** 关联，表示哪个用户使用了哪个序列号。
+- **序列号表（`serial_numbers`）** 和 **序列号与用户租赁时间关联表（`user_serial_association`）** 通过 **`serial_number_id`** 关联。
+- **服务器表（`servers`）** 和 **容器表（`containers`）** 通过 **`server_id`** 关联，容器隶属于服务器。
+- **告警表（`alerts`）** 和 **服务器表（`servers`）** 通过 **`server_id`** 关联，表示告警与服务器的关系。
+- **容器流量统计表（`container_traffic_stats`）** 和 **容器表（`containers`）** 通过 **`container_id`** 关联，记录容器的流量统计信息。
+- **服务器负载监控表（`server_load_status`）** 和 **服务器表（`servers`）** 通过 **`server_id`** 关联，记录每台服务器的负载和流量。
