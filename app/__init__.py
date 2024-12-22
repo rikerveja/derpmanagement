@@ -9,6 +9,7 @@ from logging.handlers import RotatingFileHandler
 from dotenv import load_dotenv
 import os
 
+
 # 加载环境变量
 load_dotenv()
 
@@ -85,6 +86,7 @@ def create_app():
     from app.routes.monitoring_routes import monitoring_bp  # 新增：监控模块
     from app.routes.serial_routes import serial_bp  # 新增：序列号管理模块
     from app.routes.security_routes import security_bp  # 新增：安全与设备绑定模块
+    from app.utils.system_logs import logs_bp  # 导入 logs 蓝图
 
     # 蓝图注册到 Flask 应用
     app.register_blueprint(user_bp, url_prefix='/api/user')
@@ -102,6 +104,7 @@ def create_app():
     app.register_blueprint(monitoring_bp, url_prefix='/api/monitoring')  # 新增：监控模块
     app.register_blueprint(serial_bp, url_prefix='/api/serial')  # 新增：序列号管理模块
     app.register_blueprint(security_bp, url_prefix='/api/security')  # 新增：安全与设备绑定模块
+    app.register_blueprint(logs_bp, url_prefix='/api')  # 注册 logs 蓝图，并设置 URL 前缀
 
     app.logger.info("App successfully created and initialized.")
     return app
