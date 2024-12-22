@@ -36,7 +36,7 @@ class DockerSSHManager:
             return client
         except Exception as e:
             logger.error(f"Error connecting to SSH: {e}")
-            raise
+            raise  # 重新抛出异常，以便上层处理
 
     def create_container(self, image_name, container_name, ports, environment=None):
         """
@@ -117,32 +117,9 @@ class DockerSSHManager:
 
     def close(self):
         """关闭 SSH 客户端连接"""
-        self.ssh_client.close()
-        logger.info("SSH connection closed.")
-
-
-# 使用 DockerSSHManager 管理容器
-docker_manager = DockerSSHManager(
-    ssh_host="192.168.1.100",  # 远程服务器 IP 地址
-    ssh_user="your_ssh_user",  # SSH 用户名
-    ssh_key="/path/to/ssh/key"  # 或者使用 ssh_password="your_password"
-)
-
-# 示例：创建 Docker 容器
-docker_manager.create_container(
-    image_name="nginx",
-    container_name="my_nginx_container",
-    ports="8080:80"
-)
-
-# 示例：停止 Docker 容器
-docker_manager.stop_container("my_nginx_container")
-
-# 示例：获取容器状态
-docker_manager.get_container_status("my_nginx_container")
-
-# 示例：列出所有容器
-docker_manager.list_containers(all=True)
-
-# 关闭 SSH 连接
-docker_manager.close()
+        try:
+            self.ssh_client.close()
+            logger.info("SSH connection closed.")
+        except Exception as e:
+            logger.error(f"Error closing SSH connection: {e}")
+            raise
