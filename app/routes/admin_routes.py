@@ -25,7 +25,7 @@ def set_user_permissions(user_id):
     role = data.get('role')
 
     # 验证角色是否合法
-    if role not in VALID_ROLES:
+    if not role or role not in VALID_ROLES:
         log_operation(user_id=user_id, operation="set_user_permissions", status="failed", details="Invalid role")
         return jsonify({"success": False, "message": "Invalid role"}), 400
 
@@ -34,12 +34,15 @@ def set_user_permissions(user_id):
         log_operation(user_id=user_id, operation="set_user_permissions", status="failed", details="Unauthorized access")
         return jsonify({"success": False, "message": "You do not have permission to assign this role"}), 403
 
-    # 修改角色并保存
-    old_role = user.role
-    user.role = role
-    db.session.commit()
-
-    # 记录操作日志
-    log_operation(user_id=user_id, operation="set_user_permissions", status="success", details=f"Role updated from {old_role} to {role}")
-
-    return jsonify({"success": True, "message": f"Role updated to {role}"}), 200
+     # 修改角色并保存
+     old_role = user.role
+     user.role = role
+    try:
+        db.session.commit()
+      # 记录操作日志
+        log_operation(user_id=user_id, operation="set_user_permissions", status="success", details=f"Role updated from {old_role} to {role}")
+        return jsonify({"success": True, "message": f"Role updated to {role}"}), 200
+    except Exception as e:
+        db.session.rollback()  # 回滚事务
+        log_operation(user_id=user_id, operation="set_user_permissions", status="failed", details=f"Database error: {str(e)}")
+        return jsonify({"success": False, "message": "Failed to update role due to a database error"}), 500
