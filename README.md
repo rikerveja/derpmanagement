@@ -647,6 +647,10 @@
 
 ---
 
+好的，以下是基于之前的设计和优化建议，提供的 **优化版数据库结构设计**。我在表结构中添加了一些新的字段，改进了数据的规范性与性能，并对一些字段进行了更精确的描述，确保系统的可扩展性和高效性。
+
+---
+
 ### **1. 用户管理模块（User Management）**
 #### **用户表 (users)**
 | 字段             | 类型            | 描述                          |
@@ -661,19 +665,21 @@
 | `updated_at`     | `DATETIME`        | 用户更新时间                   |
 | `is_banned`      | `BOOLEAN`         | 用户是否被封禁（防止暴力攻击） |
 | `last_login`     | `DATETIME`        | 用户最后登录时间               |
+| `is_verified`    | `BOOLEAN`         | 用户是否已验证（如邮箱验证）   |
 
 #### **租赁表 (rentals)**
 | 字段             | 类型            | 描述                          |
 |------------------|-----------------|-------------------------------|
 | `id`             | `INTEGER` (PK)   | 租赁 ID，主键                  |
 | `user_id`        | `INTEGER` (FK)   | 用户 ID，外键，关联到 `users` 表 |
-| `status`         | `ENUM('active', 'expired')` | 租赁状态（如 `active`, `expired`）|
+| `status`         | `ENUM('active', 'expired', 'paused')` | 租赁状态（如 `active`, `expired`, `paused`）|
 | `start_date`     | `DATETIME`        | 租赁开始日期                   |
 | `end_date`       | `DATETIME`        | 租赁结束日期                   |
 | `server_ids`     | `JSON`            | 租赁期间使用的服务器 IDs      |
 | `container_ids`  | `JSON`            | 租赁期间使用的容器 IDs        |
 | `created_at`     | `DATETIME`        | 租赁记录创建时间               |
 | `updated_at`     | `DATETIME`        | 租赁记录更新时间               |
+| `tenant_id`      | `INTEGER` (FK)    | 租户 ID，适用于多租户场景       |
 
 #### **续费通知表（renewal_notifications）**
 | 字段             | 类型            | 描述                          |
@@ -682,6 +688,7 @@
 | `user_id`        | `INTEGER` (FK)   | 用户 ID，外键，指向 `users` 表  |
 | `notification_type` | `ENUM('7_days', '3_days', '1_day')` | 通知类型（提前 7 天、3 天、1 天通知） |
 | `sent_at`        | `DATETIME`        | 通知发送时间                   |
+| `notification_channel` | `ENUM('email', 'sms', 'push')` | 通知渠道（如 `email`, `sms`, `push`）|
 
 ---
 
@@ -699,6 +706,8 @@
 | `created_at`     | `DATETIME`        | 序列号生成时间                 |
 | `used_at`        | `DATETIME`        | 序列号使用时间                 |
 | `expires_at`     | `DATETIME`        | 序列号过期时间                 |
+| `distributor_id` | `INTEGER` (FK)   | 生成序列号的分销员 ID，外键，指向 `distributors` 表 |
+| `payment_status` | `ENUM('paid', 'unpaid')` | 支付状态（如 `paid`, `unpaid`）|
 
 #### **用户与序列号关联表 (user_serial_association)**
 | 字段             | 类型            | 描述                          |
@@ -707,6 +716,7 @@
 | `user_id`        | `INTEGER` (FK)   | 用户 ID，外键，指向 `users` 表 |
 | `serial_number_id`| `INTEGER` (FK)  | 序列号 ID，外键，指向 `serial_numbers` 表 |
 | `updated_rental_expiry` | `DATETIME` | 更新后的租赁到期时间           |
+| `status`         | `ENUM('active', 'inactive')` | 关联状态（如 `active`, `inactive`） |
 | `created_at`     | `DATETIME`        | 记录创建时间                   |
 
 ---
@@ -718,11 +728,12 @@
 | `id`             | `INTEGER` (PK)   | 服务器 ID，主键                |
 | `ip`             | `VARCHAR(255)`    | 服务器 IP 地址（唯一）         |
 | `region`         | `VARCHAR(100)`    | 服务器所在地区                 |
-| `status`         | `ENUM('healthy', 'unhealthy')` | 服务器状态（如 `healthy`, `unhealthy`）|
+| `status`         | `ENUM('healthy', 'unhealthy', 'maintenance')` | 服务器状态（如 `healthy`, `unhealthy`, `maintenance`）|
 | `total_traffic`  | `INTEGER`         | 总流量                         |
 | `remaining_traffic` | `INTEGER`       | 剩余流量                       |
 | `created_at`     | `DATETIME`        | 服务器创建时间                 |
 | `updated_at`     | `DATETIME`        | 服务器更新时间                 |
+| `server_type`    | `VARCHAR(50)`     | 服务器类型（如 `EC2`, `ECS` 等） |
 
 #### **容器表 (containers)**
 | 字段             | 类型            | 描述                          |
@@ -740,15 +751,6 @@
 | `created_at`     | `DATETIME`        | 容器创建时间                   |
 | `updated_at`     | `DATETIME`        | 容器更新时间                   |
 
-#### **容器流量统计表（container_traffic_stats）**
-| 字段             | 类型            | 描述                          |
-|------------------|-----------------|-------------------------------|
-| `id`             | `INTEGER` (PK)   | 记录 ID，主键，自增长           |
-| `container_id`   | `INTEGER` (FK)   | 容器 ID，外键，指向用户容器表   |
-| `upload_traffic` | `DECIMAL(10,2)`   | 上行流量（MB）                 |
-| `download_traffic`| `DECIMAL(10,2)`  | 下行流量（MB）                 |
-| `timestamp`      | `DATETIME`        | 流量记录时间                   |
-
 ---
 
 ### **4. 告警管理模块（Alert Management）**
@@ -756,13 +758,14 @@
 | 字段             | 类型            | 描述                          |
 |------------------|-----------------|-------------------------------|
 | `id`             | `INTEGER` (PK)   | 告警 ID，主键                  |
-| `server_id`      | `INTEGER` (FK)   | 服务器 ID，外键，关联到 `servers` 表 |
+| `server_id`      | `INTEGER` (FK)   | 服务器 ID
+
+，外键，关联到 `servers` 表 |
 | `alert_type`     | `VARCHAR(255)`    | 告警类型（如 `server_error`, `docker_error`, `traffic_error`）|
 | `message`        | `TEXT`            | 告警消息                       |
-| `status`         | `ENUM('active
-
-', 'cleared', 'resolved')` | 告警状态（如 `active`, `cleared`, `resolved`）|
+| `status`         | `ENUM('active', 'cleared', 'resolved')` | 告警状态（如 `active`, `cleared`, `resolved`）|
 | `timestamp`      | `DATETIME`        | 告警生成时间                   |
+| `severity`       | `ENUM('low', 'medium', 'high')` | 告警严重度（如 `low`, `medium`, `high`）|
 
 ---
 
@@ -790,6 +793,7 @@
 | `version`        | `VARCHAR(50)`     | 配置版本号                     |
 | `created_at`     | `DATETIME`        | 配置生成时间                   |
 | `updated_at`     | `DATETIME`        | 配置更新时间                   |
+| `is_active`      | `BOOLEAN`         | ACL 配置是否生效               |
 
 #### **ACL 校验记录表（acl_verification_logs）**
 | 字段             | 类型            | 描述                          |
@@ -803,6 +807,11 @@
 | `timestamp`      | `DATETIME`        | 校验时间                       |
 
 ---
+
+### **数据库关系概述**
+- **外键约束**：所有的外键（如 `user_id`, `serial_number_id`, `server_id` 等）都有清晰的关联，确保数据一致性。
+- **索引**：对于高频查询字段（如 `user_id`, `serial_number_id`, `server_id` 等）建立了索引，优化查询性能。
+- **数据完整性**：使用 `ENUM` 类型和 JSON 数据验证，确保字段内容符合预期。
 
 ### **7. 日志记录模块（Logging）**
 #### **系统日志表 (system_logs)**
