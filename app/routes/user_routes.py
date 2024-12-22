@@ -11,18 +11,24 @@ import os
 user_bp = Blueprint('user', __name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# 验证必填字段
+def validate_required_fields(data, fields):
+    missing_fields = [field for field in fields if not data.get(field)]
+    return missing_fields
+
 # 添加用户
 @user_bp.route('/api/add_user', methods=['POST'])
 def add_user():
     data = request.json
-    username = data.get('username')
-    email = data.get('email')
-    password = data.get('password')
-    verification_code = data.get('verification_code')
+    required_fields = ['username', 'email', 'password', 'verification_code']
+    missing_fields = validate_required_fields(data, required_fields)
 
-    if not username or not email or not password or not verification_code:
-        log_operation(None, "add_user", "failed", "Missing required fields")
-        return jsonify({"success": False, "message": "Missing required fields"}), 400
+    if missing_fields:
+        log_operation(None, "add_user", "failed", f"Missing fields: {', '.join(missing_fields)}")
+        return jsonify({"success": False, "message": f"Missing fields: {', '.join(missing_fields)}"}), 400
+
+    email = data.get('email')
+    verification_code = data.get('verification_code')
 
     if not validate_verification_code(email, verification_code):
         log_operation(None, "add_user", "failed", f"Invalid or expired verification code for email: {email}")
@@ -33,8 +39,8 @@ def add_user():
         log_operation(None, "add_user", "failed", f"Email already registered: {email}")
         return jsonify({"success": False, "message": "Email already registered"}), 400
 
-    hashed_password = hash_password(password)
-    user = User(username=username, email=email, password=hashed_password)
+    hashed_password = hash_password(data.get('password'))
+    user = User(username=data.get('username'), email=email, password=hashed_password)
 
     db.session.add(user)
     try:
@@ -44,19 +50,22 @@ def add_user():
     except Exception as e:
         db.session.rollback()
         log_operation(None, "add_user", "failed", f"Database error: {e}")
-        return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
+        return jsonify({"success": False, "message": "Internal server error"}), 500
 
 
 # 用户登录
 @user_bp.route('/api/login', methods=['POST'])
 def login():
     data = request.json
+    required_fields = ['email', 'password']
+    missing_fields = validate_required_fields(data, required_fields)
+
+    if missing_fields:
+        log_operation(None, "login", "failed", f"Missing fields: {', '.join(missing_fields)}")
+        return jsonify({"success": False, "message": f"Missing fields: {', '.join(missing_fields)}"}), 400
+
     email = data.get('email')
     password = data.get('password')
-
-    if not email or not password:
-        log_operation(None, "login", "failed", "Missing email or password")
-        return jsonify({"success": False, "message": "Missing email or password"}), 400
 
     user = User.query.filter_by(email=email).first()
     if not user or not check_password(password, user.password):
@@ -151,37 +160,30 @@ def apply_distributor():
         log_operation(None, "apply_distributor", "failed", f"User not found: {user_id}")
         return jsonify({"success": False, "message": "User not found"}), 404
 
-    # 假设这里检查一些条件来批准分销员申请
-    # 例如：如果用户已经是分销员，则返回提示
     if user.role == "distributor":
         log_operation(user.id, "apply_distributor", "failed", "User already a distributor")
         return jsonify({"success": False, "message": "User is already a distributor"}), 400
 
-    # 审核通过，更新用户角色为分销员
-    user.role = "distributor"
-    db.session.commit()
-
-    log_operation(user.id, "apply_distributor", "success", f"User {user_id} approved as distributor")
-    return jsonify({"success": True, "message": "User approved as distributor"}), 200
+    try:
+        user.role = "distributor"
+        db.session.commit()
+        log_operation(user.id, "apply_distributor", "success", f"User {user_id} approved as distributor")
+        return jsonify({"success": True, "message": "User approved as distributor"}), 200
+    except Exception as e:
+        db.session.rollback()
+        log_operation(user.id, "apply_distributor", "failed", f"Error approving distributor: {str(e)}")
+        return jsonify({"success": False, "message": "Failed to apply as distributor"}), 500
 
 
 # 下载 ACL 配置文件
 @user_bp.route('/api/user/download_acl', methods=['GET'])
 def download_acl():
-    """
-    下载用户的 ACL 文件接口
-    请求参数：
-        - user_id: 用户ID
-    返回：
-        - 成功或失败信息，成功时返回文件下载
-    """
     user_id = request.args.get('user_id')
     user = User.query.get(user_id)
     if not user:
         return jsonify({"success": False, "message": "User not found"}), 404
 
-    # 假设 ACL 文件已经存储在文件系统中
-    acl_filename = f"{user_id}_acl.json"
+    acl_filename = os.path.basename(f"{user_id}_acl.json")
     acl_file_path = os.path.join('acl_files', acl_filename)
 
     if not os.path.exists(acl_file_path):
