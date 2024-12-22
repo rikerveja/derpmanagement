@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from flask_mail import Message
 from app import mail, db
-from app.models import User
+from app.models import User, NotificationLog
 from datetime import datetime, timedelta
 from app.utils.notifications_utils import send_email
 import logging
@@ -41,6 +41,27 @@ def send_reminder():
             email_sent = send_email(user.email, email_subject, email_body)
             if not email_sent:
                 failed_emails.append(user.email)
+                # 记录通知失败的日志
+                notification_log = NotificationLog(
+                    user_id=user.id,
+                    subject=email_subject,
+                    body=email_body,
+                    status="failed",
+                    error_message="Failed to send email"
+                )
+                db.session.add(notification_log)
+            else:
+                # 记录通知成功的日志
+                notification_log = NotificationLog(
+                    user_id=user.id,
+                    subject=email_subject,
+                    body=email_body,
+                    status="success"
+                )
+                db.session.add(notification_log)
+
+        # 提交所有日志到数据库
+        db.session.commit()
 
         if failed_emails:
             logging.error(f"Failed to send reminder to: {', '.join(failed_emails)}")
