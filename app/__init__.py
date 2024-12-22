@@ -87,7 +87,7 @@ def create_app():
     from app.routes.serial_routes import serial_bp  # 新增：序列号管理模块
     from app.routes.security_routes import security_bp  # 新增：安全与设备绑定模块
     from app.utils.system_logs import logs_bp  # 导入 logs 蓝图
-    from app.routes.user_history_routes import user_history_bp  # 导入 user_history 蓝图
+    from app.utils.user_history import user_history_bp  # 从 utils 导入 user_history 蓝图
 
     # 蓝图注册到 Flask 应用
     app.register_blueprint(user_bp, url_prefix='/api/user')
