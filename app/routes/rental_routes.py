@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from app.models import SerialNumber, UserContainer
+from app.models import SerialNumber, UserContainer, UserHistory
 from app.utils.email_utils import send_verification_email
 from app.utils.logging_utils import log_operation
 from app import db
@@ -32,6 +32,11 @@ def check_expiry():
             user_containers = UserContainer.query.filter_by(user_id=rental.user_id).all()
             for container in user_containers:
                 db.session.delete(container)
+
+            # 删除租赁历史记录
+            user_history = UserHistory.query.filter_by(user_id=rental.user_id).all()
+            for history in user_history:
+                db.session.delete(history)
 
             log_operation(
                 user_id=rental.user_id,
@@ -149,3 +154,69 @@ def renew_rental():
             details=f"Error renewing rental: {str(e)}"
         )
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
+
+
+# 删除租赁信息（删除序列号及其关联的容器和历史记录）
+@rental_bp.route('/api/rental/delete/<int:serial_id>', methods=['DELETE'])
+def delete_rental(serial_id):
+    """
+    删除用户的租赁信息，包括序列号和关联的容器
+    """
+    try:
+        rental = SerialNumber.query.get(serial_id)
+        if not rental:
+            return jsonify({"success": False, "message": "Rental not found"}), 404
+
+        # 删除用户的容器
+        user_containers = UserContainer.query.filter_by(user_id=rental.user_id).all()
+        for container in user_containers:
+            db.session.delete(container)
+
+        # 删除租赁历史记录
+        user_history = UserHistory.query.filter_by(user_id=rental.user_id).all()
+        for history in user_history:
+            db.session.delete(history)
+
+        # 删除序列号
+        db.session.delete(rental)
+        db.session.commit()
+
+        log_operation(
+            user_id=rental.user_id,
+            operation="delete_rental",
+            status="success",
+            details=f"Rental and associated containers deleted for user {rental.user_id}"
+        )
+        return jsonify({"success": True, "message": "Rental deleted successfully"}), 200
+    except Exception as e:
+        db.session.rollback()  # 回滚事务
+        log_operation(
+            user_id=None,
+            operation="delete_rental",
+            status="failed",
+            details=f"Error deleting rental: {str(e)}"
+        )
+        return jsonify({"success": False, "message": f"Error deleting rental: {str(e)}"}), 500
+
+
+# 查询用户租赁历史记录
+@rental_bp.route('/api/rental/history/<int:user_id>', methods=['GET'])
+def get_user_history(user_id):
+    """
+    查询用户租赁历史记录
+    """
+    try:
+        user_history = UserHistory.query.filter_by(user_id=user_id).all()
+        if not user_history:
+            return jsonify({"success": False, "message": "No history found"}), 404
+
+        history_data = [
+            {
+                "rental_start": record.rental_start,
+                "rental_end": record.rental_end,
+                "total_traffic": record.total_traffic,
+            } for record in user_history
+        ]
+        return jsonify({"success": True, "history": history_data}), 200
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Error fetching user history: {str(e)}"}), 500
