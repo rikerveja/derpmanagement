@@ -21,10 +21,18 @@ def generate_verification_code(length=6, use_letters=False):
     :param length: 验证码长度
     :param use_letters: 是否包括字母
     """
-    characters = string.digits
-    if use_letters:
-        characters += string.ascii_letters  # 包括字母
-    return ''.join(random.choices(characters, k=length))
+    try:
+        characters = string.digits
+        if use_letters:
+            characters += string.ascii_letters  # 包括字母
+        code = ''.join(random.choices(characters, k=length))
+        logger.info(f"Generated verification code: {code}")
+        return code
+    except Exception as e:
+        logger.error(f"Error generating verification code: {e}")
+        logger.error(traceback.format_exc())  # 记录详细的异常信息
+        return None
+
 
 # 发送邮箱验证码
 def send_verification_email(email, use_letters=False):
@@ -34,6 +42,10 @@ def send_verification_email(email, use_letters=False):
     :param use_letters: 是否使用字母组成验证码
     """
     verification_code = generate_verification_code(use_letters=use_letters)
+
+    if not verification_code:
+        logger.error("Failed to generate verification code.")
+        return False
 
     # 将验证码存储到 Redis，设置过期时间（默认 5 分钟）
     try:
@@ -52,10 +64,14 @@ def send_verification_email(email, use_letters=False):
         mail.send(msg)
         logger.info(f"Verification email sent to {email}")
         return True
+    except redis.RedisError as redis_error:
+        logger.error(f"Error interacting with Redis: {redis_error}")
+        logger.error(traceback.format_exc())  # 记录 Redis 错误信息
     except Exception as e:
         logger.error(f"Error sending verification email to {email}: {e}")
         logger.error(traceback.format_exc())  # 记录详细的异常信息
-        return False
+    return False
+
 
 # 验证邮箱验证码
 def validate_verification_code(email, code):
@@ -76,6 +92,10 @@ def validate_verification_code(email, code):
                 logger.warning(f"Invalid verification code for {email}.")
                 return False
         logger.warning(f"Verification code for {email} has expired or not found.")
+        return False
+    except redis.RedisError as redis_error:
+        logger.error(f"Error interacting with Redis: {redis_error}")
+        logger.error(traceback.format_exc())  # 记录 Redis 错误信息
         return False
     except Exception as e:
         logger.error(f"Error validating verification code for {email}: {e}")
