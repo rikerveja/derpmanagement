@@ -812,9 +812,11 @@
 - **外键约束**：所有的外键（如 `user_id`, `serial_number_id`, `server_id` 等）都有清晰的关联，确保数据一致性。
 - **索引**：对于高频查询字段（如 `user_id`, `serial_number_id`, `server_id` 等）建立了索引，优化查询性能。
 - **数据完整性**：使用 `ENUM` 类型和 JSON 数据验证，确保字段内容符合预期。
-
+- 
 ### **7. 日志记录模块（Logging）**
+
 #### **系统日志表 (system_logs)**
+
 | 字段             | 类型            | 描述                          |
 |------------------|-----------------|-------------------------------|
 | `id`             | `INTEGER` (PK)   | 日志 ID，主键                  |
@@ -827,7 +829,9 @@
 ---
 
 ### **8. 续费通知表（renewal_notifications）**
+
 #### **续费通知表（renewal_notifications）**
+
 | 字段             | 类型            | 描述                          |
 |------------------|-----------------|-------------------------------|
 | `id`             | `INTEGER` (PK)   | 记录 ID，主键，自增长           |
@@ -838,11 +842,13 @@
 ---
 
 ### **9. 容器流量统计表（container_traffic_stats）**
+
 #### **容器流量统计表（container_traffic_stats）**
+
 | 字段             | 类型            | 描述                          |
 |------------------|-----------------|-------------------------------|
 | `id`             | `INTEGER` (PK)   | 记录 ID，主键，自增长           |
-| `container_id`   | `INTEGER` (FK)   | 容器 ID，外键，指向用户容器表   |
+| `container_id`   | `INTEGER` (FK)   | 容器 ID，外键，指向 `containers` 表 |
 | `upload_traffic` | `DECIMAL(10,2)`   | 上行流量（MB）                 |
 | `download_traffic`| `DECIMAL(10,2)`  | 下行流量（MB）                 |
 | `timestamp`      | `DATETIME`        | 流量记录时间                   |
@@ -850,7 +856,9 @@
 ---
 
 ### **10. 服务器负载监控表（server_load_status）**
+
 #### **服务器负载监控表（server_load_status）**
+
 | 字段             | 类型            | 描述                          |
 |------------------|-----------------|-------------------------------|
 | `id`             | `INTEGER` (PK)   | 记录 ID，主键，自增长           |
@@ -859,6 +867,9 @@
 | `remaining_traffic` | `DECIMAL(10,2)` | 剩余流量（单位：GB）            |
 | `container_count` | `INTEGER`        | 服务器上的容器数量             |
 | `timestamp`      | `DATETIME`       | 记录时间                       |
+
+---
+
 
 ---
 
