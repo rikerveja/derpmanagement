@@ -46,3 +46,15 @@ htmlcov/
 .tox/
 .cache/
 pytest_cache/
+
+# Jupyter Notebook 文件
+.ipynb_checkpoints/
+
+# PyCharm 项目配置文件
+.idea/
+
+# macOS 系统文件
+*.swp
+
+# Windows 系统文件
+Thumbs.db
