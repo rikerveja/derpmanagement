@@ -11,6 +11,9 @@ server_bp = Blueprint('server', __name__)
 # 添加服务器
 @server_bp.route('/api/add_server', methods=['POST'])
 def add_server():
+    """
+    添加新服务器
+    """
     data = request.json
     ip = data.get('ip')
     region = data.get('region')
@@ -18,13 +21,15 @@ def add_server():
     cpu = data.get('cpu')  # 新增：CPU 配置
     memory = data.get('memory')  # 新增：内存配置
 
-    # 检查字段是否完整
+    # 检查必填字段
     if not ip or not region or not cpu or not memory:
+        logging.error("Missing required fields: ip, region, cpu, memory")
         return jsonify({"success": False, "message": "Missing required fields (ip, region, cpu, memory)"}), 400
 
     # 检查服务器是否已存在
     existing_server = Server.query.filter_by(ip=ip).first()
     if existing_server:
+        logging.error(f"Server with IP {ip} already exists")
         return jsonify({"success": False, "message": "Server already exists"}), 400
 
     # 创建新服务器
@@ -43,8 +48,12 @@ def add_server():
 # 获取服务器状态
 @server_bp.route('/api/server/status/<int:server_id>', methods=['GET'])
 def server_status(server_id):
+    """
+    获取指定服务器的状态
+    """
     server = Server.query.get(server_id)
     if not server:
+        logging.error(f"Server with ID {server_id} not found")
         return jsonify({"success": False, "message": "Server not found"}), 404
 
     # 获取服务器状态
@@ -52,16 +61,20 @@ def server_status(server_id):
         status = get_server_status(server.ip)
         return jsonify({"success": True, "status": status, "load": server.load}), 200
     except Exception as e:
-        logging.error(f"Error getting server status: {e}")
+        logging.error(f"Error getting server status for server {server_id}: {e}")
         return jsonify({"success": False, "message": f"Error getting server status: {str(e)}"}), 500
 
 
 # 监控服务器健康
 @server_bp.route('/api/server/health_check', methods=['GET'])
 def health_check():
+    """
+    监控所有服务器的健康状况
+    """
     try:
         # 监控所有服务器的健康状况
         results = monitor_server_health()
+        logging.info("Health check completed successfully")
         return jsonify({"success": True, "health_check_results": results}), 200
     except Exception as e:
         logging.error(f"Error during health check: {e}")
