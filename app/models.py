@@ -175,6 +175,26 @@ class SystemAlert(db.Model):
     updated_at = db.Column(db.DateTime, default=func.now(), onupdate=func.now())  # 更新时间
     resolved_at = db.Column(db.DateTime, nullable=True)  # 解决时间（新增字段）
 
+# 设备与服务器之间的 ACL 配置模型
+class ACLConfig(db.Model):
+    __tablename__ = 'acl_configs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # 关联用户
+    user = db.relationship('User', backref=db.backref('acl_configs', lazy=True))
+    
+    server_id = db.Column(db.Integer, db.ForeignKey('servers.id'), nullable=False)  # 关联服务器
+    server = db.relationship('Server', backref=db.backref('acl_configs', lazy=True))
+
+    container_id = db.Column(db.Integer, db.ForeignKey('user_containers.id'), nullable=False)  # 关联容器
+    container = db.relationship('UserContainer', backref=db.backref('acl_configs', lazy=True))
+    
+    derp_port = db.Column(db.Integer, nullable=False)  # DERP 服务的端口号
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)  # 创建时间
+    
+    def __repr__(self):
+        return f"<ACLConfig user_id={self.user_id} server_id={self.server_id} container_id={self.container_id}>"
+
 class NotificationLog(db.Model):
     __tablename__ = 'notification_logs'
 
