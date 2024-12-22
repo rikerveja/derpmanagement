@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
-from app.models import SerialNumber, db
+from app.models import SerialNumber
+from app import db
 import random
 import string
 from datetime import datetime, timedelta
@@ -127,3 +128,50 @@ def ban_user(user_id):
         user.is_banned = True
         db.session.commit()
         logging.info(f"User {user_id} has been banned")
+
+
+# 更新序列号
+@serial_bp.route('/api/serial/update/<int:id>', methods=['PUT'])
+def update_serial_number(id):
+    """
+    更新指定序列号的状态和过期时间
+    :param id: 序列号 ID
+    """
+    data = request.json
+    status = data.get('status')
+    expires_at = data.get('expires_at')
+
+    serial = SerialNumber.query.get(id)
+    if not serial:
+        return jsonify({"success": False, "message": "Serial number not found"}), 404
+
+    try:
+        serial.status = status if status else serial.status
+        serial.expires_at = expires_at if expires_at else serial.expires_at
+        db.session.commit()
+        return jsonify({"success": True, "message": "Serial number updated successfully"}), 200
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error updating serial number: {e}")
+        return jsonify({"success": False, "message": f"Error updating serial number: {str(e)}"}), 500
+
+
+# 删除序列号
+@serial_bp.route('/api/serial/delete/<int:id>', methods=['DELETE'])
+def delete_serial_number(id):
+    """
+    删除指定序列号
+    :param id: 序列号 ID
+    """
+    serial = SerialNumber.query.get(id)
+    if not serial:
+        return jsonify({"success": False, "message": "Serial number not found"}), 404
+
+    try:
+        db.session.delete(serial)
+        db.session.commit()
+        return jsonify({"success": True, "message": "Serial number deleted successfully"}), 200
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error deleting serial number: {e}")
+        return jsonify({"success": False, "message": f"Error deleting serial number: {str(e)}"}), 500
