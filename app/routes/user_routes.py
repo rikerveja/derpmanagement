@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, send_from_directory
-from app.models import User, UserHistory, Server
+from app.models import User, UserHistory
 from app.utils.auth_utils import hash_password, check_password, generate_jwt, generate_refresh_token
 from app.utils.email_utils import send_verification_email, validate_verification_code
 from app import db
