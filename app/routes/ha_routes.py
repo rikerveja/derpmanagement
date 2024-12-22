@@ -26,6 +26,7 @@ def check_server_health_status():
     try:
         return jsonify({"success": True, "server_health": server_health}), 200
     except Exception as e:
+        log_operation(user_id=None, operation="check_server_health_status", status="failed", details=f"Error fetching server health: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching server health: {str(e)}"}), 500
 
 
@@ -37,6 +38,7 @@ def check_individual_server_health(server_id):
     """
     server_info = server_health.get(server_id)
     if not server_info:
+        log_operation(user_id=None, operation="check_individual_server_health", status="failed", details="Server not found")
         return jsonify({"success": False, "message": "Server not found"}), 404
 
     try:
@@ -44,6 +46,7 @@ def check_individual_server_health(server_id):
         server_info['status'] = "healthy" if random.random() > 0.2 else "unhealthy"
         return jsonify({"success": True, "server_id": server_id, "status": server_info['status']}), 200
     except Exception as e:
+        log_operation(user_id=None, operation="check_individual_server_health", status="failed", details=f"Error checking server health: {str(e)}")
         return jsonify({"success": False, "message": f"Error checking server health: {str(e)}"}), 500
 
 
@@ -83,6 +86,7 @@ def failover():
         log_operation(user_id=None, operation="failover", status="success", details=f"Failover completed for: {unhealthy_servers}")
         return jsonify({"success": True, "message": "Failover completed", "updated_health": server_health}), 200
     except Exception as e:
+        log_operation(user_id=None, operation="failover", status="failed", details=f"Error during failover: {str(e)}")
         return jsonify({"success": False, "message": f"Error during failover: {str(e)}"}), 500
 
 
@@ -107,6 +111,7 @@ def load_balance():
         log_operation(user_id=None, operation="load_balance", status="success", details=f"Load balanced for: {high_load_servers}")
         return jsonify({"success": True, "message": "Load balancing completed", "updated_health": server_health}), 200
     except Exception as e:
+        log_operation(user_id=None, operation="load_balance", status="failed", details=f"Error during load balancing: {str(e)}")
         return jsonify({"success": False, "message": f"Error during load balancing: {str(e)}"}), 500
 
 
@@ -132,6 +137,7 @@ def disaster_recovery():
         log_operation(user_id=None, operation="disaster_recovery", status="success", details=f"Disaster recovery performed for: {affected_servers}")
         return jsonify({"success": True, "message": "Disaster recovery completed", "updated_health": server_health}), 200
     except Exception as e:
+        log_operation(user_id=None, operation="disaster_recovery", status="failed", details=f"Error during disaster recovery: {str(e)}")
         return jsonify({"success": False, "message": f"Error during disaster recovery: {str(e)}"}), 500
 
 
@@ -213,4 +219,5 @@ def replace_docker_container():
         return jsonify({"success": False, "message": "Invalid failure type"}), 400
 
     except Exception as e:
+        log_operation(user_id=None, operation="replace_docker_container", status="failed", details=f"Error during container replacement: {str(e)}")
         return jsonify({"success": False, "message": f"Error during container replacement: {str(e)}"}), 500
