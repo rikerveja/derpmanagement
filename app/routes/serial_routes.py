@@ -32,26 +32,30 @@ def check_serial(serial_code):
         log_operation(None, "check_serial", "failed", f"Brute force attempt detected from IP: {ip_address}")
         return jsonify({"success": False, "message": "Too many failed attempts. You are temporarily banned."}), 403
     
-    # 查找序列号
-    serial_number = SerialNumber.query.filter_by(code=serial_code).first()
-    if not serial_number:
-        log_failed_attempt(ip_address)
-        return jsonify({"success": False, "message": "Serial number not found"}), 404
+    try:
+        # 查找序列号
+        serial_number = SerialNumber.query.filter_by(code=serial_code).first()
+        if not serial_number:
+            log_failed_attempt(ip_address)
+            return jsonify({"success": False, "message": "Serial number not found"}), 404
 
-    # 检查序列号是否过期
-    current_time = datetime.utcnow()
-    expired = serial_number.expires_at < current_time if serial_number.expires_at else False
+        # 检查序列号是否过期
+        current_time = datetime.utcnow()
+        expired = serial_number.expires_at < current_time if serial_number.expires_at else False
 
-    # 返回序列号的详细信息
-    return jsonify({
-        "success": True,
-        "serial_code": serial_number.code,
-        "status": serial_number.status,
-        "duration_days": serial_number.duration_days,
-        "created_at": serial_number.created_at.isoformat(),
-        "expires_at": serial_number.expires_at.isoformat() if serial_number.expires_at else None,
-        "expired": expired
-    }), 200
+        # 返回序列号的详细信息
+        return jsonify({
+            "success": True,
+            "serial_code": serial_number.code,
+            "status": serial_number.status,
+            "duration_days": serial_number.duration_days,
+            "created_at": serial_number.created_at.isoformat(),
+            "expires_at": serial_number.expires_at.isoformat() if serial_number.expires_at else None,
+            "expired": expired
+        }), 200
+    except Exception as e:
+        logging.error(f"Error checking serial code {serial_code}: {str(e)}")
+        return jsonify({"success": False, "message": f"Error checking serial code: {str(e)}"}), 500
 
 
 # 生成序列号
@@ -70,22 +74,22 @@ def generate_serial():
         return jsonify({"success": False, "message": "Invalid parameters"}), 400
 
     serial_numbers = []
-    for _ in range(count):
-        # 确保序列号唯一性
-        while True:
-            code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=serial_length))
-            existing_serial = SerialNumber.query.filter_by(code=code).first()
-            if not existing_serial:  # 如果序列号不重复，跳出循环
-                break
-
-        # 设置序列号的默认状态为 "unused"
-        expires_at = datetime.utcnow() + timedelta(days=duration_days)
-        serial_number = SerialNumber(code=code, duration_days=duration_days, status='unused', expires_at=expires_at)
-        db.session.add(serial_number)
-        serial_numbers.append(code)
-
-    # 提交事务
     try:
+        for _ in range(count):
+            # 确保序列号唯一性
+            while True:
+                code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=serial_length))
+                existing_serial = SerialNumber.query.filter_by(code=code).first()
+                if not existing_serial:  # 如果序列号不重复，跳出循环
+                    break
+
+            # 设置序列号的默认状态为 "unused"
+            expires_at = datetime.utcnow() + timedelta(days=duration_days)
+            serial_number = SerialNumber(code=code, duration_days=duration_days, status='unused', expires_at=expires_at)
+            db.session.add(serial_number)
+            serial_numbers.append(code)
+
+        # 提交事务
         db.session.commit()
         logging.info(f"Generated {count} serial numbers successfully.")
         return jsonify({"success": True, "serial_numbers": serial_numbers}), 201
@@ -122,4 +126,4 @@ def ban_user(user_id):
     if user:
         user.is_banned = True
         db.session.commit()
-
+        logging.info(f"User {user_id} has been banned")
