@@ -15,11 +15,15 @@ def check_expiry():
     检测租赁到期的用户并释放资源
     """
     try:
+        # 查找所有已到期的租赁
         expired_rentals = SerialNumber.query.filter(
             SerialNumber.status == 'active',
             SerialNumber.used_at + timedelta(days=SerialNumber.duration_days) < datetime.utcnow()
         ).all()
 
+        if not expired_rentals:
+            log_operation(user_id=None, operation="rental_expiry", status="info", details="No expired rentals found.")
+        
         for rental in expired_rentals:
             # 标记为到期
             rental.status = 'expired'
@@ -39,7 +43,7 @@ def check_expiry():
         db.session.commit()
         return jsonify({"success": True, "message": "Expired rentals processed successfully"}), 200
     except Exception as e:
-        db.session.rollback()
+        db.session.rollback()  # 回滚事务
         log_operation(
             user_id=None,
             operation="rental_expiry",
@@ -62,9 +66,16 @@ def send_expiry_notifications():
             SerialNumber.used_at + timedelta(days=SerialNumber.duration_days - days_to_expiry) < datetime.utcnow()
         ).all()
 
+        if not expiring_rentals:
+            log_operation(user_id=None, operation="send_expiry_notification", status="info", details="No rentals expiring soon.")
+        
+        failed_emails = []
         for rental in expiring_rentals:
             user_email = rental.user.email
-            send_verification_email(user_email)  # 复用邮件发送逻辑，提醒用户续费
+            email_sent = send_verification_email(user_email)  # 复用邮件发送逻辑，提醒用户续费
+
+            if not email_sent:
+                failed_emails.append(user_email)
 
             log_operation(
                 user_id=rental.user_id,
@@ -72,6 +83,10 @@ def send_expiry_notifications():
                 status="success",
                 details=f"Expiry notification sent to {user_email}"
             )
+
+        if failed_emails:
+            logging.error(f"Failed to send reminder to: {', '.join(failed_emails)}")
+            return jsonify({"success": False, "message": f"Failed to send reminders to: {', '.join(failed_emails)}"}), 500
 
         return jsonify({"success": True, "message": "Expiry notifications sent successfully"}), 200
     except Exception as e:
@@ -103,6 +118,7 @@ def renew_rental():
         return jsonify({"success": False, "message": "Missing serial code"}), 400
 
     try:
+        # 查找对应的租赁
         rental = SerialNumber.query.filter_by(code=serial_code, status='active').first()
         if not rental:
             log_operation(
@@ -113,7 +129,8 @@ def renew_rental():
             )
             return jsonify({"success": False, "message": "Invalid or expired serial code"}), 404
 
-        rental.duration_days += data.get('additional_days', 30)  # 默认续费 30 天
+        # 增加续租天数（默认为30天）
+        rental.duration_days += data.get('additional_days', 30)
         db.session.commit()
 
         log_operation(
@@ -124,7 +141,7 @@ def renew_rental():
         )
         return jsonify({"success": True, "message": "Rental renewed successfully"}), 200
     except Exception as e:
-        db.session.rollback()
+        db.session.rollback()  # 回滚事务
         log_operation(
             user_id=None,
             operation="renew_rental",
