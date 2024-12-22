@@ -30,16 +30,23 @@ def set_user_permissions(user_id):
         return jsonify({"success": False, "message": "Invalid role"}), 400
 
     # 仅允许超级管理员修改用户角色
+    # 检查是否为超级管理员，并且只有超级管理员可以赋予超级管理员权限
     if role == 'super_admin' and user.role != 'super_admin':
         log_operation(user_id=user_id, operation="set_user_permissions", status="failed", details="Unauthorized access")
         return jsonify({"success": False, "message": "You do not have permission to assign this role"}), 403
 
-     # 修改角色并保存
-     old_role = user.role
-     user.role = role
+    if role == 'distributor' and user.role == 'super_admin':
+        log_operation(user_id=user_id, operation="set_user_permissions", status="failed", details="Super Admin cannot be a distributor")
+        return jsonify({"success": False, "message": "Super Admin cannot be a distributor"}), 403
+
+    # 修改角色并保存
+    old_role = user.role
+    user.role = role
+
     try:
         db.session.commit()
-      # 记录操作日志
+
+        # 记录操作日志
         log_operation(user_id=user_id, operation="set_user_permissions", status="success", details=f"Role updated from {old_role} to {role}")
         return jsonify({"success": True, "message": f"Role updated to {role}"}), 200
     except Exception as e:
