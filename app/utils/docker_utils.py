@@ -50,27 +50,6 @@ class DockerSSHManager:
         except Exception as e:
             logger.error(f"Error executing command: {e}")
             return None
-            
-def get_docker_traffic(container_name):
-    """
-    获取指定容器的流量数据。
-    :param container_name: 容器名称
-    :return: 流量数据字典
-    """
-    try:
-        # 示例命令：假设获取容器的网络流量
-        command = f"docker stats {container_name} --no-stream --format '{{{{.NetIO}}}}'"
-        result = execute_command(command)  # 调用 DockerSSHManager 的 execute_command 方法
-        if result:
-            # 示例解析结果
-            rx, tx = result.split(" / ")
-            return {"received": rx, "transmitted": tx}
-        else:
-            logger.error(f"Failed to fetch traffic for container {container_name}.")
-            return {"error": "No data"}
-    except Exception as e:
-        logger.error(f"Error getting docker traffic: {e}")
-        return {"error": str(e)}
 
     def create_container(self, image_name, container_name, ports, environment=None):
         """
@@ -134,6 +113,25 @@ def get_docker_traffic(container_name):
         except Exception as e:
             logger.error(f"Error checking Docker health: {e}")
             return {"status": "error", "message": f"Error checking Docker health: {e}"}
+
+    def get_docker_traffic(self, container_name):
+        """
+        获取指定容器的流量数据。
+        """
+        try:
+            # 示例命令：假设获取容器的网络流量
+            command = f"docker stats {container_name} --no-stream --format '{{{{.NetIO}}}}'"
+            result = self.execute_command(command)
+            if result:
+                # 示例解析结果
+                rx, tx = result.split(" / ")
+                return {"received": rx.strip(), "transmitted": tx.strip()}
+            else:
+                logger.error(f"Failed to fetch traffic for container {container_name}.")
+                return {"error": "No data"}
+        except Exception as e:
+            logger.error(f"Error getting docker traffic: {e}")
+            return {"error": str(e)}
 
     def close(self):
         """
@@ -199,6 +197,17 @@ def check_docker_health(ssh_host, ssh_user, ssh_password):
         manager.close()
 
 
+def get_docker_traffic(ssh_host, ssh_user, ssh_password, container_name):
+    """
+    独立的获取 Docker 容器流量数据函数。
+    """
+    manager = DockerSSHManager(ssh_host, ssh_user, ssh_password=ssh_password)
+    try:
+        return manager.get_docker_traffic(container_name)
+    finally:
+        manager.close()
+
+
 # 导出模块
 __all__ = [
     "DockerSSHManager",
@@ -207,5 +216,6 @@ __all__ = [
     "get_container_status",
     "list_containers",
     "update_container",
-    "check_docker_health"
+    "check_docker_health",
+    "get_docker_traffic"
 ]
