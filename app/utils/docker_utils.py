@@ -81,7 +81,7 @@ class DockerSSHManager:
         result = self.execute_command(command)
         return result.splitlines() if result else []
 
-    def update_container(self, container_name, new_image, environment=None, ports=None):
+    def update_docker_container(self, container_name, new_image, environment=None, ports=None):
         """
         更新容器：停止、删除并重新创建。
         """
@@ -178,10 +178,10 @@ def list_containers(ssh_host, ssh_user, ssh_password, all=False):
         manager.close()
 
 
-def update_container(ssh_host, ssh_user, ssh_password, container_name, new_image, environment=None, ports=None):
+def update_docker_container(ssh_host, ssh_user, ssh_password, container_name, new_image, environment=None, ports=None):
     manager = DockerSSHManager(ssh_host, ssh_user, ssh_password=ssh_password)
     try:
-        return manager.update_container(container_name, new_image, environment, ports)
+        return manager.update_docker_container(container_name, new_image, environment, ports)
     finally:
         manager.close()
 
@@ -215,7 +215,7 @@ __all__ = [
     "stop_container",
     "get_container_status",
     "list_containers",
-    "update_container",
+    "update_docker_container",
     "check_docker_health",
     "get_docker_traffic"
 ]
