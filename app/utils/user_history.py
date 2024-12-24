@@ -4,7 +4,7 @@ from app import db
 import logging
 
 # 定义蓝图
-rental_bp = Blueprint('rental', __name__)
+user_history_bp = Blueprint('user_history', __name__)
 
 # 更新用户历史记录
 @rental_bp.route('/api/rental/history/update/<int:id>', methods=['PUT'])
