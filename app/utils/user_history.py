@@ -7,7 +7,7 @@ import logging
 user_history_bp = Blueprint('user_history', __name__)
 
 # 更新用户历史记录
-@rental_bp.route('/api/rental/history/update/<int:id>', methods=['PUT'])
+@user_history_bp.route('/api/rental/history/update/<int:id>', methods=['PUT'])
 def update_user_history(id):
     """
     更新用户的历史记录
@@ -40,7 +40,7 @@ def update_user_history(id):
         return jsonify({"success": False, "message": f"Error updating user history: {str(e)}"}), 500
 
 # 删除用户历史记录
-@rental_bp.route('/api/rental/history/delete/<int:id>', methods=['DELETE'])
+@user_history_bp.route('/api/rental/history/delete/<int:id>', methods=['DELETE'])
 def delete_user_history(id):
     """
     删除指定用户的历史记录
