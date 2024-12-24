@@ -1,6 +1,6 @@
 import paramiko
 import logging
-from app.config import Config
+from app.config import Config  # 引入 Config
 
 # 设置日志
 logging.basicConfig(level=logging.INFO)
@@ -9,6 +9,9 @@ logger = logging.getLogger('docker_utils')
 
 class DockerSSHManager:
     def __init__(self, ssh_host, ssh_user, ssh_key=None, ssh_password=None):
+        """
+        初始化 SSH 管理器。
+        """
         self.ssh_host = ssh_host
         self.ssh_user = ssh_user
         self.ssh_key = ssh_key
@@ -16,6 +19,9 @@ class DockerSSHManager:
         self.ssh_client = self._create_ssh_client()
 
     def _create_ssh_client(self):
+        """
+        创建并配置 SSH 客户端。
+        """
         try:
             client = paramiko.SSHClient()
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -29,91 +35,89 @@ class DockerSSHManager:
             logger.error(f"Error connecting to SSH: {e}")
             raise
 
-    def create_container(self, image_name, container_name, ports, environment=None):
+    def execute_command(self, command, timeout=30):
+        """
+        执行远程命令并返回结果。
+        """
         try:
-            command = f"docker run -d --name {container_name} -p {ports} "
-            if environment:
-                command += " ".join([f"-e {key}={value}" for key, value in environment.items()])
-            command += f" {image_name}"
-            stdin, stdout, stderr = self.ssh_client.exec_command(command)
-            error = stderr.read().decode('utf-8')
+            stdin, stdout, stderr = self.ssh_client.exec_command(command, timeout=timeout)
+            error = stderr.read().decode('utf-8').strip()
             if error:
-                logger.error(f"Error creating container: {error}")
+                logger.error(f"Command error: {error}")
                 return None
-            container_id = stdout.read().decode('utf-8').strip()
-            logger.info(f"Container created with ID: {container_id}")
-            return container_id
+            result = stdout.read().decode('utf-8').strip()
+            return result
         except Exception as e:
-            logger.error(f"Error creating container via SSH: {e}")
+            logger.error(f"Error executing command: {e}")
             return None
+
+    def create_container(self, image_name, container_name, ports, environment=None):
+        """
+        在远程服务器上创建 Docker 容器。
+        """
+        command = f"docker run -d --name {container_name} -p {ports} "
+        if environment:
+            command += " ".join([f"-e {key}={value}" for key, value in environment.items()])
+        command += f" {image_name}"
+        return self.execute_command(command)
 
     def stop_container(self, container_name):
-        try:
-            command = f"docker stop {container_name}"
-            stdin, stdout, stderr = self.ssh_client.exec_command(command)
-            error = stderr.read().decode('utf-8')
-            if error:
-                logger.error(f"Error stopping container {container_name}: {error}")
-                return False
-            logger.info(f"Container {container_name} stopped.")
-            return True
-        except Exception as e:
-            logger.error(f"Error stopping container via SSH: {e}")
-            return False
+        """
+        停止指定的 Docker 容器。
+        """
+        return self.execute_command(f"docker stop {container_name}")
 
     def get_container_status(self, container_name):
-        try:
-            command = f"docker inspect --format '{{{{.State.Status}}}}' {container_name}"
-            stdin, stdout, stderr = self.ssh_client.exec_command(command)
-            error = stderr.read().decode('utf-8')
-            if error:
-                logger.error(f"Error getting status for container {container_name}: {error}")
-                return None
-            status = stdout.read().decode('utf-8').strip()
-            logger.info(f"Container {container_name} status: {status}")
-            return status
-        except Exception as e:
-            logger.error(f"Error getting container status via SSH: {e}")
-            return None
+        """
+        获取指定容器的状态。
+        """
+        return self.execute_command(f"docker inspect --format '{{{{.State.Status}}}}' {container_name}")
 
     def list_containers(self, all=False):
-        try:
-            command = f"docker ps {'-a' if all else ''}"
-            stdin, stdout, stderr = self.ssh_client.exec_command(command)
-            error = stderr.read().decode('utf-8')
-            if error:
-                logger.error(f"Error listing containers: {error}")
-                return []
-            containers = stdout.read().decode('utf-8').splitlines()
-            logger.info(f"Containers listed: {containers}")
-            return containers
-        except Exception as e:
-            logger.error(f"Error listing containers via SSH: {e}")
-            return []
+        """
+        列出 Docker 容器。
+        """
+        command = f"docker ps {'-a' if all else ''} --format '{{{{.Names}}}}'"
+        result = self.execute_command(command)
+        return result.splitlines() if result else []
 
     def update_container(self, container_name, new_image, environment=None, ports=None):
         """
         更新容器：停止、删除并重新创建。
         """
         try:
-            # 停止容器
             self.stop_container(container_name)
-            # 删除容器
-            command = f"docker rm {container_name}"
-            stdin, stdout, stderr = self.ssh_client.exec_command(command)
-            error = stderr.read().decode('utf-8')
-            if error:
-                logger.error(f"Error removing container {container_name}: {error}")
-                return None
-            logger.info(f"Container {container_name} removed.")
-
-            # 重新创建容器
+            self.execute_command(f"docker rm {container_name}")
             return self.create_container(new_image, container_name, ports, environment)
         except Exception as e:
             logger.error(f"Error updating container {container_name}: {e}")
             return None
 
+    def check_docker_health(self):
+        """
+        检查 Docker 的健康状态。
+        """
+        try:
+            # 使用 Config 中的阈值配置（如果需要）
+            threshold = Config.ALERT_THRESHOLD if hasattr(Config, 'ALERT_THRESHOLD') else 80.0
+
+            # 检查 Docker 服务状态
+            command = "systemctl is-active docker"
+            result = self.execute_command(command)
+            if result == "active":
+                logger.info("Docker service is active.")
+                return {"status": "healthy", "message": "Docker service is running", "threshold": threshold}
+            else:
+                logger.warning("Docker service is not running.")
+                return {"status": "unhealthy", "message": "Docker service is not running"}
+        except Exception as e:
+            logger.error(f"Error checking Docker health: {e}")
+            return {"status": "error", "message": f"Error checking Docker health: {e}"}
+
     def close(self):
+        """
+        关闭 SSH 连接。
+        """
         try:
             self.ssh_client.close()
             logger.info("SSH connection closed.")
@@ -163,6 +167,17 @@ def update_container(ssh_host, ssh_user, ssh_password, container_name, new_image
         manager.close()
 
 
+def check_docker_health(ssh_host, ssh_user, ssh_password):
+    """
+    独立的检查 Docker 健康状态函数。
+    """
+    manager = DockerSSHManager(ssh_host, ssh_user, ssh_password=ssh_password)
+    try:
+        return manager.check_docker_health()
+    finally:
+        manager.close()
+
+
 # 导出模块
 __all__ = [
     "DockerSSHManager",
@@ -170,5 +185,6 @@ __all__ = [
     "stop_container",
     "get_container_status",
     "list_containers",
-    "update_container"
+    "update_container",
+    "check_docker_health"
 ]
