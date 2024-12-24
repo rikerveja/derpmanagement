@@ -10,6 +10,9 @@ class Config:
     """
     # 应用安全密钥
     SECRET_KEY = os.getenv('SECRET_KEY', 'default_secret_key')
+    
+    # 服务器负载告警阈值
+    HIGH_LOAD_THRESHOLD = float(os.getenv('HIGH_LOAD_THRESHOLD', 80.0))  # 默认 80.0%
 
     # 数据库配置
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))  # 获取当前项目的根目录路径
