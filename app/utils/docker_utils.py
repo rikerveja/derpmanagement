@@ -50,6 +50,27 @@ class DockerSSHManager:
         except Exception as e:
             logger.error(f"Error executing command: {e}")
             return None
+            
+def get_docker_traffic(container_name):
+    """
+    获取指定容器的流量数据。
+    :param container_name: 容器名称
+    :return: 流量数据字典
+    """
+    try:
+        # 示例命令：假设获取容器的网络流量
+        command = f"docker stats {container_name} --no-stream --format '{{{{.NetIO}}}}'"
+        result = execute_command(command)  # 调用 DockerSSHManager 的 execute_command 方法
+        if result:
+            # 示例解析结果
+            rx, tx = result.split(" / ")
+            return {"received": rx, "transmitted": tx}
+        else:
+            logger.error(f"Failed to fetch traffic for container {container_name}.")
+            return {"error": "No data"}
+    except Exception as e:
+        logger.error(f"Error getting docker traffic: {e}")
+        return {"error": str(e)}
 
     def create_container(self, image_name, container_name, ports, environment=None):
         """
