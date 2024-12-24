@@ -6,6 +6,7 @@ from app.config import Config
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('docker_utils')
 
+
 class DockerSSHManager:
     def __init__(self, ssh_host, ssh_user, ssh_key=None, ssh_password=None):
         """
@@ -25,7 +26,7 @@ class DockerSSHManager:
         """创建 SSH 客户端"""
         try:
             client = paramiko.SSHClient()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # 自动添加主机密钥（生产环境应配置为更严格的策略）
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
             if self.ssh_key:
                 client.connect(self.ssh_host, username=self.ssh_user, key_filename=self.ssh_key)
@@ -36,26 +37,24 @@ class DockerSSHManager:
             return client
         except Exception as e:
             logger.error(f"Error connecting to SSH: {e}")
-            raise  # 重新抛出异常，以便上层处理
+            raise
 
     def create_container(self, image_name, container_name, ports, environment=None):
         """
         通过 SSH 在远程服务器上创建 Docker 容器。
         """
         try:
-            # Docker 命令
             command = f"docker run -d --name {container_name} -p {ports} "
             if environment:
                 command += " ".join([f"-e {key}={value}" for key, value in environment.items()])
+            command += f" {image_name}"
 
-            command += f"{image_name}"
-            
             stdin, stdout, stderr = self.ssh_client.exec_command(command)
             error = stderr.read().decode('utf-8')
             if error:
                 logger.error(f"Error creating container: {error}")
                 return None
-            container_id = stdout.read().decode('utf-8').strip()  # 获取容器 ID
+            container_id = stdout.read().decode('utf-8').strip()
             logger.info(f"Container created with ID: {container_id}")
             return container_id
         except Exception as e:
@@ -123,3 +122,58 @@ class DockerSSHManager:
         except Exception as e:
             logger.error(f"Error closing SSH connection: {e}")
             raise
+
+
+# 独立函数包装
+def create_container(ssh_host, ssh_user, ssh_password, image_name, container_name, ports, environment=None):
+    """
+    独立的创建 Docker 容器函数。
+    """
+    manager = DockerSSHManager(ssh_host, ssh_user, ssh_password=ssh_password)
+    try:
+        return manager.create_container(image_name, container_name, ports, environment)
+    finally:
+        manager.close()
+
+
+def stop_container(ssh_host, ssh_user, ssh_password, container_name):
+    """
+    独立的停止 Docker 容器函数。
+    """
+    manager = DockerSSHManager(ssh_host, ssh_user, ssh_password=ssh_password)
+    try:
+        return manager.stop_container(container_name)
+    finally:
+        manager.close()
+
+
+def get_container_status(ssh_host, ssh_user, ssh_password, container_name):
+    """
+    独立的获取 Docker 容器状态函数。
+    """
+    manager = DockerSSHManager(ssh_host, ssh_user, ssh_password=ssh_password)
+    try:
+        return manager.get_container_status(container_name)
+    finally:
+        manager.close()
+
+
+def list_containers(ssh_host, ssh_user, ssh_password, all=False):
+    """
+    独立的列出 Docker 容器函数。
+    """
+    manager = DockerSSHManager(ssh_host, ssh_user, ssh_password=ssh_password)
+    try:
+        return manager.list_containers(all)
+    finally:
+        manager.close()
+
+
+# 导出模块
+__all__ = [
+    "DockerSSHManager",
+    "create_container",
+    "stop_container",
+    "get_container_status",
+    "list_containers"
+]
