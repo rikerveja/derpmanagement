@@ -89,22 +89,22 @@ def create_app():
     from app.utils.user_history import user_history_bp  # 从 utils 导入 user_history 蓝图
 
     # 蓝图注册到 Flask 应用
-    app.register_blueprint(user_bp, url_prefix='/api/user')
-    app.register_blueprint(server_bp, url_prefix='/api/server')
-    app.register_blueprint(container_bp, url_prefix='/api/container')
-    app.register_blueprint(acl_bp, url_prefix='/api/acl')
-    app.register_blueprint(finance_bp, url_prefix='/api/finance')
-    app.register_blueprint(rental_bp, url_prefix='/api/rental')
-    app.register_blueprint(logs_bp, url_prefix='/api/logs')
-    app.register_blueprint(ha_bp, url_prefix='/api/ha')
-    app.register_blueprint(notifications_bp, url_prefix='/api/notifications')
-    app.register_blueprint(admin_bp, url_prefix='/api/admin')  # 管理员模块
-    app.register_blueprint(traffic_bp, url_prefix='/api/traffic')  # 流量模块
-    app.register_blueprint(alerts_bp, url_prefix='/api/alerts')  # 告警模块
-    app.register_blueprint(monitoring_bp, url_prefix='/api/monitoring')  # 新增：监控模块
-    app.register_blueprint(serial_bp, url_prefix='/api/serial')  # 新增：序列号管理模块
-    app.register_blueprint(security_bp, url_prefix='/api/security')  # 新增：安全与设备绑定模块
-    app.register_blueprint(user_history_bp, url_prefix='/api/user_history')  # 注册 user_history 蓝图
+    app.register_blueprint(user_bp, url_prefix='')
+    app.register_blueprint(server_bp, url_prefix='')
+    app.register_blueprint(container_bp, url_prefix='')
+    app.register_blueprint(acl_bp, url_prefix='')
+    app.register_blueprint(finance_bp, url_prefix='')
+    app.register_blueprint(rental_bp, url_prefix='')
+    app.register_blueprint(logs_bp, url_prefix='')
+    app.register_blueprint(ha_bp, url_prefix='')
+    app.register_blueprint(notifications_bp, url_prefix='')
+    app.register_blueprint(admin_bp, url_prefix='')  # 管理员模块
+    app.register_blueprint(traffic_bp, url_prefix='')  # 流量模块
+    app.register_blueprint(alerts_bp, url_prefix='')  # 告警模块
+    app.register_blueprint(monitoring_bp, url_prefix='')  # 新增：监控模块
+    app.register_blueprint(serial_bp, url_prefix='')  # 新增：序列号管理模块
+    app.register_blueprint(security_bp, url_prefix='')  # 新增：安全与设备绑定模块
+    app.register_blueprint(user_history_bp, url_prefix='')  # 注册 user_history 蓝图
 
     app.logger.info("App successfully created and initialized.")
     return app
