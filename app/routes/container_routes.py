@@ -14,8 +14,7 @@ def get_containers():
     all_containers = request.args.get('all', 'false').lower() == 'true'
     try:
         containers = list_containers(all=all_containers)
-        container_list = [{'id': c.id, 'name': c.name, 'status': c.status} for c in containers]
-        return jsonify({"success": True, "containers": container_list}), 200
+        return jsonify({"success": True, "containers": containers}), 200
     except Exception as e:
         return jsonify({"success": False, "message": f"Error fetching containers: {str(e)}"}), 500
 
@@ -82,16 +81,17 @@ def update_existing_container(container_name):
     更新容器配置（如 ports, environment 等）
     """
     data = request.json
+    new_image = data.get('new_image')  # 新镜像（如果需要更新镜像）
     ports = data.get('ports')
     environment = data.get('environment', None)
 
     # 检查必填字段
-    if not ports:
-        return jsonify({"success": False, "message": "Missing required parameters (ports)"}), 400
+    if not new_image or not ports:
+        return jsonify({"success": False, "message": "Missing required parameters (new_image, ports)"}), 400
 
     try:
         # 调用更新容器的函数
-        result = update_container(container_name, ports, environment)
+        result = update_docker_container(container_name, new_image, environment, ports)
         if result:
             return jsonify({"success": True, "message": f"Container {container_name} updated successfully"}), 200
         else:
