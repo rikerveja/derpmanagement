@@ -50,6 +50,26 @@ def check_individual_server_health(server_id):
         return jsonify({"success": False, "message": f"Error checking server health: {str(e)}"}), 500
 
 
+# 获取 Docker 容器的流量数据
+@ha_bp.route('/api/ha/container_traffic/<container_id>', methods=['GET'])
+def get_container_traffic(container_id):
+    """
+    获取指定 Docker 容器的网络流量数据。
+    """
+    ssh_host = "your_ssh_host"  # 替换为实际的 SSH 主机
+    ssh_user = "your_ssh_user"  # 替换为实际的 SSH 用户
+    ssh_password = "your_ssh_password"  # 替换为实际的 SSH 密码
+
+    try:
+        traffic_data = get_docker_traffic(ssh_host, ssh_user, ssh_password, container_id)
+        if "error" in traffic_data:
+            return jsonify({"success": False, "message": traffic_data["error"]}), 500
+        return jsonify({"success": True, "traffic": traffic_data}), 200
+    except Exception as e:
+        log_operation(user_id=None, operation="get_container_traffic", status="failed", details=f"Error fetching traffic: {str(e)}")
+        return jsonify({"success": False, "message": f"Error fetching traffic: {str(e)}"}), 500
+
+
 # 故障切换
 @ha_bp.route('/api/ha/failover', methods=['POST'])
 def failover():
