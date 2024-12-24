@@ -10,66 +10,65 @@ logger = logging.getLogger("auth_utils")
 
 # 加密密码
 def hash_password(password):
-    """
-    使用 bcrypt 对密码进行加密。
-    """
     try:
-        # 加盐并加密密码，控制复杂度
         hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(12)).decode('utf-8')
         logger.info("Password hashed successfully.")
         return hashed
     except Exception as e:
-        logger.exception("Error hashing password.")  # 记录详细错误信息
-        raise  # 重新抛出异常，以便上层处理
-
+        logger.exception("Error hashing password.")
+        raise
 
 # 验证密码
 def check_password(password, hashed_password):
-    """
-    验证用户提供的密码是否与存储的哈希密码匹配。
-    """
     try:
-        # 比较提供的密码和存储的哈希密码
         result = bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
         logger.info(f"Password check {'succeeded' if result else 'failed'}.")
         return result
     except Exception as e:
-        logger.exception("Error checking password.")  # 记录详细错误信息
-        return False  # 返回 False，表示密码不匹配或发生错误
-
+        logger.exception("Error checking password.")
+        return False
 
 # 生成 JWT
 def generate_jwt(payload, expiration_hours=24):
-    """
-    生成包含指定负载的 JWT。
-    默认过期时间为 24 小时。
-    """
     try:
-        payload['exp'] = datetime.utcnow() + timedelta(hours=expiration_hours)  # 设置过期时间
+        payload['exp'] = datetime.utcnow() + timedelta(hours=expiration_hours)
         token = jwt.encode(payload, Config.SECRET_KEY, algorithm="HS256")
         logger.info("JWT generated successfully.")
         return token
     except Exception as e:
-        logger.exception("Error generating JWT.")  # 记录详细错误信息
-        raise  # 重新抛出异常，以便上层处理
-
+        logger.exception("Error generating JWT.")
+        raise
 
 # 解码 JWT
 def decode_jwt(token):
-    """
-    解码 JWT 并验证其有效性。
-    """
     try:
-        # 解码 JWT
         decoded = jwt.decode(token, Config.SECRET_KEY, algorithms=["HS256"])
         logger.info("JWT decoded successfully.")
         return decoded
     except jwt.ExpiredSignatureError:
-        logger.warning("JWT has expired.")  # 专门处理过期情况
+        logger.warning("JWT has expired.")
         return {"error": "Token has expired"}
     except jwt.InvalidTokenError as e:
-        logger.warning(f"Invalid JWT: {e}")  # 捕获并记录更多异常
+        logger.warning(f"Invalid JWT: {e}")
         return {"error": f"Invalid token: {e}"}
     except Exception as e:
-        logger.exception("Error decoding JWT.")  # 记录详细错误信息
+        logger.exception("Error decoding JWT.")
         return {"error": f"Error decoding JWT: {str(e)}"}
+
+# 生成刷新令牌
+def generate_refresh_token(user_id, expiration_days=7):
+    """
+    为用户生成一个刷新令牌。
+    默认过期时间为 7 天。
+    """
+    try:
+        payload = {
+            "user_id": user_id,
+            "exp": datetime.utcnow() + timedelta(days=expiration_days)
+        }
+        token = jwt.encode(payload, Config.SECRET_KEY, algorithm="HS256")
+        logger.info("Refresh token generated successfully.")
+        return token
+    except Exception as e:
+        logger.exception("Error generating refresh token.")
+        raise
