@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from app.utils.docker_utils import create_container, stop_container, get_container_status, list_containers, update_container
+from app.utils.docker_utils import create_container, stop_container, get_container_status, list_containers, update_docker_container
 import logging
 
 # 定义蓝图
