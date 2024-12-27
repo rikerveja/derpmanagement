@@ -108,18 +108,19 @@ def create_app():
     app.register_blueprint(user_history_bp, url_prefix='')  # 注册 user_history 蓝图
 
 
-    @app.route('/api/urls', methods=['GET'])
-        def get_api_urls():
-        api_urls = []
-            for rule in app.url_map.iter_rules():
-            if rule.endpoint != 'static' and '/api/' in str(rule):
-                    methods = ', '.join(rule.methods)  # 获取该路由支持的 HTTP 方法
-                    api_urls.append({
-                        'endpoint': rule.endpoint,  # 获取路由的 endpoint 名称
-                        'url': str(rule),            # 获取路由的完整 URL
-                        'methods': methods           # 获取该路由支持的 HTTP 方法
-                    })
-          return jsonify(api_urls)
+@app.route('/api/urls', methods=['GET'])
+def get_api_urls():
+    api_urls = []
+    for rule in app.url_map.iter_rules():
+        if rule.endpoint != 'static' and '/api/' in str(rule):
+            methods = ', '.join(rule.methods)
+            api_urls.append({
+                'endpoint': rule.endpoint,
+                'url': str(rule),
+                'methods': methods
+            })
+    return jsonify(api_urls)
+
 
 
     app.logger.info("App successfully created and initialized.")
