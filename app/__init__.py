@@ -1,4 +1,5 @@
 from flask import Flask
+from flask import jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_mail import Mail
 from flask_migrate import Migrate
@@ -105,6 +106,21 @@ def create_app():
     app.register_blueprint(serial_bp, url_prefix='')  # 新增：序列号管理模块
     app.register_blueprint(security_bp, url_prefix='')  # 新增：安全与设备绑定模块
     app.register_blueprint(user_history_bp, url_prefix='')  # 注册 user_history 蓝图
+
+
+    @app.route('/api/urls', methods=['GET'])
+        def get_api_urls():
+        api_urls = []
+            for rule in app.url_map.iter_rules():
+            if rule.endpoint != 'static' and '/api/' in str(rule):
+                    methods = ', '.join(rule.methods)  # 获取该路由支持的 HTTP 方法
+                    api_urls.append({
+                        'endpoint': rule.endpoint,  # 获取路由的 endpoint 名称
+                        'url': str(rule),            # 获取路由的完整 URL
+                        'methods': methods           # 获取该路由支持的 HTTP 方法
+                    })
+          return jsonify(api_urls)
+
 
     app.logger.info("App successfully created and initialized.")
     return app
