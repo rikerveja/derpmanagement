@@ -1,5 +1,4 @@
-from flask import Flask
-from flask import jsonify
+from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_mail import Mail
 from flask_migrate import Migrate
@@ -9,7 +8,6 @@ import logging
 from logging.handlers import RotatingFileHandler
 from dotenv import load_dotenv
 import os
-
 
 # 加载环境变量
 load_dotenv()
@@ -44,6 +42,21 @@ def make_celery(app):
     )
     celery_instance.conf.update(app.config)
     return celery_instance
+
+
+# 注册 /api/urls 路由
+@app.route('/api/urls', methods=['GET'])
+def get_api_urls():
+    api_urls = []
+    for rule in app.url_map.iter_rules():
+        if rule.endpoint != 'static' and '/api/' in str(rule):
+            methods = ', '.join(rule.methods)
+            api_urls.append({
+                'endpoint': rule.endpoint,
+                'url': str(rule),
+                'methods': methods
+            })
+    return jsonify(api_urls)
 
 
 def create_app():
@@ -106,22 +119,6 @@ def create_app():
     app.register_blueprint(serial_bp, url_prefix='')  # 新增：序列号管理模块
     app.register_blueprint(security_bp, url_prefix='')  # 新增：安全与设备绑定模块
     app.register_blueprint(user_history_bp, url_prefix='')  # 注册 user_history 蓝图
-
-
-@app.route('/api/urls', methods=['GET'])
-def get_api_urls():
-    api_urls = []
-    for rule in app.url_map.iter_rules():
-        if rule.endpoint != 'static' and '/api/' in str(rule):
-            methods = ', '.join(rule.methods)
-            api_urls.append({
-                'endpoint': rule.endpoint,
-                'url': str(rule),
-                'methods': methods
-            })
-    return jsonify(api_urls)
-
-
 
     app.logger.info("App successfully created and initialized.")
     return app
