@@ -1,3 +1,5 @@
+# app/__init__.py
+
 from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_mail import Mail
@@ -42,21 +44,6 @@ def make_celery(app):
     )
     celery_instance.conf.update(app.config)
     return celery_instance
-
-
-# 注册 /api/urls 路由
-@app.route('/api/urls', methods=['GET'])
-def get_api_urls():
-    api_urls = []
-    for rule in app.url_map.iter_rules():
-        if rule.endpoint != 'static' and '/api/' in str(rule):
-            methods = ', '.join(rule.methods)
-            api_urls.append({
-                'endpoint': rule.endpoint,
-                'url': str(rule),
-                'methods': methods
-            })
-    return jsonify(api_urls)
 
 
 def create_app():
@@ -122,3 +109,19 @@ def create_app():
 
     app.logger.info("App successfully created and initialized.")
     return app
+
+
+# /api/urls 路由的定义
+@app.route('/api/urls', methods=['GET'])
+def get_api_urls():
+    api_urls = []
+    for rule in app.url_map.iter_rules():
+        if rule.endpoint != 'static' and '/api/' in str(rule):
+            methods = ', '.join(rule.methods)
+            api_urls.append({
+                'endpoint': rule.endpoint,
+                'url': str(rule),
+                'methods': methods
+            })
+    return jsonify(api_urls)
+
