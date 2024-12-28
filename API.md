@@ -979,5 +979,53 @@
       "message": "Docker container replaced successfully"
     }
     ```
-
 ---
+
+### **7. 通知相关 API**
+
+#### **7.1 发送提醒通知**
+- **URL**: `/api/notifications/send_reminder`
+- **Method**: `POST`
+- **Description**: 发送租赁到期或其他事件的提醒通知。
+- **Request Body**:
+  ```json
+  {
+    "user_id": 123,
+    "message": "Your rental is about to expire",
+    "reminder_date": "2024-12-15"
+  }
+  ```
+- **Response**:
+  - **200 OK**:
+    ```json
+    {
+      "message": "Reminder notification sent successfully"
+    }
+    ```
+  - **400 Bad Request**:
+    ```json
+    {
+      "error": "Invalid notification data"
+    }
+    ```
+
+### **8. 监控相关 API**
+
+#### **8.1 获取监控状态**
+- **URL**: `/api/monitoring`
+- **Method**: `GET`
+- **Description**: 获取当前系统的监控状态。
+- **Response**:
+  ```json
+  {
+    "status": "healthy",
+    "uptime": "72 hours",
+    "issues": [
+      {
+        "type": "server_down",
+        "timestamp": "2024-01-01T12:00:00Z",
+        "message": "Server 123 is down"
+      }
+    ]
+  }
+  ```
