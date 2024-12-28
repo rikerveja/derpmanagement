@@ -1,3 +1,5 @@
+# app/__init__.py
+
 from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_mail import Mail
@@ -18,6 +20,7 @@ mail = Mail()
 migrate = Migrate()
 celery = None
 
+
 def setup_logging(app):
     """设置日志记录"""
     log_file = app.config['LOG_FILE']
@@ -28,6 +31,7 @@ def setup_logging(app):
     )
     handler.setFormatter(formatter)
     app.logger.addHandler(handler)
+
 
 def make_celery(app):
     """
@@ -40,6 +44,7 @@ def make_celery(app):
     )
     celery_instance.conf.update(app.config)
     return celery_instance
+
 
 def create_app():
     app = Flask(__name__)
@@ -106,12 +111,13 @@ def create_app():
     return app
 
 
-# 新增的获取 API 路由的代码：
+# 此部分应放在 create_app() 函数外部，确保 Flask 应用实例 `app` 已初始化
+app = create_app()  # 创建应用实例
+
 @app.route('/api/urls', methods=['GET'])
 def get_api_urls():
     api_urls = []
     for rule in app.url_map.iter_rules():
-        # 仅获取以 '/api/' 开头的路由
         if rule.endpoint != 'static' and '/api/' in str(rule):
             methods = ', '.join(rule.methods)  # 获取该路由支持的 HTTP 方法
             api_urls.append({
@@ -120,3 +126,4 @@ def get_api_urls():
                 'methods': methods           # 路由支持的 HTTP 方法
             })
     return jsonify(api_urls)
+
