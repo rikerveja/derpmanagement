@@ -1048,5 +1048,39 @@
     }
   }
   ```
+---
+
+### **10. 获取 API 列表**
+
+#### **10.1 获取所有 API 路由**
+- **URL**: `/api/urls`
+- **Method**: `GET`
+- **Description**: 获取系统中所有 API 路由的列表，包括每个 API 的 `endpoint`、`methods` 和 `url`。
+- **Response**:
+  ```json
+  [
+    {
+      "endpoint": "user.add_user",
+      "methods": "OPTIONS, POST",
+      "url": "/api/add_user"
+    },
+    {
+      "endpoint": "user.login",
+      "methods": "OPTIONS, POST",
+      "url": "/api/login"
+    },
+    {
+      "endpoint": "server.add_server",
+      "methods": "OPTIONS, POST",
+      "url": "/api/add_server"
+    },
+    {
+      "endpoint": "traffic.realtime_traffic",
+      "methods": "OPTIONS, GET, HEAD",
+      "url": "/api/traffic/realtime"
+    },
+    // ... 其他 API 路由
+  ]
+  ```
 
 ---
