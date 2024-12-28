@@ -606,6 +606,164 @@
       "message": "Rental deleted successfully"
     }
     ```
+---
+
+### **4. 告警相关 API**
+
+#### **4.1 获取实时告警**
+- **URL**: `/api/alerts/realtime`
+- **Method**: `GET`
+- **Description**: 获取所有实时告警数据。
+- **Response**:
+  ```json
+  {
+    "alerts": [
+      {
+        "alert_id": 1,
+        "message": "High traffic detected",
+        "timestamp": "2024-01-01T00:00:00Z"
+      }
+    ]
+  }
+  ```
+
+#### **4.2 添加告警**
+- **URL**: `/api/alerts/add`
+- **Method**: `POST`
+- **Description**: 添加一个新的告警。
+- **Request Body**:
+  ```json
+  {
+    "alert_type": "traffic",
+    "threshold": 10000,
+    "message": "Traffic limit exceeded"
+  }
+  ```
+- **Response**:
+  - **200 OK**:
+    ```json
+    {
+      "message": "Alert added successfully"
+    }
+    ```
+  - **400 Bad Request**:
+    ```json
+    {
+      "error": "Invalid alert data"
+    }
+    ```
+
+#### **4.3 检查每月流量**
+- **URL**: `/api/alerts/traffic`
+- **Method**: `POST`
+- **Description**: 检查每月的流量告警。
+- **Request Body**:
+  ```json
+  {
+    "month": "2024-01"
+  }
+  ```
+- **Response**:
+  - **200 OK**:
+    ```json
+    {
+      "message": "Monthly traffic alert checked successfully"
+    }
+    ```
+
+#### **4.4 检查服务器健康状态**
+- **URL**: `/api/alerts/server_health`
+- **Method**: `POST`
+- **Description**: 检查服务器健康状态是否触发告警。
+- **Request Body**:
+  ```json
+  {
+    "server_id": 123
+  }
+  ```
+- **Response**:
+  - **200 OK**:
+    ```json
+    {
+      "message": "Server health status alert checked successfully"
+    }
+    ```
+
+#### **4.5 检查 Docker 流量健康**
+- **URL**: `/api/alerts/docker_traffic`
+- **Method**: `POST`
+- **Description**: 检查 Docker 容器流量是否触发告警。
+- **Request Body**:
+  ```json
+  {
+    "container_id": 123
+  }
+  ```
+- **Response**:
+  - **200 OK**:
+    ```json
+    {
+      "message": "Docker container traffic health checked successfully"
+    }
+    ```
+
+#### **4.6 检查 Docker 容器状态**
+- **URL**: `/api/alerts/docker_container`
+- **Method**: `POST`
+- **Description**: 检查 Docker 容器状态是否触发告警。
+- **Request Body**:
+  ```json
+  {
+    "container_id": 123
+  }
+  ```
+- **Response**:
+  - **200 OK**:
+    ```json
+    {
+      "message": "Docker container status alert checked successfully"
+    }
+    ```
+
+#### **4.7 删除告警**
+- **URL**: `/api/alerts/delete/<int:id>`
+- **Method**: `DELETE`
+- **Description**: 删除指定的告警。
+- **Response**:
+  - **200 OK**:
+    ```json
+    {
+      "message": "Alert deleted successfully"
+    }
+    ```
+  - **400 Bad Request**:
+    ```json
+    {
+      "error": "Invalid alert ID"
+    }
+    ```
+
+#### **4.8 获取所有告警**
+- **URL**: `/api/alerts`
+- **Method**: `GET`
+- **Description**: 获取所有告警的列表。
+- **Response**:
+  ```json
+  {
+    "alerts": [
+      {
+        "alert_id": 1,
+        "message": "High traffic detected",
+        "timestamp": "2024-01-01T00:00:00Z"
+      },
+      {
+        "alert_id": 2,
+        "message": "Server down",
+        "timestamp": "2024-01-01T01:00:00Z"
+      }
+    ]
+  }
+  ```
 
 ---
 
