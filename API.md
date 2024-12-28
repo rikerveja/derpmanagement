@@ -767,6 +767,78 @@
 
 ---
 
+### **5. 序列号相关 API**
+
+#### **5.1 检查序列号**
+- **URL**: `/api/serial/check/<serial_code>`
+- **Method**: `GET`
+- **Description**: 检查指定的序列号是否有效。
+- **Response**:
+  ```json
+  {
+    "serial_code": "ABC123",
+    "status": "valid",
+    "issued_to": "user@example.com"
+  }
+  ```
+
+#### **5.2 生成序列号**
+- **URL**: `/api/serial/generate`
+- **Method**: `POST`
+- **Description**: 生成一个新的序列号。
+- **Request Body**:
+  ```json
+  {
+    "user_id": 123,
+    "type": "rental",
+    "expiry_date": "2025-12-31"
+  }
+  ```
+- **Response**:
+  - **200 OK**:
+    ```json
+    {
+      "message": "Serial number generated successfully",
+      "serial_code": "XYZ789"
+    }
+    ```
+  - **400 Bad Request**:
+    ```json
+    {
+      "error": "Invalid data"
+    }
+    ```
+
+#### **5.3 更新序列号**
+- **URL**: `/api/serial/update/<int:id>`
+- **Method**: `PUT`
+- **Description**: 更新指定序列号的信息。
+- **Request Body**:
+  ```json
+  {
+    "serial_code": "XYZ789",
+    "expiry_date": "2026-12-31"
+  }
+  ```
+- **Response**:
+  - **200 OK**:
+    ```json
+    {
+      "message": "Serial number updated successfully"
+    }
+    ```
+
+#### **5.4 删除序列号**
+- **URL**: `/api/serial/delete/<int:id>`
+- **Method**: `DELETE`
+- **Description**: 删除指定的序列号。
+- **Response**:
+  - **200 OK**:
+    ```json
+    {
+      "message": "Serial number deleted successfully"
+    }
+    ```
 ### **5. 高可用性 (HA) 相关 API**
 
 #### **5.1 检查服务器健康状态**
