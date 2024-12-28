@@ -608,6 +608,59 @@
     ```
 ---
 
+### **6. 租赁历史和用户历史相关 API**
+
+#### **6.1 获取用户租赁历史**
+- **URL**: `/api/rental/history/<int:user_id>`
+- **Method**: `GET`
+- **Description**: 获取指定用户的租赁历史记录。
+- **Response**:
+  ```json
+  {
+    "user_id": 123,
+    "rental_history": [
+      {
+        "rental_id": 1,
+        "status": "active",
+        "start_date": "2024-01-01",
+        "end_date": "2024-12-31"
+      }
+    ]
+  }
+  ```
+
+#### **6.2 更新用户历史记录**
+- **URL**: `/api/rental/history/update/<int:id>`
+- **Method**: `PUT`
+- **Description**: 更新指定用户的租赁历史记录。
+- **Request Body**:
+  ```json
+  {
+    "status": "renewed",
+    "start_date": "2025-01-01",
+    "end_date": "2025-12-31"
+  }
+  ```
+- **Response**:
+  - **200 OK**:
+    ```json
+    {
+      "message": "User rental history updated successfully"
+    }
+    ```
+
+#### **6.3 删除用户历史记录**
+- **URL**: `/api/rental/history/delete/<int:id>`
+- **Method**: `DELETE`
+- **Description**: 删除指定的用户租赁历史记录。
+- **Response**:
+  - **200 OK**:
+    ```json
+    {
+      "message": "User rental history deleted successfully"
+    }
+    ```
+
 ### **4. 告警相关 API**
 
 #### **4.1 获取实时告警**
