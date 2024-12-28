@@ -150,6 +150,63 @@
   ```
 
 ---
+好的，我将为你单独列出这部分的 API 文档。你可以将其添加到汇总文件中。
+
+---
+
+### **1. 服务器相关 API**
+
+#### **1.1 添加服务器**
+- **URL**: `/api/add_server`
+- **Method**: `POST`
+- **Description**: 向系统中添加一个新服务器。
+- **Request Body**:
+  ```json
+  {
+    "server_name": "string",
+    "ip_address": "string",
+    "status": "string"
+  }
+  ```
+- **Response**:
+  - **200 OK**:
+    ```json
+    {
+      "message": "Server added successfully",
+      "server_id": 123
+    }
+    ```
+  - **400 Bad Request**:
+    ```json
+    {
+      "error": "Invalid server data"
+    }
+    ```
+
+#### **1.2 获取服务器状态**
+- **URL**: `/api/server/status/<int:server_id>`
+- **Method**: `GET`
+- **Description**: 获取指定服务器的当前状态。
+- **Response**:
+  ```json
+  {
+    "server_id": 123,
+    "status": "online"
+  }
+  ```
+
+#### **1.3 健康检查**
+- **URL**: `/api/server/health_check`
+- **Method**: `GET`
+- **Description**: 检查服务器的健康状态。
+- **Response**:
+  ```json
+  {
+    "status": "healthy"
+  }
+  ```
+
+---
 
 ### **2. 容器相关 API**
 
