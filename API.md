@@ -207,6 +207,88 @@
   ```
 
 ---
+好的，以下是你提供的 API 路由的详细文档。你可以将它们添加到你的汇总文件中。
+
+---
+
+### **2. 日志相关 API**
+
+#### **2.1 获取系统日志**
+- **URL**: `/api/logs/system`
+- **Method**: `GET`
+- **Description**: 获取系统日志。
+- **Response**:
+  ```json
+  {
+    "logs": [
+      {
+        "log_id": 1,
+        "message": "System started",
+        "timestamp": "2024-01-01T00:00:00Z"
+      }
+    ]
+  }
+  ```
+
+#### **2.2 获取用户日志（按时间）**
+- **URL**: `/api/logs/user_by_time`
+- **Method**: `GET`
+- **Description**: 根据时间获取用户日志。
+- **Response**:
+  ```json
+  {
+    "user_id": 123,
+    "logs": [
+      {
+        "log_id": 1,
+        "message": "User logged in",
+        "timestamp": "2024-01-01T12:00:00Z"
+      }
+    ]
+  }
+  ```
+
+#### **2.3 更新日志**
+- **URL**: `/api/logs/update/<int:id>`
+- **Method**: `PUT`
+- **Description**: 更新指定日志的信息。
+- **Request Body**:
+  ```json
+  {
+    "message": "Updated log message"
+  }
+  ```
+- **Response**:
+  - **200 OK**:
+    ```json
+    {
+      "message": "Log updated successfully"
+    }
+    ```
+  - **400 Bad Request**:
+    ```json
+    {
+      "error": "Invalid log data"
+    }
+    ```
+
+#### **2.4 删除日志**
+- **URL**: `/api/logs/delete/<int:id>`
+- **Method**: `DELETE`
+- **Description**: 删除指定日志。
+- **Response**:
+  - **200 OK**:
+    ```json
+    {
+      "message": "Log deleted successfully"
+    }
+    ```
+  - **400 Bad Request**:
+    ```json
+    {
+      "error": "Invalid log ID"
+    }
+    ```
 
 ### **2. 容器相关 API**
 
