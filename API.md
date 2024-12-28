@@ -447,6 +447,95 @@
 
 ---
 
+### **3. 流量相关 API**
+
+#### **3.1 获取实时流量**
+- **URL**: `/api/traffic/realtime`
+- **Method**: `GET`
+- **Description**: 获取所有容器的实时流量数据。
+- **Response**:
+  ```json
+  {
+    "traffic": {
+      "in": 2048,
+      "out": 4096
+    }
+  }
+  ```
+
+#### **3.2 获取指定容器的实时流量**
+- **URL**: `/api/traffic/realtime/<int:container_id>`
+- **Method**: `GET`
+- **Description**: 获取指定容器的实时流量数据。
+- **Response**:
+  ```json
+  {
+    "container_id": 123,
+    "traffic": {
+      "in": 1024,
+      "out": 2048
+    }
+  }
+  ```
+
+#### **3.3 获取用户流量历史**
+- **URL**: `/api/traffic/history/<int:user_id>`
+- **Method**: `GET`
+- **Description**: 获取指定用户的流量历史记录。
+- **Response**:
+  ```json
+  {
+    "user_id": 123,
+    "traffic_history": [
+      {
+        "timestamp": "2024-01-01T00:00:00Z",
+        "in": 1024,
+        "out": 2048
+      }
+    ]
+  }
+  ```
+
+#### **3.4 获取流量统计**
+- **URL**: `/api/traffic/stats`
+- **Method**: `POST`
+- **Description**: 获取流量统计数据。
+- **Request Body**:
+  ```json
+  {
+    "start_date": "2024-01-01",
+    "end_date": "2024-12-31"
+  }
+  ```
+- **Response**:
+  - **200 OK**:
+    ```json
+    {
+      "total_in": 1048576,
+      "total_out": 2097152
+    }
+    ```
+
+#### **3.5 检测超限用户**
+- **URL**: `/api/traffic/overlimit`
+- **Method**: `GET`
+- **Description**: 检测超限流量的用户。
+- **Response**:
+  ```json
+  {
+    "overlimit_users": [
+      {
+        "user_id": 123,
+        "traffic_in": 10240,
+        "traffic_out": 20480
+      }
+    ]
+  }
+  ```
+
+---
+
+如果你有更多的 API 或其他需求，欢迎继续提问！
 ### **4. 租赁相关 API**
 
 #### **4.1 检查租赁到期**
