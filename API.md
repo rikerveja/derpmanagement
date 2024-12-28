@@ -1029,3 +1029,24 @@
     ]
   }
   ```
+
+---
+
+### **9. 安全相关 API**
+
+#### **9.1 获取用户的 ACL 信息**
+- **URL**: `/api/security/user_acl_info/<int:user_id>`
+- **Method**: `GET`
+- **Description**: 获取指定用户的 ACL（访问控制列表）信息。
+- **Response**:
+  ```json
+  {
+    "user_id": 123,
+    "acl_info": {
+      "permissions": ["read", "write", "execute"],
+      "role": "admin"
+    }
+  }
+  ```
+
+---
