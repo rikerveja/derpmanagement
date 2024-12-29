@@ -2,6 +2,7 @@
 import { reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { mdiAccount, mdiAsterisk } from '@mdi/js'
+import api from '@/services/api'
 import SectionFullScreen from '@/components/SectionFullScreen.vue'
 import CardBox from '@/components/CardBox.vue'
 import FormCheckRadio from '@/components/FormCheckRadio.vue'
@@ -12,15 +13,21 @@ import BaseButtons from '@/components/BaseButtons.vue'
 import LayoutGuest from '@/layouts/LayoutGuest.vue'
 
 const form = reactive({
-  login: 'john.doe',
-  pass: 'highly-secure-password-fYjUw-',
+  login: 'admin',
+  pass: 'password',
   remember: true
 })
 
 const router = useRouter()
 
-const submit = () => {
-  router.push('/dashboard')
+const submit = async () => {
+  try {
+    const response = await api.login(form.login, form.pass)
+    localStorage.setItem('token', response.token)
+    router.push('/dashboard')
+  } catch (error) {
+    alert('登录失败: ' + error.message)
+  }
 }
 </script>
 

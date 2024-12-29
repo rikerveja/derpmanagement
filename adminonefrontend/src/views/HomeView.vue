@@ -22,15 +22,33 @@ import CardBoxClient from '@/components/CardBoxClient.vue'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
 import SectionBannerStarOnGitHub from '@/components/SectionBannerStarOnGitHub.vue'
+import api from '@/services/api'
 
 const chartData = ref(null)
+const containers = ref([])
+const traffic = ref(null)
+const alerts = ref([])
 
 const fillChartData = () => {
   chartData.value = chartConfig.sampleChartData()
 }
 
-onMounted(() => {
-  fillChartData()
+onMounted(async () => {
+  try {
+    // 获取容器列表
+    const containersData = await api.getContainers()
+    containers.value = containersData.containers
+
+    // 获取实时流量
+    const trafficData = await api.getRealTimeTraffic()
+    traffic.value = trafficData.traffic
+
+    // 获取告警信息
+    const alertsData = await api.getAlerts()
+    alerts.value = alertsData.alerts
+  } catch (error) {
+    console.error('获取数据失败:', error)
+  }
 })
 
 const mainStore = useMainStore()
