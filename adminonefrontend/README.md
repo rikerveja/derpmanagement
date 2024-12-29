@@ -1,179 +1,193 @@
-# [Admin One &mdash; Free Vue 3.x Tailwind 3.x Admin Dashboard with dark mode](https://justboil.me/tailwind-admin-templates/free-vue-dashboard/)
+# DERP Management System
 
-[![version](https://img.shields.io/github/v/release/justboil/admin-one-vue-tailwind)](https://justboil.me/tailwind-admin-templates/free-vue-dashboard/)  [![license](https://img.shields.io/badge/license-MIT-blue.svg)](https://justboil.me/tailwind-admin-templates/free-vue-dashboard/)
+基于 [Admin One Vue.js 3.x Tailwind 3.x](https://justboil.me/tailwind-admin-templates/free-vue-dashboard/) 模板开发的 DERP 管理系统。
 
-### Tailwind 3.x Vue 3.x with Vite or Nuxt or Laravel
+[![Vue 3.x](https://img.shields.io/badge/vue-3.x-brightgreen.svg)](https://v3.vuejs.org/)
+[![Tailwind 3.x](https://img.shields.io/badge/tailwind-3.x-blue.svg)](https://tailwindcss.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-[![Free Vue 3 Tailwind 3 admin dashboard with dark mode](https://static.justboil.me/templates/one/repo-tailwind-vue.png)](https://justboil.github.io/admin-one-vue-tailwind/)
+## 功能特性
 
-[![Vue Tailwind white & dark styles](https://static.justboil.me/templates/one/repo-styles.png)](https://justboil.github.io/admin-one-vue-tailwind/)
+- 📊 实时仪表盘
+- 🔐 用户管理与权限控制
+- 🐳 容器管理
+- 📈 流量监控
+- 🔔 告警管理
+- ⚙️ 系统管理
+- 🎫 序列号管理
+- 📝 租赁管理
+- 🌓 深色模式支持
+- 📱 响应式设计
 
-### Tailwind 3.x Vue 3.x with Vite or Nuxt or Laravel
+## 技术栈
 
-**Admin One** is simple, beautiful and free Vue.js 3.x Tailwind CSS 3.x admin dashboard. Nuxt 3.x or Laravel 9.x integrations available
+- Vue 3.x + Composition API
+- Vite
+- Vue Router
+- Tailwind CSS 3.x
+- MDI Icons
+- Axios
+- Pinia 状态管理
 
-* Built with **Vue.js 3**, **Tailwind CSS 3** framework & **Composition API**
-* **Vite** under the hood &mdash; [Info](https://vitejs.dev)
-* **Nuxt 3** integration available &mdash; [Info](#nuxt-3-integration)
-* **Laravel Breeze Inertia Vue** integration available &mdash; [Info](#laravel-9x-integration)
-* **SFC** `<script setup>` &mdash; [Info](https://v3.vuejs.org/api/sfc-script-setup.html)
-* **Pinia** state library (official Vuex 5) &mdash; [Info](https://pinia.vuejs.org/)
-* **Dark mode**
-* **Styled** scrollbars
-* SPA with **Router**
-* **Production CSS** is only **&thickapprox;38kb**
-* Reusable components
-* Free under MIT License
-* [Premium version](https://justboil.me/tailwind-admin-templates/vue-dashboard/) available
+## 快速开始
 
-## Table of Contents
+### 安装依赖
 
-* [React TypeScript version](#looking-for-react-typescript-version)
-* [Responsive layout](#responsive-layout)
-  * [Mobile & tablet](#mobile--tablet)
-  * [Small laptops](#small-laptops-1024px)
-  * [Laptops & desktops](#laptops--desktops)
-* [Demo](#demo)
-  * [Free dashboard demo](#free-dashboard-demo)
-  * [Premium dashboard demo](#premium-dashboard-demo)
-* [Quick Start](#quick-start)
-  * [Get code & install](#get-code--install)
-  * [Vite builds](#vite-builds)
-  * [Linting](#linting)
-  * [Nuxt 3.x integration](#nuxt-3x-integration)
-  * [Laravel 9.x integration](#laravel-9x-integration)
-* [Docs](#docs)
-* [Browser Support](#browser-support)
-* [Reporting Issues](#reporting-issues)
-* [Licensing](#licensing)
-* [Useful Links](#useful-links)
-
-## Looking for React TypeScript version?
-
-This is **Tailwind Vue dashboard** version
-
-Looking for **Tailwind React TypeScript**? Check [Admin One - React TypeScript Tailwind dashboard](https://github.com/justboil/admin-one-react-tailwind) version
-
-## Responsive layout
-
-### Mobile & tablet
-
-Mobile layout with hidden aside menu and collapsable cards & tables
-
-[![Free Vue 3 Tailwind CSS 3 admin dashboard](https://static.justboil.me/templates/one/one-tailwind-vue-mobile.png)](https://justboil.github.io/admin-one-vue-tailwind/)
-
-### Small laptops 1024px
-
-Small laptop layout with show/hide aside menu option
-
-[![Free Vue 3 Tailwind CSS 3 admin dashboard](https://static.justboil.me/templates/one/one-tailwind-vue-1024.png)](https://justboil.github.io/admin-one-vue-tailwind/)
-
-[![Free Vue 3 Tailwind CSS 3 admin dashboard](https://static.justboil.me/templates/one/one-tailwind-vue-1024-menu-open.png)](https://justboil.github.io/admin-one-vue-tailwind/)
-
-### Laptops & desktops
-
-Classic layout with aside menus on the left
-
-[![Free Vue 3 Tailwind CSS 3 admin dashboard](https://static.justboil.me/templates/one/one-tailwind-vue-widescreen.png)](https://justboil.github.io/admin-one-vue-tailwind/)
-
-## Demo
-
-### Free Dashboard Demo
-
-https://justboil.github.io/admin-one-vue-tailwind/
-
-### Premium Dashboard Demo
-
-https://tailwind-vue.justboil.me/
-
-## Quick Start
-
-Get code & install. Then `dev` or `build` with [Vite](#vite-builds) or integrate with [Nuxt](#nuxt-3x-integration) or [Laravel](#laravel-9x-integration)
-
-* [Get code & install](#get-code--install)
-* [Vite builds](#vite-builds)
-* [Linting](#linting)
-* [Nuxt 3.x integration](#nuxt-3x-integration)
-* [Laravel 9.x integration](#laravel-9x-integration)
-
-### Get code & install
-
-#### Get the repo
-
-* [Create new repo](https://github.com/justboil/admin-one-vue-tailwind/generate) with this template
-* &hellip; or clone this repo on GitHub
-* &hellip; or [download .zip](https://github.com/justboil/admin-one-vue-tailwind/archive/master.zip) from GitHub
-
-#### Install
-
-`cd` to project's dir and run `npm install`
-
-### Vite builds
-
-[Vite](https://vitejs.dev) is next Generation Frontend Tooling featuring unbundled web-development
-
-#### Hot-reloads for development
-
+```bash
+npm install
 ```
+
+### 开发环境运行
+
+```bash
 npm run dev
 ```
 
-#### Builds and minifies for production
+### 生产环境构建
 
-```
+```bash
 npm run build
 ```
 
-#### Serves recently built app
+### 预览构建结果
 
-```
+```bash
 npm run preview
 ```
 
-### Linting
+### 代码检查
 
-#### Lint
-
-```
+```bash
 npm run lint
 ```
 
-### Nuxt 3.x integration
+## API 功能说明
 
-This dashboard can be integrated with Nuxt 3.x. [Check guide](https://github.com/justboil/admin-one-vue-tailwind/tree/master/.nuxt-guide) for more information
+### 用户相关
+- 用户登录 `/login`
+- 添加用户 `/add_user`
+- 发送验证邮件 `/send_verification_email`
+- 获取租赁信息 `/user/rental_info`
+- 获取用户历史 `/user/history/:userId`
+- 申请分销商 `/user/apply_distributor`
+- 下载 ACL `/user/download_acl`
+- 获取用户 ACL 信息 `/user/acl_info/:userId`
 
-### Laravel 9.x integration
+### 服务器相关
+- 添加服务器 `/add_server`
+- 获取服务器状态 `/server/status/:serverId`
+- 检查服务器健康 `/server/health_check`
+- 获取服务器健康检查 `/server/health_check/:serverId`
 
-This dashboard can be integrated with Laravel 9.x Breeze Inertia + Vue.js stack. [Check guide](https://github.com/justboil/admin-one-vue-tailwind/tree/master/.laravel-guide) for more information
+### 日志相关
+- 获取系统日志 `/logs/system`
+- 获取用户时间日志 `/logs/user_by_time`
+- 更新日志 `/logs/update/:id`
+- 删除日志 `/logs/delete/:id`
 
-## Docs
+### 容器相关
+- 获取容器列表 `/containers`
+- 添加容器 `/containers/add`
+- 获取容器状态 `/containers/status/:id`
+- 获取容器流量 `/containers/traffic/:id`
 
-Customization & info: https://justboil.github.io/docs/
+### 序列号相关
+- 获取序列号列表 `/serial/list`
+- 检查序列号 `/serial/check/:serialCode`
+- 生成序列号 `/serial/generate`
+- 更新序列号 `/serial/update/:id`
+- 删除序列号 `/serial/delete/:id`
 
-## Browser Support
+### 高可用性相关
+- 获取高可用健康状态 `/ha/health`
+- 获取服务器健康状态 `/ha/health/:serverId`
+- 获取容器流量 `/ha/container_traffic/:containerId`
+- 启动故障转移 `/ha/failover`
+- 启动负载均衡 `/ha/load_balance`
+- 启动灾难恢复 `/ha/disaster_recovery`
+- 替换容器 `/ha/replace_container`
 
-We try to make sure Dashboard works well in the latest versions of all major browsers
+### 通知相关
+- 发送提醒通知 `/notifications/send_reminder`
+- 获取通知列表 `/notifications`
+- 标记通知已读 `/notifications/:notificationId/read`
 
-<img src="https://justboil.me/images/browsers-svg/chrome.svg" width="64" height="64" alt="Chrome"> <img src="https://justboil.me/images/browsers-svg/firefox.svg" width="64" height="64" alt="Firefox"> <img src="https://justboil.me/images/browsers-svg/edge.svg" width="64" height="64" alt="Edge"> <img src="https://justboil.me/images/browsers-svg/safari.svg" width="64" height="64" alt="Safari"> <img src="https://justboil.me/images/browsers-svg/opera.svg" width="64" height="64" alt="Opera">
+### 监控相关
+- 获取监控状态 `/monitoring`
 
-## Reporting Issues
+### 租赁历史相关
+- 获取租赁历史 `/rental/history/:userId`
+- 更新租赁历史 `/rental/history/update/:id`
+- 删除租赁历史 `/rental/history/delete/:id`
 
-JustBoil's free items are limited to community support on GitHub.
+## 目录结构
 
-The issue list is reserved exclusively for bug reports and feature requests. That means we do not accept usage questions. If you open an issue that does not conform to the requirements, it will be closed.
+```
+src/
+├── assets/          # 静态资源
+├── components/      # 通用组件
+├── layouts/         # 布局组件
+├── router/          # 路由配置
+├── services/        # API 服务
+├── stores/          # 状态管理
+└── views/           # 页面视图
+    ├── acl/         # ACL管理
+    ├── alerts/      # 告警管理
+    ├── auth/        # 认证相关
+    ├── containers/  # 容器管理
+    ├── dashboard/   # 仪表盘
+    ├── rental/      # 租赁管理
+    ├── serial/      # 序列号管理
+    ├── system/      # 系统管理
+    ├── traffic/     # 流量监控
+    └── users/       # 用户管理
+```
 
-1. Make sure that you are using the latest version of the Dashboard. Issues for outdated versions are irrelevant
-2. Provide steps to reproduce
-3. Provide an expected behavior
-4. Describe what is actually happening
-5. Platform, Browser & version as some issues may be browser specific
+## 响应式布局
 
-## Licensing
+### 移动端和平板
 
-- Copyright &copy; 2019-2022 JustBoil.me (https://justboil.me)
-- Licensed under MIT
+- 隐藏侧边菜单
+- 可折叠的卡片和表格
+- 优化的触摸操作体验
 
-## Useful Links
+### 小型笔记本 (1024px)
+
+- 可切换显示/隐藏侧边菜单
+- 自适应的内容布局
+
+### 笔记本和台式机
+
+- 固定的左侧菜单布局
+- 充分利用宽屏空间
+
+## 环境变量
+
+```
+VITE_API_BASE_URL=http://localhost:8000
+```
+
+## 浏览器支持
+
+- Chrome >= 87
+- Firefox >= 78
+- Safari >= 14
+- Edge >= 88
+
+## 开发规范
+
+- 使用 Vue 3 组合式 API
+- 遵循 ESLint 配置
+- 使用 Prettier 进行代码格式化
+- 组件使用 PascalCase 命名
+- 使用 Tailwind CSS 进行样式开发
+- 使用 MDI 图标库
+
+## License
+
+[MIT](LICENSE)
+
+## 致谢
 
 - [JustBoil.me](https://justboil.me/)
 - [Tailwind CSS](https://tailwindcss.com/)
