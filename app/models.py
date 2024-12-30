@@ -982,7 +982,8 @@ class OperationLog(db.Model):
 
     # 关系定义
     user = relationship('User', back_populates='operation_logs')
-    target = relationship('SshConnectionLog', back_populates='operation_logs')  # 确保目标模型定义正确
+    # 使用字符串引用 SSHConnectionLog
+    ssh_connection = relationship('SSHConnectionLog', back_populates='container_deployment_logs')
 
 
 class ServerCategoryAssociation(db.Model):
