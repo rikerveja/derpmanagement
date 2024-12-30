@@ -709,14 +709,19 @@ class TrafficAlert(db.Model):
     status = Column(Enum('active', 'resolved', name='alert_status'), default='active')
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    # 考虑添加条件外键或使用多态关联
+    # 使用独立的外键约束
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    container_id = Column(Integer, ForeignKey('docker_containers.id'), nullable=True)
+    server_id = Column(Integer, ForeignKey('servers.id'), nullable=True)
+
+    # 关系定义
+    user = relationship("User")
+    container = relationship("DockerContainer")
+    server = relationship("Server")
+
     __table_args__ = (
-        ForeignKeyConstraint(
-            ['resource_id', 'resource_type'],
-            ['users.id', 'resource_type'],
-            name='fk_resource_user',
-            use_alter=True
-        ),
+        Index('idx_traffic_alert_type', 'resource_type'),
+        Index('idx_traffic_alert_status', 'status'),
     )
 
 
@@ -730,13 +735,19 @@ class TrafficReport(db.Model):
     period = Column(String(50), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # 使用独立的外键约束
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    container_id = Column(Integer, ForeignKey('docker_containers.id'), nullable=True)
+    server_id = Column(Integer, ForeignKey('servers.id'), nullable=True)
+
+    # 关系定义
+    user = relationship("User")
+    container = relationship("DockerContainer")
+    server = relationship("Server")
+
     __table_args__ = (
-        ForeignKeyConstraint(
-            ['resource_id', 'resource_type'],
-            ['users.id', 'resource_type'],
-            name='fk_resource_user_report',
-            use_alter=True
-        ),
+        Index('idx_traffic_report_type', 'resource_type'),
+        Index('idx_traffic_report_period', 'period'),
     )
 
 
