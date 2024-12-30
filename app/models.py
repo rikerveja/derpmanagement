@@ -122,6 +122,7 @@ class Distributor(Base):
     unique_link = Column(String(255))
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    serial_numbers = relationship("SerialNumber", back_populates="distributor")
 
     __table_args__ = (
         UniqueConstraint('email', name='unique_distributor_email'),
