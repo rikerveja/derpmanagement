@@ -98,21 +98,18 @@
           </div>
         </template>
   
-        <div class="form-group">
-          <label for="captcha">图形验证码</label>
-          <div class="captcha-container">
-            <input 
-              type="text" 
-              id="captcha"
-              v-model="formData.captcha"
-              required
-              placeholder="请输入验证码"
-              maxlength="4"
-            >
-            <div class="captcha-image" @click="refreshCaptcha">
-              <img :src="captchaUrl" alt="验证码">
-            </div>
-          </div>
+        <div class="form-group" v-if="isLogin || showSlideVerify">
+          <label>请完成验证</label>
+          <slide-verify
+            ref="slideVerify"
+            :slider-text="'向右滑动'"
+            :accuracy="accuracy"
+            :show-refresh="true"
+            :is-auto-refresh="true"
+            @again="onAgain"
+            @success="onSuccess"
+            @fail="onFail"
+          ></slide-verify>
         </div>
   
         <div v-if="!isLogin" class="agreement">
@@ -142,11 +139,19 @@
   </template>
   
   <script>
+  import SlideVerify from 'vue-monoplasty-slide-verify'
+  
   export default {
     name: 'LoginView',
+    components: {
+      SlideVerify
+    },
     data() {
       return {
         isLogin: true,
+        showSlideVerify: false, // 控制注册时是否显示验证码
+        accuracy: 5, // 验证精度
+        verifySuccess: false, // 验证是否通过
         captchaUrl: '',
         countdown: 0,
         formData: {
@@ -165,6 +170,11 @@
     },
     methods: {
       async handleSubmit() {
+        if (!this.verifySuccess) {
+          alert('请先完成滑动验证')
+          return
+        }
+  
         // 表单验证
         if (!this.isLogin) {
           if (!this.validateForm()) {
@@ -259,6 +269,12 @@
           return
         }
   
+        if (!this.verifySuccess) {
+          this.showSlideVerify = true
+          alert('请先完成滑动验证')
+          return
+        }
+  
         try {
           const response = await fetch('/api/send-email-code', {
             method: 'POST',
@@ -272,6 +288,7 @@
   
           if (response.ok) {
             this.startCountdown()
+            this.showSlideVerify = false // 验证成功后隐藏滑块
           } else {
             const error = await response.json()
             throw new Error(error.message || '发送验证码失败')
@@ -293,7 +310,11 @@
       toggleForm() {
         this.isLogin = !this.isLogin
         this.resetForm()
-        this.refreshCaptcha()
+        this.verifySuccess = false
+        this.showSlideVerify = false
+        if (this.$refs.slideVerify) {
+          this.$refs.slideVerify.reset()
+        }
       },
       resetForm() {
         this.formData = {
@@ -316,6 +337,25 @@
       showPrivacy() {
         // 实现显示隐私政策的逻辑
         alert('显示隐私政策')
+      },
+      // 验证成功
+      onSuccess(times) {
+        console.log('验证通过，耗时 ' + times + '毫秒')
+        this.verifySuccess = true
+        
+        // 如果是注册流程，验证成功后发送邮箱验证码
+        if (!this.isLogin && this.formData.email) {
+          this.sendEmailCode()
+        }
+      },
+      // 验证失败
+      onFail() {
+        console.log('验证失败')
+        this.verifySuccess = false
+      },
+      // 重新验证
+      onAgain() {
+        this.verifySuccess = false
       }
     }
   }
@@ -495,5 +535,42 @@
       margin: 20px;
       padding: 20px;
     }
+  }
+  
+  /* 添加滑动验证码样式 */
+  :deep(.slide-verify) {
+    margin: 0 auto;
+    width: 100% !important;
+  }
+  
+  :deep(.slide-verify-slider) {
+    width: 100% !important;
+    height: 40px !important;
+    background-color: #f9fafb !important;
+    border: 1px solid #dcdfe6 !important;
+    border-radius: 0.25rem !important;
+  }
+  
+  :deep(.slide-verify-slider-mask) {
+    height: 40px !important;
+    border-radius: 0.25rem !important;
+    background-color: rgba(126, 58, 242, 0.1) !important;
+  }
+  
+  :deep(.slide-verify-slider-text) {
+    line-height: 40px !important;
+    font-size: 0.875rem !important;
+    color: #2c3e50 !important;
+  }
+  
+  :deep(.slide-verify-slider-icon) {
+    width: 40px !important;
+    height: 40px !important;
+    background-color: #7e3af2 !important;
+    box-shadow: 0 2px 6px rgba(126, 58, 242, 0.2) !important;
+  }
+  
+  :deep(.slide-verify-refresh-icon) {
+    color: #7e3af2 !important;
   }
   </style> 
