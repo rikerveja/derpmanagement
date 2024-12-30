@@ -16,7 +16,8 @@ def validate_required_fields(data, fields):
     missing_fields = [field for field in fields if not data.get(field)]
     return missing_fields
 
-# 列出所有用户
+import traceback
+
 @user_bp.route('/api/users', methods=['GET'])
 def get_all_users():
     try:
@@ -31,15 +32,15 @@ def get_all_users():
                 'username': user.username,
                 'email': user.email,
                 'role': user.role,
-                'rental_expiry': user.rental_expiry,
-                'created_at': user.created_at,
-                'updated_at': user.updated_at,
-                'is_banned': user.is_banned,
-                'banned_reason': user.banned_reason,
-                'last_login': user.last_login,
-                'is_verified': user.is_verified,
-                'verification_token': user.verification_token,
-                'password_encrypted': user.password_encrypted
+                'rental_expiry': user.rental_expiry if user.rental_expiry is None else user.rental_expiry.strftime('%Y-%m-%d %H:%M:%S'),
+                'created_at': user.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                'updated_at': user.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
+                'is_banned': user.is_banned,  # 0 或 1
+                'banned_reason': user.banned_reason if user.banned_reason else None,
+                'last_login': user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else None,
+                'is_verified': user.is_verified,  # 0 或 1
+                'verification_token': user.verification_token if user.verification_token else None,
+                'password_encrypted': user.password_encrypted  # 0 或 1
             }
             users_data.append(user_data)
 
@@ -47,7 +48,9 @@ def get_all_users():
         return jsonify({"success": True, "users": users_data}), 200
 
     except Exception as e:
-        log_operation(None, "get_all_users", "failed", f"Error fetching users: {str(e)}")
+        # 记录详细的错误信息，包括堆栈信息
+        error_message = f"Error fetching users: {str(e)}\n{traceback.format_exc()}"
+        log_operation(None, "get_all_users", "failed", error_message)
         return jsonify({"success": False, "message": "Internal server error"}), 500
 
 
