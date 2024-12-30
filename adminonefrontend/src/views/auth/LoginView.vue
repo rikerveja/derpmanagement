@@ -215,9 +215,7 @@
             const data = await response.json()
             
             if (data.success) {
-              // 保存 token 到 localStorage
               localStorage.setItem('token', data.token)
-              // 跳转到仪表盘
               this.$router.push('/dashboard')
             } else {
               throw new Error(data.message || '登录失败')
