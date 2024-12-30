@@ -5,13 +5,13 @@
         <!-- 登录时只显示用户名和密码 -->
         <template v-if="isLogin">
           <div class="form-group">
-            <label for="username">用户名</label>
+            <label for="email">邮箱</label>
             <input 
-              type="text" 
-              id="username"
-              v-model="formData.username"
+              type="email" 
+              id="email"
+              v-model="formData.email"
               required
-              placeholder="请输入用户名"
+              placeholder="请输入邮箱"
             >
           </div>
   
@@ -207,7 +207,7 @@
                 'Content-Type': 'application/json'
               },
               body: JSON.stringify({
-                username: this.formData.username,
+                email: this.formData.email,
                 password: this.formData.password
               })
             })
