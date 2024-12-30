@@ -4,7 +4,7 @@ from sqlalchemy.sql import func
 from datetime import timedelta
 from datetime import datetime
 import re
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Enum, ForeignKey, DECIMAL, JSON, UniqueConstraint
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Enum, ForeignKey, DECIMAL, JSON, UniqueConstraint, ForeignKeyConstraint, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -42,12 +42,18 @@ class User(Base):
     serial_numbers = relationship("SerialNumber", back_populates="user")
     notifications = relationship("RenewalNotification", back_populates="user")
 
+    __table_args__ = (
+        Index('idx_user_email', 'email'),
+        Index('idx_user_username', 'username'),
+        Index('idx_user_role', 'role'),
+    )
+
 
 class UserLog(Base):
     __tablename__ = 'user_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
     operation = Column(String(255))
     details = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -66,16 +72,18 @@ class RolePermission(Base):
 
 
 class DistributorCommission(Base):
-    __tablename__ = 'distributor_commission'
-
+    __tablename__ = 'distributor_commissions'
+    
     id = Column(Integer, primary_key=True, autoincrement=True)
     distributor_id = Column(Integer, ForeignKey('users.id'))
-    serial_number = Column(String(255), nullable=False)
-    amount = Column(DECIMAL(10, 2), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    invoice_id = Column(Integer, ForeignKey('invoices.id'))
+    commission_amount = Column(DECIMAL(10, 2))
     status = Column(Enum('pending', 'paid', name='commission_status'), default='pending')
+    paid_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-    distributor = relationship("User", back_populates="commissions")
+    distributor = relationship("User")
+    invoice = relationship("Invoice")
 
 
 class Rental(Base):
@@ -86,23 +94,29 @@ class Rental(Base):
     status = Column(Enum('active', 'expired', 'paused', name='rental_status'), default='active', nullable=False)
     start_date = Column(DateTime, nullable=False)
     end_date = Column(DateTime, nullable=False)
-    server_ids = Column(JSON)
-    container_ids = Column(JSON)
+    server_ids = Column(JSON, default=dict)
+    container_ids = Column(JSON, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     tenant_id = Column(Integer)
 
     user = relationship("User", back_populates="rentals")
 
+    __table_args__ = (
+        Index('idx_rental_status', 'status'),
+        Index('idx_rental_user', 'user_id'),
+        Index('idx_rental_dates', 'start_date', 'end_date'),
+    )
+
 
 class RenewalNotification(Base):
     __tablename__ = 'renewal_notifications'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
-    notification_type = Column(Enum('7_days', '3_days', '1_day', name='notification_type'))
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
+    notification_type = Column(Enum('7_days', '3_days', '1_day', name='notification_type'), nullable=False)
     sent_at = Column(DateTime, default=datetime.utcnow)
-    notification_channel = Column(Enum('email', 'sms', 'push', name='notification_channel'))
+    notification_channel = Column(Enum('email', 'sms', 'push', name='notification_channel'), nullable=False)
     notification_sent = Column(Boolean, default=False)
     notification_status = Column(Enum('pending', 'sent', 'failed', name='notification_status'), default='pending')
     notification_content = Column(String)
@@ -126,6 +140,9 @@ class Distributor(Base):
 
     __table_args__ = (
         UniqueConstraint('email', name='unique_distributor_email'),
+        Index('idx_distributor_username', 'username'),
+        Index('idx_distributor_role', 'role'),
+        Index('idx_distributor_mode', 'distributor_mode'),
     )
 
 
@@ -135,7 +152,7 @@ class SerialNumber(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     code = Column(String(255), unique=True, nullable=False)
     status = Column(Enum('unused', 'used', 'expired', name='serial_number_status'), nullable=False)
-    user_id = Column(Integer, ForeignKey('users.id'))
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'))
     valid_days = Column(Integer)
     start_date = Column(DateTime)
     end_date = Column(DateTime)
@@ -144,19 +161,25 @@ class SerialNumber(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     used_at = Column(DateTime)
-    distributor_id = Column(Integer, ForeignKey('distributors.id'))
+    distributor_id = Column(Integer, ForeignKey('distributors.id', ondelete='SET NULL'))
     payment_status = Column(Enum('paid', 'unpaid', name='payment_status'), default='unpaid')
 
     user = relationship("User", back_populates="serial_numbers")
     distributor = relationship("Distributor", back_populates="serial_numbers")
+
+    __table_args__ = (
+        Index('idx_serial_code', 'code'),
+        Index('idx_serial_status', 'status'),
+        Index('idx_serial_user', 'user_id'),
+    )
 
 
 class SerialUserAssociation(Base):
     __tablename__ = 'serial_user_association'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
-    serial_number_id = Column(Integer, ForeignKey('serial_numbers.id'))
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
+    serial_number_id = Column(Integer, ForeignKey('serial_numbers.id', ondelete='CASCADE'))
     status = Column(Enum('activated', 'pending', 'expired', name='serial_status'), default='pending')
     activated_at = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -178,12 +201,12 @@ class Server(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     server_name = Column(String(255), nullable=False)
     ip_address = Column(String(255), nullable=False)
-    category_id = Column(Integer, ForeignKey('server_categories.id'))
+    category_id = Column(Integer, ForeignKey('server_categories.id', ondelete='SET NULL'))
     cpu = Column(String(50))
     memory = Column(String(50))
     storage = Column(String(50))
     bandwidth = Column(String(255))
-    status = Column(Enum('healthy', 'unhealthy', 'maintenance', name='server_status'), default='healthy')
+    status = Column(Enum('healthy', 'unhealthy', 'maintenance', name='server_status'), default='healthy', nullable=False)
     server_type = Column(String(255))
     region = Column(String(255))
     user_count = Column(Integer, default=0)
@@ -194,17 +217,22 @@ class Server(Base):
 
     category = relationship("ServerCategory")
 
+    __table_args__ = (
+        Index('idx_server_status', 'status'),
+        Index('idx_server_region', 'region'),
+    )
+
 
 class DockerContainer(Base):
     __tablename__ = 'docker_containers'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     container_id = Column(String(255), unique=True, nullable=False)
-    server_id = Column(Integer, ForeignKey('servers.id'))
-    user_id = Column(Integer, ForeignKey('users.id'))
+    server_id = Column(Integer, ForeignKey('servers.id', ondelete='CASCADE'))
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
     port = Column(Integer)
     stun_port = Column(Integer)
-    status = Column(Enum('running', 'stopped', 'paused', 'restarting', 'exited', name='container_status'), default='running')
+    status = Column(Enum('running', 'stopped', 'paused', 'restarting', 'exited', name='container_status'), default='running', nullable=False)
     image = Column(String(255))
     max_upload_traffic = Column(DECIMAL(10, 2))
     max_download_traffic = Column(DECIMAL(10, 2))
@@ -216,14 +244,20 @@ class DockerContainer(Base):
     server = relationship("Server")
     user = relationship("User")
 
+    __table_args__ = (
+        Index('idx_container_status', 'status'),
+        Index('idx_container_server', 'server_id'),
+        Index('idx_container_user', 'user_id'),
+    )
+
 
 class SerialServerAssociation(Base):
     __tablename__ = 'serial_server_association'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    serial_number_id = Column(Integer, ForeignKey('serial_numbers.id'))
-    server_id = Column(Integer, ForeignKey('servers.id'))
-    container_id = Column(Integer, ForeignKey('docker_containers.id'), nullable=False)
+    serial_number_id = Column(Integer, ForeignKey('serial_numbers.id', ondelete='CASCADE'))
+    server_id = Column(Integer, ForeignKey('servers.id', ondelete='CASCADE'))
+    container_id = Column(Integer, ForeignKey('docker_containers.id', ondelete='CASCADE'), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -248,8 +282,8 @@ class ServerContainerAssociation(Base):
     __tablename__ = 'server_container_association'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    server_id = Column(Integer, ForeignKey('servers.id'))
-    container_id = Column(Integer, ForeignKey('docker_containers.id'))
+    server_id = Column(Integer, ForeignKey('servers.id', ondelete='CASCADE'))
+    container_id = Column(Integer, ForeignKey('docker_containers.id', ondelete='CASCADE'))
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -261,7 +295,7 @@ class ServerHistory(Base):
     __tablename__ = 'server_history'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    server_id = Column(Integer, ForeignKey('servers.id'))
+    server_id = Column(Integer, ForeignKey('servers.id', ondelete='CASCADE'))
     operation = Column(Enum('status_change', 'maintenance', 'downtime', 'restore', name='server_operation'))
     details = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -273,7 +307,7 @@ class ServerTrafficMonitoring(Base):
     __tablename__ = 'server_traffic_monitoring'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    server_id = Column(Integer, ForeignKey('servers.id'))
+    server_id = Column(Integer, ForeignKey('servers.id', ondelete='CASCADE'))
     total_traffic = Column(Integer)
     used_traffic = Column(Integer)
     remaining_traffic = Column(Integer)
@@ -281,12 +315,17 @@ class ServerTrafficMonitoring(Base):
 
     server = relationship("Server")
 
+    __table_args__ = (
+        Index('idx_traffic_server', 'server_id'),
+        Index('idx_traffic_timestamp', 'timestamp'),
+    )
+
 
 class ServerPerformanceMonitoring(Base):
     __tablename__ = 'server_performance_monitoring'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    server_id = Column(Integer, ForeignKey('servers.id'))
+    server_id = Column(Integer, ForeignKey('servers.id', ondelete='CASCADE'))
     cpu_usage = Column(DECIMAL(10, 2))
     memory_usage = Column(DECIMAL(10, 2))
     network_latency = Column(DECIMAL(10, 2))
@@ -294,12 +333,17 @@ class ServerPerformanceMonitoring(Base):
 
     server = relationship("Server")
 
+    __table_args__ = (
+        Index('idx_perf_server', 'server_id'),
+        Index('idx_perf_timestamp', 'timestamp'),
+    )
+
 
 class DockerContainerResources(Base):
     __tablename__ = 'docker_container_resources'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    container_id = Column(Integer, ForeignKey('docker_containers.id'))
+    container_id = Column(Integer, ForeignKey('docker_containers.id', ondelete='CASCADE'))
     cpu_limit = Column(DECIMAL(10, 2))
     memory_limit = Column(DECIMAL(10, 2))
     disk_limit = Column(DECIMAL(10, 2))
@@ -313,19 +357,24 @@ class DockerContainerTraffic(Base):
     __tablename__ = 'docker_container_traffic'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    container_id = Column(Integer, ForeignKey('docker_containers.id'))
+    container_id = Column(Integer, ForeignKey('docker_containers.id', ondelete='CASCADE'))
     upload_traffic = Column(DECIMAL(10, 2))
     download_traffic = Column(DECIMAL(10, 2))
     timestamp = Column(DateTime, default=datetime.utcnow)
 
     container = relationship("DockerContainer")
 
+    __table_args__ = (
+        Index('idx_container_traffic_container', 'container_id'),
+        Index('idx_container_traffic_timestamp', 'timestamp'),
+    )
+
 
 class DockerContainerEvents(Base):
     __tablename__ = 'docker_container_events'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    container_id = Column(Integer, ForeignKey('docker_containers.id'))
+    container_id = Column(Integer, ForeignKey('docker_containers.id', ondelete='CASCADE'))
     event_type = Column(Enum('start', 'stop', 'restart', 'pause', 'unpause', 'error', name='container_event_type'))
     event_message = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -337,7 +386,7 @@ class DockerContainerLogs(Base):
     __tablename__ = 'docker_container_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    container_id = Column(Integer, ForeignKey('docker_containers.id'))
+    container_id = Column(Integer, ForeignKey('docker_containers.id', ondelete='CASCADE'))
     log_level = Column(Enum('info', 'warn', 'error', name='log_level'))
     log_message = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -349,10 +398,10 @@ class ACLConfig(Base):
     __tablename__ = 'acl_configs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
-    server_ids = Column(JSON)
-    container_ids = Column(JSON)
-    acl_data = Column(JSON)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
+    server_ids = Column(JSON, default=dict)
+    container_ids = Column(JSON, default=dict)
+    acl_data = Column(JSON, default=dict)
     version = Column(String(50))
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -360,16 +409,21 @@ class ACLConfig(Base):
 
     user = relationship("User")
 
+    __table_args__ = (
+        Index('idx_acl_user', 'user_id'),
+        Index('idx_acl_active', 'is_active'),
+    )
+
 
 class ACLVerificationLog(Base):
     __tablename__ = 'acl_verification_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
-    acl_id = Column(Integer, ForeignKey('acl_configs.id'))
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
+    acl_id = Column(Integer, ForeignKey('acl_configs.id', ondelete='CASCADE'))
     ip_address = Column(String(50))
     location = Column(String(255))
-    status = Column(Enum('approved', 'denied', name='verification_status'))
+    status = Column(Enum('approved', 'denied', name='verification_status'), default='pending', nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User")
@@ -380,9 +434,9 @@ class ACLLog(Base):
     __tablename__ = 'acl_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
     operation = Column(Enum('generate', 'update', 'delete', name='acl_operation'))
-    acl_config_id = Column(Integer, ForeignKey('acl_configs.id'))
+    acl_config_id = Column(Integer, ForeignKey('acl_configs.id', ondelete='CASCADE'))
     details = Column(String)
     ip_address = Column(String(255))
     location = Column(String(255))
@@ -396,7 +450,7 @@ class ACLFilePath(Base):
     __tablename__ = 'acl_file_paths'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    acl_config_id = Column(Integer, ForeignKey('acl_configs.id'))
+    acl_config_id = Column(Integer, ForeignKey('acl_configs.id', ondelete='CASCADE'))
     file_path = Column(String(255), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -408,8 +462,8 @@ class ACLDownloadLog(Base):
     __tablename__ = 'acl_download_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
-    acl_file_id = Column(Integer, ForeignKey('acl_file_paths.id'))
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
+    acl_file_id = Column(Integer, ForeignKey('acl_file_paths.id', ondelete='CASCADE'))
     download_time = Column(DateTime, default=datetime.utcnow)
     ip_address = Column(String(255))
 
@@ -433,28 +487,36 @@ class AlarmLog(Base):
     __tablename__ = 'alarm_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    rule_id = Column(Integer, ForeignKey('alarm_rules.id'))
-    server_id = Column(Integer, ForeignKey('servers.id'))
-    user_id = Column(Integer, ForeignKey('users.id'))
+    rule_id = Column(Integer, ForeignKey('alarm_rules.id', ondelete='SET NULL'))
+    server_id = Column(Integer, ForeignKey('servers.id', ondelete='SET NULL'))
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'))
     alert_type = Column(String(255))
     message = Column(String)
     status = Column(Enum('active', 'resolved', 'acknowledged', name='alarm_status'))
     created_at = Column(DateTime, default=datetime.utcnow)
     resolved_at = Column(DateTime)
     acknowledged_at = Column(DateTime)
-    resolved_by = Column(Integer, ForeignKey('users.id'))
+    resolved_by = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'))
 
     rule = relationship("AlarmRule")
     server = relationship("Server")
     user = relationship("User", foreign_keys=[user_id])
     resolved_by_user = relationship("User", foreign_keys=[resolved_by])
 
+    __table_args__ = (
+        Index('idx_alarm_rule', 'rule_id'),
+        Index('idx_alarm_server', 'server_id'),
+        Index('idx_alarm_user', 'user_id'),
+        Index('idx_alarm_status', 'status'),
+        Index('idx_alarm_created', 'created_at'),
+    )
+
 
 class AlarmNotification(Base):
     __tablename__ = 'alarm_notifications'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    alarm_log_id = Column(Integer, ForeignKey('alarm_logs.id'))
+    alarm_log_id = Column(Integer, ForeignKey('alarm_logs.id', ondelete='CASCADE'))
     notification_type = Column(Enum('email', 'sms', 'push', name='notification_channel'))
     status = Column(Enum('sent', 'failed', 'pending', name='notification_status'), default='pending')
     sent_at = Column(DateTime)
@@ -468,9 +530,9 @@ class AlarmResolution(Base):
     __tablename__ = 'alarm_resolutions'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    alarm_log_id = Column(Integer, ForeignKey('alarm_logs.id'))
+    alarm_log_id = Column(Integer, ForeignKey('alarm_logs.id', ondelete='CASCADE'))
     action_taken = Column(String)
-    resolved_by = Column(Integer, ForeignKey('users.id'))
+    resolved_by = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'))
     resolved_at = Column(DateTime)
     status = Column(Enum('resolved', 'ignored', 'escalated', name='resolution_status'))
 
@@ -659,8 +721,15 @@ class TrafficAlert(Base):
     status = Column(Enum('active', 'resolved', name='alert_status'), default='active')
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    # Foreign key relationship based on resource_type
-    user = relationship("User", foreign_keys=[resource_id])
+    # 考虑添加条件外键或使用多态关联
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ['resource_id', 'resource_type'],
+            ['users.id', 'resource_type'],
+            name='fk_resource_user',
+            use_alter=True
+        ),
+    )
 
 
 class TrafficReport(Base):
@@ -673,7 +742,14 @@ class TrafficReport(Base):
     period = Column(String(50), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    user = relationship("User", foreign_keys=[resource_id])
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ['resource_id', 'resource_type'],
+            ['users.id', 'resource_type'],
+            name='fk_resource_user_report',
+            use_alter=True
+        ),
+    )
 
 
 class DeviceBinding(Base):
@@ -682,8 +758,8 @@ class DeviceBinding(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey('users.id'))
     serial_number_id = Column(Integer, ForeignKey('serial_numbers.id'))
-    server_ids = Column(JSON)
-    container_ids = Column(JSON)
+    server_ids = Column(JSON, default=dict)
+    container_ids = Column(JSON, default=dict)
     acl_id = Column(Integer, ForeignKey('acl_configs.id'))
     bind_time = Column(DateTime, default=datetime.utcnow)
     status = Column(Enum('active', 'inactive', name='device_binding_status'), default='active')
@@ -691,6 +767,12 @@ class DeviceBinding(Base):
     user = relationship("User")
     serial_number = relationship("SerialNumber")
     acl_config = relationship("ACLConfig")
+
+    __table_args__ = (
+        Index('idx_binding_user', 'user_id'),
+        Index('idx_binding_serial', 'serial_number_id'),
+        Index('idx_binding_status', 'status'),
+    )
 
 
 class ResourceReleaseLog(Base):
@@ -745,8 +827,8 @@ class DistributorSerial(Base):
     serial_number = Column(String(255), unique=True, nullable=False)
     status = Column(Enum('unused', 'used', 'expired', name='serial_status'), nullable=False)
     user_id = Column(Integer, ForeignKey('users.id'))
-    server_ids = Column(JSON)
-    container_ids = Column(JSON)
+    server_ids = Column(JSON, default=dict)
+    container_ids = Column(JSON, default=dict)
     purchase_price = Column(DECIMAL(10, 2))
     sale_price = Column(DECIMAL(10, 2))
     commission = Column(DECIMAL(10, 2))
@@ -755,6 +837,13 @@ class DistributorSerial(Base):
 
     distributor = relationship("Distributor")
     user = relationship("User")
+
+    __table_args__ = (
+        Index('idx_dist_serial_distributor', 'distributor_id'),
+        Index('idx_dist_serial_user', 'user_id'),
+        Index('idx_dist_serial_status', 'status'),
+        Index('idx_dist_serial_expiry', 'expires_at'),
+    )
 
 
 class CommissionRecord(Base):
@@ -770,6 +859,12 @@ class CommissionRecord(Base):
 
     distributor = relationship("Distributor")
     serial_number = relationship("DistributorSerial")
+
+    __table_args__ = (
+        Index('idx_commission_distributor', 'distributor_id'),
+        Index('idx_commission_serial', 'serial_number_id'),
+        Index('idx_commission_status', 'status'),
+    )
 
 
 class DistributorLevel(Base):
@@ -792,6 +887,11 @@ class FinanceSettlement(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     distributor = relationship("Distributor")
+
+    __table_args__ = (
+        Index('idx_settlement_distributor', 'distributor_id'),
+        Index('idx_settlement_status', 'status'),
+    )
 
 
 class ContainerManagementLog(Base):
