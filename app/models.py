@@ -4,6 +4,9 @@ from sqlalchemy.sql import func
 from datetime import timedelta
 from datetime import datetime
 import re
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Enum, ForeignKey, DECIMAL, JSON, UniqueConstraint
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
 
 # 用户与服务器的关联表（多对多关系）
 user_server_association = db.Table(
@@ -12,11 +15,6 @@ user_server_association = db.Table(
     db.Column('server_id', db.Integer, db.ForeignKey('servers.id'), primary_key=True),
     db.UniqueConstraint('user_id', 'server_id', name='uq_user_server')  # 定义唯一约束
 )
-
-from datetime import datetime
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Enum, ForeignKey, DECIMAL, JSON, UniqueConstraint
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
 
 Base = declarative_base()
 
@@ -531,3 +529,383 @@ class PaymentMethod(Base):
     method_name = Column(String(50), nullable=False)
     account_info = Column(String(255), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class FinanceLog(Base):
+    __tablename__ = 'finance_logs'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id'))
+    operation = Column(String(255), nullable=False)
+    details = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
+
+class ContainerReplacementLog(Base):
+    __tablename__ = 'container_replacement_logs'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    server_id = Column(Integer, ForeignKey('servers.id'))
+    old_container_id = Column(Integer, ForeignKey('docker_containers.id'))
+    new_container_id = Column(Integer, ForeignKey('docker_containers.id'))
+    status = Column(Enum('replaced', 'failed', 'in-progress', name='container_replacement_status'), nullable=False)
+    reason = Column(String)
+    operation_type = Column(Enum('automatic', 'manual', name='operation_type'), nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    user_id = Column(Integer, ForeignKey('users.id'))
+
+    server = relationship("Server")
+    old_container = relationship("DockerContainer", foreign_keys=[old_container_id])
+    new_container = relationship("DockerContainer", foreign_keys=[new_container_id])
+    user = relationship("User")
+
+
+class DockerFailureLog(Base):
+    __tablename__ = 'docker_failure_logs'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    container_id = Column(Integer, ForeignKey('docker_containers.id'))
+    status = Column(Enum('failed', 'repaired', 'pending', name='docker_failure_status'), default='failed')
+    repair_attempts = Column(Integer, default=0)
+    last_attempt_time = Column(DateTime)
+    failure_details = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    container = relationship("DockerContainer")
+
+
+class ContainerCleanupLog(Base):
+    __tablename__ = 'container_cleanup_logs'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    old_container_id = Column(Integer, ForeignKey('docker_containers.id'))
+    cleanup_status = Column(Enum('completed', 'failed', name='cleanup_status'), nullable=False)
+    cleanup_details = Column(String)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+
+    old_container = relationship("DockerContainer")
+
+
+class ContainerAndServiceUpdateLog(Base):
+    __tablename__ = 'container_and_service_update_logs'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    container_id = Column(Integer, ForeignKey('docker_containers.id'))
+    service_type = Column(String(255))
+    status = Column(Enum('started', 'updated', 'failed', name='update_status'), nullable=False)
+    details = Column(String)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+
+    container = relationship("DockerContainer")
+
+
+class UserTraffic(Base):
+    __tablename__ = 'user_traffic'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id'))
+    upload_traffic = Column(DECIMAL(10, 2))
+    download_traffic = Column(DECIMAL(10, 2))
+    total_traffic = Column(DECIMAL(10, 2))
+    traffic_limit = Column(DECIMAL(10, 2))
+    remaining_traffic = Column(DECIMAL(10, 2))
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
+
+class ContainerTraffic(Base):
+    __tablename__ = 'container_traffic'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    container_id = Column(Integer, ForeignKey('docker_containers.id'))
+    server_id = Column(Integer, ForeignKey('servers.id'))
+    upload_traffic = Column(DECIMAL(10, 2))
+    download_traffic = Column(DECIMAL(10, 2))
+    total_traffic = Column(DECIMAL(10, 2))
+    traffic_limit = Column(DECIMAL(10, 2))
+    remaining_traffic = Column(DECIMAL(10, 2))
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    container = relationship("DockerContainer")
+    server = relationship("Server")
+
+
+class ServerTraffic(Base):
+    __tablename__ = 'server_traffic'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    server_id = Column(Integer, ForeignKey('servers.id'))
+    total_traffic = Column(DECIMAL(10, 2))
+    remaining_traffic = Column(DECIMAL(10, 2))
+    traffic_limit = Column(DECIMAL(10, 2))
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    server = relationship("Server")
+
+
+class TrafficAlert(Base):
+    __tablename__ = 'traffic_alerts'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    resource_type = Column(Enum('user', 'container', 'server', name='resource_type'), nullable=False)
+    resource_id = Column(Integer)
+    alert_type = Column(String(255))
+    threshold = Column(DECIMAL(10, 2))
+    actual_traffic = Column(DECIMAL(10, 2))
+    status = Column(Enum('active', 'resolved', name='alert_status'), default='active')
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Foreign key relationship based on resource_type
+    user = relationship("User", foreign_keys=[resource_id])
+
+
+class TrafficReport(Base):
+    __tablename__ = 'traffic_reports'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    resource_type = Column(Enum('user', 'container', 'server', name='resource_type'), nullable=False)
+    resource_id = Column(Integer)
+    total_traffic = Column(DECIMAL(10, 2))
+    period = Column(String(50), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", foreign_keys=[resource_id])
+
+
+class DeviceBinding(Base):
+    __tablename__ = 'device_bindings'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id'))
+    serial_number_id = Column(Integer, ForeignKey('serial_numbers.id'))
+    server_ids = Column(JSON)
+    container_ids = Column(JSON)
+    acl_id = Column(Integer, ForeignKey('acl_configs.id'))
+    bind_time = Column(DateTime, default=datetime.utcnow)
+    status = Column(Enum('active', 'inactive', name='device_binding_status'), default='active')
+
+    user = relationship("User")
+    serial_number = relationship("SerialNumber")
+    acl_config = relationship("ACLConfig")
+
+
+class ResourceReleaseLog(Base):
+    __tablename__ = 'resource_release_logs'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    serial_number_id = Column(Integer, ForeignKey('serial_numbers.id'))
+    resource_type = Column(Enum('server', 'container', 'acl', name='resource_type'), nullable=False)
+    resource_id = Column(Integer)
+    release_time = Column(DateTime, default=datetime.utcnow)
+    released_by = Column(Integer, ForeignKey('users.id'))
+    status = Column(Enum('success', 'failed', name='release_status'), default='success')
+
+    serial_number = relationship("SerialNumber")
+    released_by_user = relationship("User")
+
+
+class RenewalRecord(Base):
+    __tablename__ = 'renewal_records'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id'))
+    serial_number_id = Column(Integer, ForeignKey('serial_numbers.id'))
+    renewal_amount = Column(DECIMAL(10, 2))
+    renewal_period = Column(Integer)
+    renewal_date = Column(DateTime, default=datetime.utcnow)
+    status = Column(Enum('success', 'failed', name='renewal_status'), default='success')
+
+    user = relationship("User")
+    serial_number = relationship("SerialNumber")
+
+
+class DeviceValidation(Base):
+    __tablename__ = 'device_validations'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id'))
+    serial_number_id = Column(Integer, ForeignKey('serial_numbers.id'))
+    validation_status = Column(Enum('approved', 'denied', 'pending', name='validation_status'), nullable=False)
+    ip_address = Column(String(255))
+    timestamp = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+    serial_number = relationship("SerialNumber")
+
+
+class DistributorSerial(Base):
+    __tablename__ = 'distributor_serials'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    distributor_id = Column(Integer, ForeignKey('distributors.id'))
+    serial_number = Column(String(255), unique=True, nullable=False)
+    status = Column(Enum('unused', 'used', 'expired', name='serial_status'), nullable=False)
+    user_id = Column(Integer, ForeignKey('users.id'))
+    server_ids = Column(JSON)
+    container_ids = Column(JSON)
+    purchase_price = Column(DECIMAL(10, 2))
+    sale_price = Column(DECIMAL(10, 2))
+    commission = Column(DECIMAL(10, 2))
+    expires_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    distributor = relationship("Distributor")
+    user = relationship("User")
+
+
+class CommissionRecord(Base):
+    __tablename__ = 'commission_records'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    distributor_id = Column(Integer, ForeignKey('distributors.id'))
+    serial_number_id = Column(Integer, ForeignKey('distributor_serials.id'))
+    commission_amount = Column(DECIMAL(10, 2))
+    status = Column(Enum('pending', 'paid', name='commission_status'), default='pending')
+    payment_date = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    distributor = relationship("Distributor")
+    serial_number = relationship("DistributorSerial")
+
+
+class DistributorLevel(Base):
+    __tablename__ = 'distributor_levels'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    level_name = Column(String(255), nullable=False)
+    commission_rate = Column(DECIMAL(5, 2), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class FinanceSettlement(Base):
+    __tablename__ = 'finance_settlements'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    distributor_id = Column(Integer, ForeignKey('distributors.id'))
+    settlement_amount = Column(DECIMAL(10, 2))
+    status = Column(Enum('pending', 'paid', 'cancelled', name='settlement_status'), default='pending')
+    settled_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    distributor = relationship("Distributor")
+
+
+class ContainerManagementLog(Base):
+    __tablename__ = 'container_management_logs'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    server_id = Column(Integer, ForeignKey('servers.id'))
+    container_id = Column(Integer, ForeignKey('docker_containers.id'))
+    action = Column(Enum('create', 'delete', name='container_action'), nullable=False)
+    old_container_count = Column(Integer)
+    new_container_count = Column(Integer)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    user_id = Column(Integer, ForeignKey('users.id'))
+    details = Column(String)
+
+    server = relationship("Server")
+    container = relationship("DockerContainer")
+    user = relationship("User")
+
+
+class ServerContainerCount(Base):
+    __tablename__ = 'server_container_count'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    server_id = Column(Integer, ForeignKey('servers.id'))
+    container_count = Column(Integer)
+    max_container_limit = Column(Integer, default=10)
+    last_updated = Column(DateTime, default=datetime.utcnow)
+
+    server = relationship("Server")
+
+
+class ServerContainerStatus(Base):
+    __tablename__ = 'server_container_status'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    server_id = Column(Integer, ForeignKey('servers.id'))
+    container_id = Column(Integer, ForeignKey('docker_containers.id'))
+    status = Column(Enum('healthy', 'unhealthy', 'restarting', 'paused', name='container_status'), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    server = relationship("Server")
+    container = relationship("DockerContainer")
+
+
+class SSHConnectionLog(Base):
+    __tablename__ = 'ssh_connection_logs'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    server_id = Column(Integer, ForeignKey('servers.id'))
+    user_id = Column(Integer, ForeignKey('users.id'))
+    ssh_status = Column(Enum('success', 'failed', name='ssh_status'), nullable=False)
+    connect_time = Column(DateTime, default=datetime.utcnow)
+    disconnect_time = Column(DateTime)
+    ip_address = Column(String(255))
+    details = Column(String)
+
+    server = relationship("Server")
+    user = relationship("User")
+
+
+class ContainerDeploymentLog(Base):
+    __tablename__ = 'container_deployment_logs'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    server_id = Column(Integer, ForeignKey('servers.id'))
+    container_id = Column(Integer, ForeignKey('docker_containers.id'))
+    derp_service_status = Column(Enum('deployed', 'failed', name='derp_service_status'), nullable=False)
+    deployment_time = Column(DateTime, default=datetime.utcnow)
+    ssh_connection_id = Column(Integer, ForeignKey('ssh_connection_logs.id'))
+    details = Column(String)
+
+    server = relationship("Server")
+    container = relationship("DockerContainer")
+    ssh_connection = relationship("SSHConnectionLog")
+
+
+class OperationLog(Base):
+    __tablename__ = 'operation_logs'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id'))
+    operation = Column(String(255), nullable=False)
+    target_id = Column(Integer)
+    status = Column(Enum('success', 'failed', name='operation_status'), nullable=False)
+    details = Column(String)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+    target = relationship("SSHConnectionLog", foreign_keys=[target_id])
+
+
+class ServerCategoryAssociation(Base):
+    __tablename__ = 'server_category_association'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    server_id = Column(Integer, ForeignKey('servers.id'))
+    category_id = Column(Integer, ForeignKey('server_categories.id'))
+    assigned_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    server = relationship("Server")
+    category = relationship("ServerCategory")
+
+
+class ServerUpdateLog(Base):
+    __tablename__ = 'server_update_logs'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    server_id = Column(Integer, ForeignKey('servers.id'))
+    operation_type = Column(Enum('add', 'update', 'delete', name='update_operation'))
+    operation_details = Column(String)
+    performed_by = Column(Integer, ForeignKey('users.id'))
+    timestamp = Column(DateTime, default=datetime.utcnow)
+
+    server = relationship("Server")
+    user = relationship("User", foreign_keys=[performed_by])
