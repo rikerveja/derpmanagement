@@ -94,7 +94,7 @@ class Rental(db.Model):
     __tablename__ = 'rentals'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
     status = Column(Enum('active', 'expired', 'paused', name='rental_status'), default='active', nullable=False)
     start_date = Column(DateTime, nullable=False)
     end_date = Column(DateTime, nullable=False)
@@ -941,24 +941,24 @@ class ServerContainerStatus(db.Model):
 class SshConnectionLog(db.Model):
     __tablename__ = 'ssh_connection_logs'
 
-    id = Column(Integer, primary_key=True)
-    server_id = Column(Integer, ForeignKey('servers.id'))
-    user_id = Column(Integer, ForeignKey('users.id'))
-    ssh_status = Column(Enum('success', 'failed'), nullable=False)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    server_id = Column(Integer, ForeignKey('servers.id', ondelete='CASCADE'))
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
+    ssh_status = Column(Enum('success', 'failed', name='ssh_status'), nullable=False)
     connect_time = Column(DateTime, default=datetime.utcnow)
     disconnect_time = Column(DateTime)
     ip_address = Column(String(255))
-    details = Column(Text)
+    details = Column(String(1024))
 
-    operation_logs = relationship('OperationLog', back_populates='OperationLog')  # 定义回引用关系
+    operation_logs = relationship('OperationLog', back_populates='ssh_connection')
 
 
 class ContainerDeploymentLog(db.Model):
     __tablename__ = 'container_deployment_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    server_id = Column(Integer, ForeignKey('servers.id'))
-    container_id = Column(Integer, ForeignKey('docker_containers.id'))
+    server_id = Column(Integer, ForeignKey('servers.id', ondelete='CASCADE'))
+    container_id = Column(Integer, ForeignKey('docker_containers.id', ondelete='CASCADE'))
     derp_service_status = Column(Enum('deployed', 'failed', name='derp_service_status'), nullable=False)
     deployment_time = Column(DateTime, default=datetime.utcnow)
     ssh_connection_id = Column(Integer, ForeignKey('ssh_connection_logs.id'))
@@ -966,24 +966,22 @@ class ContainerDeploymentLog(db.Model):
 
     server = relationship("Server")
     container = relationship("DockerContainer")
-    ssh_connection = relationship("SSHConnectionLog")
+    ssh_connection = relationship("SshConnectionLog")
 
 
 class OperationLog(db.Model):
     __tablename__ = 'operation_logs'
 
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'))  # 与用户表的关联
-    target_id = Column(Integer, ForeignKey('ssh_connection_logs.id'))  # 确保定义了外键
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
+    target_id = Column(Integer, ForeignKey('ssh_connection_logs.id'))
     operation = Column(String(255), nullable=False)
-    status = Column(Enum('success', 'failed'), nullable=False)
-    details = Column(Text)
+    status = Column(Enum('success', 'failed', name='operation_status'), nullable=False)
+    details = Column(String(1024))
     timestamp = Column(DateTime, default=datetime.utcnow)
 
-    # 关系定义
     user = relationship('User', back_populates='operation_logs')
-    # 使用字符串引用 SSHConnectionLog
-    ssh_connection = relationship('SSHConnectionLog', back_populates='container_deployment_logs')
+    ssh_connection = relationship('SshConnectionLog', back_populates='operation_logs')
 
 
 class ServerCategoryAssociation(db.Model):
@@ -1064,7 +1062,6 @@ class UserContainer(db.Model):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     expiry_date = Column(DateTime)
     
-    # 关系定义
     user = relationship("User")
     container = relationship("DockerContainer")
 
@@ -1134,7 +1131,6 @@ class NotificationLog(db.Model):
     created_at = Column(DateTime, default=datetime.utcnow)
     error_message = Column(String(1024))
     
-    # 关系定义
     user = relationship("User")
 
     __table_args__ = (
