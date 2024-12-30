@@ -1,6 +1,7 @@
 from app import db 
 from sqlalchemy.orm import relationship, validates
 from sqlalchemy.sql import func
+from sqlalchemy import Text
 from datetime import timedelta
 from datetime import datetime
 import re
