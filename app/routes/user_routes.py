@@ -16,6 +16,41 @@ def validate_required_fields(data, fields):
     missing_fields = [field for field in fields if not data.get(field)]
     return missing_fields
 
+# 列出所有用户
+@user_bp.route('/api/users', methods=['GET'])
+def get_all_users():
+    try:
+        # 查询所有用户
+        users = User.query.all()
+
+        # 将用户数据转化为字典格式，便于返回 JSON
+        users_data = []
+        for user in users:
+            user_data = {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'role': user.role,
+                'rental_expiry': user.rental_expiry,
+                'created_at': user.created_at,
+                'updated_at': user.updated_at,
+                'is_banned': user.is_banned,
+                'banned_reason': user.banned_reason,
+                'last_login': user.last_login,
+                'is_verified': user.is_verified,
+                'verification_token': user.verification_token,
+                'password_encrypted': user.password_encrypted
+            }
+            users_data.append(user_data)
+
+        # 返回 JSON 响应
+        return jsonify({"success": True, "users": users_data}), 200
+
+    except Exception as e:
+        log_operation(None, "get_all_users", "failed", f"Error fetching users: {str(e)}")
+        return jsonify({"success": False, "message": "Internal server error"}), 500
+
+
 # 添加用户
 @user_bp.route('/api/add_user', methods=['POST'])
 def add_user():
