@@ -375,3 +375,161 @@ class ServerCategory(db.Model):
 
     def __repr__(self):
         return f"<ServerCategory {self.category_name}>"
+from app import db
+from datetime import datetime
+
+# 用户模型
+class User(db.Model):
+    __tablename__ = 'users'
+
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(255), unique=True, nullable=False)
+    email = db.Column(db.String(255), unique=True, nullable=False)
+    password = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.Enum('user', 'admin', 'distributor', name='role_enum'), default='user')
+    rental_expiry = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    is_banned = db.Column(db.Boolean, default=False)
+    banned_reason = db.Column(db.String(255), nullable=True)
+    last_login = db.Column(db.DateTime, nullable=True)
+    is_verified = db.Column(db.Boolean, default=False)
+    verification_token = db.Column(db.String(255), nullable=True)
+    password_encrypted = db.Column(db.Boolean, default=True)
+
+    logs = db.relationship('UserLog', backref='user', lazy=True)
+
+    def __repr__(self):
+        return f"<User {self.username}>"
+
+# 用户日志模型
+class UserLog(db.Model):
+    __tablename__ = 'user_logs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    operation = db.Column(db.String(255), nullable=False)
+    details = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    ip_address = db.Column(db.String(255), nullable=True)
+    user_agent = db.Column(db.String(255), nullable=True)
+
+    def __repr__(self):
+        return f"<UserLog {self.operation}>"
+
+# 角色权限模型
+class RolePermission(db.Model):
+    __tablename__ = 'roles_permissions'
+
+    role_id = db.Column(db.Integer, primary_key=True)
+    role_name = db.Column(db.String(255), unique=True, nullable=False)
+    permissions = db.Column(db.Text, nullable=True)
+
+    def __repr__(self):
+        return f"<RolePermission {self.role_name}>"
+
+# 分销员佣金模型
+class DistributorCommission(db.Model):
+    __tablename__ = 'distributor_commission'
+
+    id = db.Column(db.Integer, primary_key=True)
+    distributor_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    serial_number = db.Column(db.String(255), nullable=False)
+    amount = db.Column(db.Numeric(10, 2), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.Enum('pending', 'paid', name='commission_status'), default='pending')
+
+    distributor = db.relationship('User', backref='commissions')
+
+    def __repr__(self):
+        return f"<DistributorCommission {self.serial_number}, {self.amount}>"
+
+# 租赁信息模型
+class Rental(db.Model):
+    __tablename__ = 'rentals'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    status = db.Column(db.Enum('active', 'expired', 'paused', name='rental_status'), default='active')
+    start_date = db.Column(db.DateTime, nullable=False)
+    end_date = db.Column(db.DateTime, nullable=False)
+    server_ids = db.Column(db.JSON, nullable=True)
+    container_ids = db.Column(db.JSON, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    tenant_id = db.Column(db.Integer, nullable=True)
+
+    user = db.relationship('User', backref='rentals')
+
+    def __repr__(self):
+        return f"<Rental {self.user_id}, {self.status}>"
+
+# 续费通知模型
+class RenewalNotification(db.Model):
+    __tablename__ = 'renewal_notifications'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    notification_type = db.Column(db.Enum('7_days', '3_days', '1_day', name='notification_type'), nullable=False)
+    sent_at = db.Column(db.DateTime, default=datetime.utcnow)
+    notification_channel = db.Column(db.Enum('email', 'sms', 'push', name='notification_channel'), nullable=False)
+    notification_sent = db.Column(db.Boolean, default=False)
+    notification_status = db.Column(db.Enum('pending', 'sent', 'failed', name='notification_status'), default='pending')
+    notification_content = db.Column(db.Text, nullable=True)
+
+    user = db.relationship('User', backref='renewal_notifications')
+
+    def __repr__(self):
+        return f"<RenewalNotification {self.user_id}, {self.notification_type}>"
+
+# 分销员模型
+class Distributor(db.Model):
+    __tablename__ = 'distributors'
+
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(255), nullable=False)
+    email = db.Column(db.String(255), nullable=False, unique=True)
+    role = db.Column(db.Enum('distributor', 'golden_distributor', 'platinum_distributor', name='distributor_role'), nullable=False)
+    commission_rate = db.Column(db.Numeric(5, 2), nullable=False)
+    distributor_mode = db.Column(db.Enum('mode1', 'mode2', name='distributor_mode'), nullable=False)
+    unique_link = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<Distributor {self.username}, {self.role}>"
+
+# 序列号模型
+class SerialNumber(db.Model):
+    __tablename__ = 'serial_numbers'
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(255), unique=True, nullable=False)
+    status = db.Column(db.Enum('unused', 'used', 'expired', name='serial_status'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    valid_days = db.Column(db.Integer, nullable=True)
+    start_date = db.Column(db.DateTime, nullable=True)
+    end_date = db.Column(db.DateTime, nullable=True)
+    activated_at = db.Column(db.DateTime, nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    used_at = db.Column(db.DateTime, nullable=True)
+    distributor_id = db.Column(db.Integer, db.ForeignKey('distributors.id'), nullable=True)
+    payment_status = db.Column(db.Enum('paid', 'unpaid', name='payment_status'), default='unpaid')
+
+    user = db.relationship('User', backref='serial_numbers')
+    distributor = db.relationship('Distributor', backref='serial_numbers')
+
+    def __repr__(self):
+        return f"<SerialNumber {self.code}, {self.status}>"
+
+# 服务器分类模型
+class ServerCategory(db.Model):
+    __tablename__ = 'server_categories'
+
+    id = db.Column(db.Integer, primary_key=True)
+    category_name = db.Column(db.String(255), nullable=False)
+
+    def __repr__(self):
+        return f"<ServerCategory {self.category_name}>"
