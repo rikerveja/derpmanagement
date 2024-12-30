@@ -30,6 +30,14 @@ class User(db.Model):
     logs = relationship('UserLog', back_populates='user', lazy='dynamic')  # 用户日志关联
     histories = relationship('UserHistory', backref='user', lazy='dynamic')  # 用户历史记录
 
+    # 新增字段
+    is_banned = db.Column(db.Boolean, default=False)
+    banned_reason = db.Column(db.String(255), nullable=True)
+    last_login = db.Column(db.DateTime, nullable=True)
+    is_verified = db.Column(db.Boolean, default=False)
+    verification_token = db.Column(db.String(255), nullable=True)
+    password_encrypted = db.Column(db.Boolean, default=True)
+
     @validates('email')
     def validate_email(self, key, address):
         email_regex = r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
