@@ -1009,3 +1009,22 @@ class ServerUpdateLog(db.Model):
 
     server = relationship("Server")
     user = relationship("User", foreign_keys=[performed_by])
+
+
+class UserHistory(db.Model):
+    __tablename__ = 'user_history'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
+    action = Column(String(255), nullable=False)
+    details = Column(String)
+    ip_address = Column(String(255))
+    user_agent = Column(String(255))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
+    __table_args__ = (
+        Index('idx_user_history_user', 'user_id'),
+        Index('idx_user_history_created', 'created_at'),
+    )
