@@ -53,7 +53,7 @@ class UserLog(db.Model):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
     operation = Column(String(255))
-    details = Column(String)
+    details = Column(String(1024))
     created_at = Column(DateTime, default=datetime.utcnow)
     ip_address = Column(String(255))
     user_agent = Column(String(255))
@@ -66,7 +66,7 @@ class RolePermission(db.Model):
 
     role_id = Column(Integer, primary_key=True, autoincrement=True)
     role_name = Column(String(255), unique=True, nullable=False)
-    permissions = Column(String)
+    permissions = Column(String(1024))
 
 
 class DistributorCommission(db.Model):
@@ -122,7 +122,7 @@ class RenewalNotification(db.Model):
     notification_channel = Column(Enum('email', 'sms', 'push', name='notification_channel'), nullable=False)
     notification_sent = Column(Boolean, default=False)
     notification_status = Column(Enum('pending', 'sent', 'failed', name='notification_status'), default='pending')
-    notification_content = Column(String)
+    notification_content = Column(String(1024))
 
     user = relationship("User", back_populates="notifications")
 
@@ -275,7 +275,7 @@ class SerialHistory(db.Model):
     id = Column(Integer, primary_key=True, autoincrement=True)
     serial_number_id = Column(Integer, ForeignKey('serial_numbers.id'))
     operation = Column(Enum('generated', 'activated', 'expired', name='serial_history_status'), nullable=False)
-    details = Column(String)
+    details = Column(String(1024))
     created_at = Column(DateTime, default=datetime.utcnow)
 
     serial_number = relationship("SerialNumber")
@@ -300,7 +300,7 @@ class ServerHistory(db.Model):
     id = Column(Integer, primary_key=True, autoincrement=True)
     server_id = Column(Integer, ForeignKey('servers.id', ondelete='CASCADE'))
     operation = Column(Enum('status_change', 'maintenance', 'downtime', 'restore', name='server_operation'))
-    details = Column(String)
+    details = Column(String(1024))
     created_at = Column(DateTime, default=datetime.utcnow)
 
     server = relationship("Server")
@@ -478,8 +478,8 @@ class AlarmRule(db.Model):
     __tablename__ = 'alarm_rules'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    alert_type = Column(Enum('Brute Force Login Attempt', 'Monthly Traffic Limit Exceeded', 'Server Health Issue', 'Server Resource Mismatch', 'Docker Traffic Issue', 'Docker Container Issue', name='alert_type'))
-    alert_condition = Column(String)
+    name = Column(String(255), nullable=False)
+    alert_condition = Column(String(1024))
     threshold = Column(DECIMAL(10, 2))
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -904,7 +904,7 @@ class ContainerManagementLog(db.Model):
     new_container_count = Column(Integer)
     created_at = Column(DateTime, default=datetime.utcnow)
     user_id = Column(Integer, ForeignKey('users.id'))
-    details = Column(String)
+    details = Column(String(1024))
 
     server = relationship("Server")
     container = relationship("DockerContainer")
@@ -947,7 +947,7 @@ class SSHConnectionLog(db.Model):
     connect_time = Column(DateTime, default=datetime.utcnow)
     disconnect_time = Column(DateTime)
     ip_address = Column(String(255))
-    details = Column(String)
+    details = Column(String(1024))
 
     server = relationship("Server")
     user = relationship("User")
@@ -962,7 +962,7 @@ class ContainerDeploymentLog(db.Model):
     derp_service_status = Column(Enum('deployed', 'failed', name='derp_service_status'), nullable=False)
     deployment_time = Column(DateTime, default=datetime.utcnow)
     ssh_connection_id = Column(Integer, ForeignKey('ssh_connection_logs.id'))
-    details = Column(String)
+    details = Column(String(1024))
 
     server = relationship("Server")
     container = relationship("DockerContainer")
@@ -977,7 +977,7 @@ class OperationLog(db.Model):
     operation = Column(String(255), nullable=False)
     target_id = Column(Integer)
     status = Column(Enum('success', 'failed', name='operation_status'), nullable=False)
-    details = Column(String)
+    details = Column(String(1024))
     timestamp = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User")
@@ -1003,7 +1003,7 @@ class ServerUpdateLog(db.Model):
     id = Column(Integer, primary_key=True, autoincrement=True)
     server_id = Column(Integer, ForeignKey('servers.id'))
     operation_type = Column(Enum('add', 'update', 'delete', name='update_operation'))
-    operation_details = Column(String)
+    operation_details = Column(String(1024))
     performed_by = Column(Integer, ForeignKey('users.id'))
     timestamp = Column(DateTime, default=datetime.utcnow)
 
@@ -1017,7 +1017,7 @@ class UserHistory(db.Model):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
     action = Column(String(255), nullable=False)
-    details = Column(String)
+    details = Column(String(1024))
     ip_address = Column(String(255))
     user_agent = Column(String(255))
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -1036,8 +1036,8 @@ class SystemLog(db.Model):
     id = Column(Integer, primary_key=True, autoincrement=True)
     level = Column(Enum('debug', 'info', 'warning', 'error', 'critical', name='log_level'), nullable=False)
     module = Column(String(255))  # 记录日志来源的模块
-    message = Column(String)
-    details = Column(String)
+    message = Column(String(1024))
+    details = Column(String(1024))
     user_id = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
     ip_address = Column(String(255))
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -1101,7 +1101,7 @@ class SystemAlert(db.Model):
     severity = Column(Enum('low', 'medium', 'high', 'critical', name='alert_severity'), nullable=False)
     target_id = Column(Integer)  # 可以是服务器ID、容器ID等
     target_type = Column(String(50))  # 标识target_id的类型
-    message = Column(String, nullable=False)
+    message = Column(String(1024), nullable=False)
     details = Column(JSON, default=dict)
     status = Column(Enum('active', 'acknowledged', 'resolved', name='alert_status'), default='active')
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -1126,11 +1126,11 @@ class NotificationLog(db.Model):
     user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
     notification_type = Column(Enum('email', 'sms', 'push', 'system', name='notification_type'), nullable=False)
     title = Column(String(255))
-    content = Column(String)
+    content = Column(String(1024))
     status = Column(Enum('pending', 'sent', 'failed', name='notification_status'), default='pending')
     sent_at = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
-    error_message = Column(String)
+    error_message = Column(String(1024))
     
     # 关系定义
     user = relationship("User")
