@@ -937,20 +937,19 @@ class ServerContainerStatus(db.Model):
     container = relationship("DockerContainer")
 
 
-class SSHConnectionLog(db.Model):
+class SshConnectionLog(db.Model):
     __tablename__ = 'ssh_connection_logs'
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    id = Column(Integer, primary_key=True)
     server_id = Column(Integer, ForeignKey('servers.id'))
     user_id = Column(Integer, ForeignKey('users.id'))
-    ssh_status = Column(Enum('success', 'failed', name='ssh_status'), nullable=False)
+    ssh_status = Column(Enum('success', 'failed'), nullable=False)
     connect_time = Column(DateTime, default=datetime.utcnow)
     disconnect_time = Column(DateTime)
     ip_address = Column(String(255))
-    details = Column(String(1024))
+    details = Column(Text)
 
-    server = relationship("Server")
-    user = relationship("User")
+    operation_logs = relationship('OperationLog', back_populates='target')  # 定义回引用关系
 
 
 class ContainerDeploymentLog(db.Model):
@@ -971,17 +970,18 @@ class ContainerDeploymentLog(db.Model):
 
 class OperationLog(db.Model):
     __tablename__ = 'operation_logs'
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'))  # 与用户表的关联
+    target_id = Column(Integer, ForeignKey('ssh_connection_logs.id'))  # 确保定义了外键
     operation = Column(String(255), nullable=False)
-    target_id = Column(Integer)
-    status = Column(Enum('success', 'failed', name='operation_status'), nullable=False)
-    details = Column(String(1024))
+    status = Column(Enum('success', 'failed'), nullable=False)
+    details = Column(Text)
     timestamp = Column(DateTime, default=datetime.utcnow)
 
-    user = relationship("User")
-    target = relationship("SSHConnectionLog", foreign_keys=[target_id])
+    # 关系定义
+    user = relationship('User', back_populates='operation_logs')
+    target = relationship('SshConnectionLog', back_populates='operation_logs')  # 确保目标模型定义正确
 
 
 class ServerCategoryAssociation(db.Model):
