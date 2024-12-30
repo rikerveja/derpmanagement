@@ -73,15 +73,20 @@ class DistributorCommission(db.Model):
     __tablename__ = 'distributor_commissions'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    distributor_id = Column(Integer, ForeignKey('users.id'))
+    distributor_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
     invoice_id = Column(Integer, ForeignKey('invoices.id'))
     commission_amount = Column(DECIMAL(10, 2))
     status = Column(Enum('pending', 'paid', name='commission_status'), default='pending')
     paid_at = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    distributor = relationship("User")
+    distributor = relationship("User", back_populates="commissions")
     invoice = relationship("Invoice")
+
+    __table_args__ = (
+        Index('idx_commission_distributor', 'distributor_id'),
+        Index('idx_commission_status', 'status'),
+    )
 
 
 class Rental(db.Model):
@@ -565,21 +570,6 @@ class PaymentRecord(db.Model):
     status = Column(Enum('success', 'failed', 'pending', name='payment_status'), default='pending')
 
     user = relationship("User")
-    invoice = relationship("Invoice")
-
-
-class DistributorCommission(db.Model):
-    __tablename__ = 'distributor_commissions'
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    distributor_id = Column(Integer, ForeignKey('users.id'))
-    invoice_id = Column(Integer, ForeignKey('invoices.id'))
-    commission_amount = Column(DECIMAL(10, 2))
-    status = Column(Enum('pending', 'paid', name='commission_status'), default='pending')
-    paid_at = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    distributor = relationship("User")
     invoice = relationship("Invoice")
 
 
