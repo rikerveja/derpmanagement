@@ -27,7 +27,7 @@
           </div>
         </template>
   
-        <!-- 注册时显示所有字段，并调整顺序 -->
+        <!-- 注册时显示所有字段，调整顺序 -->
         <template v-else>
           <div class="form-group">
             <label for="email">邮箱</label>
@@ -37,7 +37,16 @@
               v-model="formData.email"
               required
               placeholder="请输入邮箱地址"
+              @input="handleEmailInput"
             >
+          </div>
+  
+          <div class="form-group" v-if="formData.email">
+            <label>请完成验证</label>
+            <slide-verify
+              ref="slideVerify"
+              @success="onSuccess"
+            />
           </div>
   
           <div class="form-group">
@@ -54,10 +63,10 @@
               <button 
                 type="button" 
                 class="send-code-btn" 
-                :disabled="countdown > 0"
+                :disabled="countdown > 0 || !verifySuccess"
                 @click="sendEmailCode"
               >
-                {{ countdown > 0 ? `${countdown}秒后重试` : '获取验证码' }}
+                {{ countdown > 0 ? `${countdown}秒后重试` : '重新发送' }}
               </button>
             </div>
           </div>
@@ -98,20 +107,6 @@
           </div>
         </template>
   
-        <div class="form-group" v-if="isLogin || showSlideVerify">
-          <label>请完成验证</label>
-          <slide-verify
-            ref="slideVerify"
-            :slider-text="'向右滑动'"
-            :accuracy="accuracy"
-            :show-refresh="true"
-            :is-auto-refresh="true"
-            @again="onAgain"
-            @success="onSuccess"
-            @fail="onFail"
-          ></slide-verify>
-        </div>
-  
         <div v-if="!isLogin" class="agreement">
           <input 
             type="checkbox" 
@@ -139,7 +134,7 @@
   </template>
   
   <script>
-  import SlideVerify from 'vue-monoplasty-slide-verify'
+  import SlideVerify from '@/components/SlideVerify.vue'
   
   export default {
     name: 'LoginView',
@@ -149,17 +144,14 @@
     data() {
       return {
         isLogin: true,
-        showSlideVerify: false, // 控制注册时是否显示验证码
-        accuracy: 5, // 验证精度
-        verifySuccess: false, // 验证是否通过
-        captchaUrl: '',
+        verifySuccess: false,
         countdown: 0,
+        emailSending: false,
         formData: {
           username: '',
           email: '',
           password: '',
           confirmPassword: '',
-          captcha: '',
           emailCode: '',
           agreement: false
         }
@@ -170,42 +162,18 @@
     },
     methods: {
       async handleSubmit() {
-        if (!this.verifySuccess) {
-          alert('请先完成滑动验证')
-          return
-        }
-  
-        // 表单验证
         if (!this.isLogin) {
+          if (!this.verifySuccess) {
+            alert('请先完成滑动验证')
+            return
+          }
+
           if (!this.validateForm()) {
             return
           }
-        }
-  
-        try {
-          if (this.isLogin) {
-            const response = await fetch('/api/login', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                username: this.formData.username,
-                password: this.formData.password,
-                captcha: this.formData.captcha
-              })
-            })
-            
-            if (response.ok) {
-              const data = await response.json()
-              localStorage.setItem('token', data.token)
-              this.$router.push('/dashboard')
-            } else {
-              const error = await response.json()
-              throw new Error(error.message || '登录失败')
-            }
-          } else {
-            const response = await fetch('/api/register', {
+
+          try {
+            const response = await fetch('/api/add_user', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json'
@@ -214,24 +182,50 @@
                 username: this.formData.username,
                 email: this.formData.email,
                 password: this.formData.password,
-                captcha: this.formData.captcha,
-                emailCode: this.formData.emailCode
+                verification_code: this.formData.emailCode
               })
             })
+
+            const data = await response.json()
             
-            if (response.ok) {
-              alert('注册成功！请登录')
+            if (data.success) {
+              alert(data.message || '注册成功！请登录')
               this.isLogin = true
               this.resetForm()
             } else {
-              const error = await response.json()
-              throw new Error(error.message || '注册失败')
+              throw new Error(data.message || '注册失败')
             }
+          } catch (error) {
+            console.error(error)
+            alert(error.message)
           }
-        } catch (error) {
-          console.error(error)
-          alert(error.message)
-          this.refreshCaptcha()
+        } else {
+          try {
+            const response = await fetch('/api/login', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                username: this.formData.username,
+                password: this.formData.password
+              })
+            })
+
+            const data = await response.json()
+            
+            if (data.success) {
+              // 保存 token 到 localStorage
+              localStorage.setItem('token', data.token)
+              // 跳转到仪表盘
+              this.$router.push('/dashboard')
+            } else {
+              throw new Error(data.message || '登录失败')
+            }
+          } catch (error) {
+            console.error(error)
+            alert(error.message)
+          }
         }
       },
       validateForm() {
@@ -270,13 +264,18 @@
         }
   
         if (!this.verifySuccess) {
-          this.showSlideVerify = true
           alert('请先完成滑动验证')
           return
         }
   
+        // 防止重复发送
+        if (this.emailSending || this.countdown > 0) {
+          return
+        }
+  
         try {
-          const response = await fetch('/api/send-email-code', {
+          this.emailSending = true
+          const response = await fetch('/api/send_verification_email', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
@@ -288,7 +287,6 @@
   
           if (response.ok) {
             this.startCountdown()
-            this.showSlideVerify = false // 验证成功后隐藏滑块
           } else {
             const error = await response.json()
             throw new Error(error.message || '发送验证码失败')
@@ -296,6 +294,8 @@
         } catch (error) {
           console.error(error)
           alert(error.message)
+        } finally {
+          this.emailSending = false
         }
       },
       startCountdown() {
@@ -308,10 +308,15 @@
         }, 1000)
       },
       toggleForm() {
+        const username = this.formData.username
         this.isLogin = !this.isLogin
         this.resetForm()
+        
+        if (this.isLogin && username) {
+          this.formData.username = username
+        }
+
         this.verifySuccess = false
-        this.showSlideVerify = false
         if (this.$refs.slideVerify) {
           this.$refs.slideVerify.reset()
         }
@@ -322,7 +327,6 @@
           email: '',
           password: '',
           confirmPassword: '',
-          captcha: '',
           emailCode: '',
           agreement: false
         }
@@ -338,24 +342,31 @@
         // 实现显示隐私政策的逻辑
         alert('显示隐私政策')
       },
-      // 验证成功
-      onSuccess(times) {
-        console.log('验证通过，耗时 ' + times + '毫秒')
-        this.verifySuccess = true
-        
-        // 如果是注册流程，验证成功后发送邮箱验证码
-        if (!this.isLogin && this.formData.email) {
-          this.sendEmailCode()
+      onSuccess() {
+        if (!this.verifySuccess) {  // 防止重复触发
+          this.verifySuccess = true
+          console.log('验证成功')
+          
+          // 验证成功后自动发送邮箱验证码
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+          if (emailRegex.test(this.formData.email)) {
+            this.sendEmailCode()
+          }
         }
       },
-      // 验证失败
-      onFail() {
-        console.log('验证失败')
+      onRefresh() {
         this.verifySuccess = false
+        console.log('刷新验证码')
       },
-      // 重新验证
-      onAgain() {
-        this.verifySuccess = false
+      handleEmailInput() {
+        // 当邮箱输入完整时，重置验证状态
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailRegex.test(this.formData.email)) {
+          this.verifySuccess = false
+          if (this.$refs.slideVerify) {
+            this.$refs.slideVerify.reset()
+          }
+        }
       }
     }
   }
@@ -537,40 +548,20 @@
     }
   }
   
-  /* 添加滑动验证码样式 */
-  :deep(.slide-verify) {
+  /* 滑动验证码样式 */
+  :deep(.drag-verify-container) {
     margin: 0 auto;
-    width: 100% !important;
-  }
-  
-  :deep(.slide-verify-slider) {
-    width: 100% !important;
-    height: 40px !important;
-    background-color: #f9fafb !important;
     border: 1px solid #dcdfe6 !important;
     border-radius: 0.25rem !important;
   }
   
-  :deep(.slide-verify-slider-mask) {
-    height: 40px !important;
-    border-radius: 0.25rem !important;
-    background-color: rgba(126, 58, 242, 0.1) !important;
-  }
-  
-  :deep(.slide-verify-slider-text) {
-    line-height: 40px !important;
+  :deep(.drag-verify-text) {
     font-size: 0.875rem !important;
     color: #2c3e50 !important;
   }
   
-  :deep(.slide-verify-slider-icon) {
-    width: 40px !important;
-    height: 40px !important;
-    background-color: #7e3af2 !important;
+  :deep(.drag-verify-circle) {
+    border-radius: 0.25rem !important;
     box-shadow: 0 2px 6px rgba(126, 58, 242, 0.2) !important;
-  }
-  
-  :deep(.slide-verify-refresh-icon) {
-    color: #7e3af2 !important;
   }
   </style> 
