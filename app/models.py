@@ -1040,6 +1040,7 @@ class SystemLog(db.Model):
     message = Column(String(1024))
     details = Column(String(1024))
     user_id = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    operation = Column(String(255), nullable=False)  # 新增 operation 字段
     ip_address = Column(String(255))
     created_at = Column(DateTime, default=datetime.utcnow)
 
