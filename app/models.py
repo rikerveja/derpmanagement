@@ -16,9 +16,7 @@ user_server_association = db.Table(
     db.UniqueConstraint('user_id', 'server_id', name='uq_user_server')  # 定义唯一约束
 )
 
-Base = declarative_base()
-
-class User(Base):
+class User(db.Model):
     __tablename__ = 'users'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -35,6 +33,7 @@ class User(Base):
     is_verified = Column(Boolean, default=False)
     verification_token = Column(String(255))
     password_encrypted = Column(Boolean, default=True)
+
     logs = relationship("UserLog", back_populates="user")
     commissions = relationship("DistributorCommission", back_populates="distributor")
     rentals = relationship("Rental", back_populates="user")
@@ -48,7 +47,7 @@ class User(Base):
     )
 
 
-class UserLog(Base):
+class UserLog(db.Model):
     __tablename__ = 'user_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -62,7 +61,7 @@ class UserLog(Base):
     user = relationship("User", back_populates="logs")
 
 
-class RolePermission(Base):
+class RolePermission(db.Model):
     __tablename__ = 'roles_permissions'
 
     role_id = Column(Integer, primary_key=True, autoincrement=True)
@@ -70,7 +69,7 @@ class RolePermission(Base):
     permissions = Column(String)
 
 
-class DistributorCommission(Base):
+class DistributorCommission(db.Model):
     __tablename__ = 'distributor_commissions'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -85,7 +84,7 @@ class DistributorCommission(Base):
     invoice = relationship("Invoice")
 
 
-class Rental(Base):
+class Rental(db.Model):
     __tablename__ = 'rentals'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -108,7 +107,7 @@ class Rental(Base):
     )
 
 
-class RenewalNotification(Base):
+class RenewalNotification(db.Model):
     __tablename__ = 'renewal_notifications'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -123,7 +122,7 @@ class RenewalNotification(Base):
     user = relationship("User", back_populates="notifications")
 
 
-class Distributor(Base):
+class Distributor(db.Model):
     __tablename__ = 'distributors'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -145,7 +144,7 @@ class Distributor(Base):
     )
 
 
-class SerialNumber(Base):
+class SerialNumber(db.Model):
     __tablename__ = 'serial_numbers'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -173,7 +172,7 @@ class SerialNumber(Base):
     )
 
 
-class SerialUserAssociation(Base):
+class SerialUserAssociation(db.Model):
     __tablename__ = 'serial_user_association'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -187,14 +186,14 @@ class SerialUserAssociation(Base):
     serial_number = relationship("SerialNumber")
 
 
-class ServerCategory(Base):
+class ServerCategory(db.Model):
     __tablename__ = 'server_categories'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     category_name = Column(String(255), nullable=False)
 
 
-class Server(Base):
+class Server(db.Model):
     __tablename__ = 'servers'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -222,7 +221,7 @@ class Server(Base):
     )
 
 
-class DockerContainer(Base):
+class DockerContainer(db.Model):
     __tablename__ = 'docker_containers'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -250,7 +249,7 @@ class DockerContainer(Base):
     )
 
 
-class SerialServerAssociation(Base):
+class SerialServerAssociation(db.Model):
     __tablename__ = 'serial_server_association'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -265,7 +264,7 @@ class SerialServerAssociation(Base):
     container = relationship("DockerContainer")
 
 
-class SerialHistory(Base):
+class SerialHistory(db.Model):
     __tablename__ = 'serial_history'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -277,7 +276,7 @@ class SerialHistory(Base):
     serial_number = relationship("SerialNumber")
 
 
-class ServerContainerAssociation(Base):
+class ServerContainerAssociation(db.Model):
     __tablename__ = 'server_container_association'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -290,7 +289,7 @@ class ServerContainerAssociation(Base):
     container = relationship("DockerContainer")
 
 
-class ServerHistory(Base):
+class ServerHistory(db.Model):
     __tablename__ = 'server_history'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -302,7 +301,7 @@ class ServerHistory(Base):
     server = relationship("Server")
 
 
-class ServerTrafficMonitoring(Base):
+class ServerTrafficMonitoring(db.Model):
     __tablename__ = 'server_traffic_monitoring'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -320,7 +319,7 @@ class ServerTrafficMonitoring(Base):
     )
 
 
-class ServerPerformanceMonitoring(Base):
+class ServerPerformanceMonitoring(db.Model):
     __tablename__ = 'server_performance_monitoring'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -338,7 +337,7 @@ class ServerPerformanceMonitoring(Base):
     )
 
 
-class DockerContainerResources(Base):
+class DockerContainerResources(db.Model):
     __tablename__ = 'docker_container_resources'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -352,7 +351,7 @@ class DockerContainerResources(Base):
     container = relationship("DockerContainer")
 
 
-class DockerContainerTraffic(Base):
+class DockerContainerTraffic(db.Model):
     __tablename__ = 'docker_container_traffic'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -369,7 +368,7 @@ class DockerContainerTraffic(Base):
     )
 
 
-class DockerContainerEvents(Base):
+class DockerContainerEvents(db.Model):
     __tablename__ = 'docker_container_events'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -381,7 +380,7 @@ class DockerContainerEvents(Base):
     container = relationship("DockerContainer")
 
 
-class DockerContainerLogs(Base):
+class DockerContainerLogs(db.Model):
     __tablename__ = 'docker_container_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -393,7 +392,7 @@ class DockerContainerLogs(Base):
     container = relationship("DockerContainer")
 
 
-class ACLConfig(Base):
+class ACLConfig(db.Model):
     __tablename__ = 'acl_configs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -414,7 +413,7 @@ class ACLConfig(Base):
     )
 
 
-class ACLVerificationLog(Base):
+class ACLVerificationLog(db.Model):
     __tablename__ = 'acl_verification_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -429,7 +428,7 @@ class ACLVerificationLog(Base):
     acl_config = relationship("ACLConfig")
 
 
-class ACLLog(Base):
+class ACLLog(db.Model):
     __tablename__ = 'acl_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -445,7 +444,7 @@ class ACLLog(Base):
     acl_config = relationship("ACLConfig")
 
 
-class ACLFilePath(Base):
+class ACLFilePath(db.Model):
     __tablename__ = 'acl_file_paths'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -457,7 +456,7 @@ class ACLFilePath(Base):
     acl_config = relationship("ACLConfig")
 
 
-class ACLDownloadLog(Base):
+class ACLDownloadLog(db.Model):
     __tablename__ = 'acl_download_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -470,7 +469,7 @@ class ACLDownloadLog(Base):
     acl_file = relationship("ACLFilePath")
 
 
-class AlarmRule(Base):
+class AlarmRule(db.Model):
     __tablename__ = 'alarm_rules'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -482,7 +481,7 @@ class AlarmRule(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
-class AlarmLog(Base):
+class AlarmLog(db.Model):
     __tablename__ = 'alarm_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -511,7 +510,7 @@ class AlarmLog(Base):
     )
 
 
-class AlarmNotification(Base):
+class AlarmNotification(db.Model):
     __tablename__ = 'alarm_notifications'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -525,7 +524,7 @@ class AlarmNotification(Base):
     alarm_log = relationship("AlarmLog")
 
 
-class AlarmResolution(Base):
+class AlarmResolution(db.Model):
     __tablename__ = 'alarm_resolutions'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -539,7 +538,7 @@ class AlarmResolution(Base):
     resolved_by_user = relationship("User")
 
 
-class Invoice(Base):
+class Invoice(db.Model):
     __tablename__ = 'invoices'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -554,7 +553,7 @@ class Invoice(Base):
     user = relationship("User")
 
 
-class PaymentRecord(Base):
+class PaymentRecord(db.Model):
     __tablename__ = 'payment_records'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -569,7 +568,7 @@ class PaymentRecord(Base):
     invoice = relationship("Invoice")
 
 
-class DistributorCommission(Base):
+class DistributorCommission(db.Model):
     __tablename__ = 'distributor_commissions'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -584,7 +583,7 @@ class DistributorCommission(Base):
     invoice = relationship("Invoice")
 
 
-class PaymentMethod(Base):
+class PaymentMethod(db.Model):
     __tablename__ = 'payment_methods'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -592,7 +591,7 @@ class PaymentMethod(Base):
     account_info = Column(String(255), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-class FinanceLog(Base):
+class FinanceLog(db.Model):
     __tablename__ = 'finance_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -604,7 +603,7 @@ class FinanceLog(Base):
     user = relationship("User")
 
 
-class ContainerReplacementLog(Base):
+class ContainerReplacementLog(db.Model):
     __tablename__ = 'container_replacement_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -623,7 +622,7 @@ class ContainerReplacementLog(Base):
     user = relationship("User")
 
 
-class DockerFailureLog(Base):
+class DockerFailureLog(db.Model):
     __tablename__ = 'docker_failure_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -638,7 +637,7 @@ class DockerFailureLog(Base):
     container = relationship("DockerContainer")
 
 
-class ContainerCleanupLog(Base):
+class ContainerCleanupLog(db.Model):
     __tablename__ = 'container_cleanup_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -650,7 +649,7 @@ class ContainerCleanupLog(Base):
     old_container = relationship("DockerContainer")
 
 
-class ContainerAndServiceUpdateLog(Base):
+class ContainerAndServiceUpdateLog(db.Model):
     __tablename__ = 'container_and_service_update_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -663,7 +662,7 @@ class ContainerAndServiceUpdateLog(Base):
     container = relationship("DockerContainer")
 
 
-class UserTraffic(Base):
+class UserTraffic(db.Model):
     __tablename__ = 'user_traffic'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -678,7 +677,7 @@ class UserTraffic(Base):
     user = relationship("User")
 
 
-class ContainerTraffic(Base):
+class ContainerTraffic(db.Model):
     __tablename__ = 'container_traffic'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -695,7 +694,7 @@ class ContainerTraffic(Base):
     server = relationship("Server")
 
 
-class ServerTraffic(Base):
+class ServerTraffic(db.Model):
     __tablename__ = 'server_traffic'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -708,7 +707,7 @@ class ServerTraffic(Base):
     server = relationship("Server")
 
 
-class TrafficAlert(Base):
+class TrafficAlert(db.Model):
     __tablename__ = 'traffic_alerts'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -731,7 +730,7 @@ class TrafficAlert(Base):
     )
 
 
-class TrafficReport(Base):
+class TrafficReport(db.Model):
     __tablename__ = 'traffic_reports'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -751,7 +750,7 @@ class TrafficReport(Base):
     )
 
 
-class DeviceBinding(Base):
+class DeviceBinding(db.Model):
     __tablename__ = 'device_bindings'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -774,7 +773,7 @@ class DeviceBinding(Base):
     )
 
 
-class ResourceReleaseLog(Base):
+class ResourceReleaseLog(db.Model):
     __tablename__ = 'resource_release_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -789,7 +788,7 @@ class ResourceReleaseLog(Base):
     released_by_user = relationship("User")
 
 
-class RenewalRecord(Base):
+class RenewalRecord(db.Model):
     __tablename__ = 'renewal_records'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -804,7 +803,7 @@ class RenewalRecord(Base):
     serial_number = relationship("SerialNumber")
 
 
-class DeviceValidation(Base):
+class DeviceValidation(db.Model):
     __tablename__ = 'device_validations'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -818,7 +817,7 @@ class DeviceValidation(Base):
     serial_number = relationship("SerialNumber")
 
 
-class DistributorSerial(Base):
+class DistributorSerial(db.Model):
     __tablename__ = 'distributor_serials'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -845,7 +844,7 @@ class DistributorSerial(Base):
     )
 
 
-class CommissionRecord(Base):
+class CommissionRecord(db.Model):
     __tablename__ = 'commission_records'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -866,7 +865,7 @@ class CommissionRecord(Base):
     )
 
 
-class DistributorLevel(Base):
+class DistributorLevel(db.Model):
     __tablename__ = 'distributor_levels'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -875,7 +874,7 @@ class DistributorLevel(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
-class FinanceSettlement(Base):
+class FinanceSettlement(db.Model):
     __tablename__ = 'finance_settlements'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -893,7 +892,7 @@ class FinanceSettlement(Base):
     )
 
 
-class ContainerManagementLog(Base):
+class ContainerManagementLog(db.Model):
     __tablename__ = 'container_management_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -911,7 +910,7 @@ class ContainerManagementLog(Base):
     user = relationship("User")
 
 
-class ServerContainerCount(Base):
+class ServerContainerCount(db.Model):
     __tablename__ = 'server_container_count'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -923,7 +922,7 @@ class ServerContainerCount(Base):
     server = relationship("Server")
 
 
-class ServerContainerStatus(Base):
+class ServerContainerStatus(db.Model):
     __tablename__ = 'server_container_status'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -937,7 +936,7 @@ class ServerContainerStatus(Base):
     container = relationship("DockerContainer")
 
 
-class SSHConnectionLog(Base):
+class SSHConnectionLog(db.Model):
     __tablename__ = 'ssh_connection_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -953,7 +952,7 @@ class SSHConnectionLog(Base):
     user = relationship("User")
 
 
-class ContainerDeploymentLog(Base):
+class ContainerDeploymentLog(db.Model):
     __tablename__ = 'container_deployment_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -969,7 +968,7 @@ class ContainerDeploymentLog(Base):
     ssh_connection = relationship("SSHConnectionLog")
 
 
-class OperationLog(Base):
+class OperationLog(db.Model):
     __tablename__ = 'operation_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -984,7 +983,7 @@ class OperationLog(Base):
     target = relationship("SSHConnectionLog", foreign_keys=[target_id])
 
 
-class ServerCategoryAssociation(Base):
+class ServerCategoryAssociation(db.Model):
     __tablename__ = 'server_category_association'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -997,7 +996,7 @@ class ServerCategoryAssociation(Base):
     category = relationship("ServerCategory")
 
 
-class ServerUpdateLog(Base):
+class ServerUpdateLog(db.Model):
     __tablename__ = 'server_update_logs'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
