@@ -1049,3 +1049,95 @@ class SystemLog(db.Model):
         Index('idx_system_log_module', 'module'),
         Index('idx_system_log_created', 'created_at'),
     )
+
+
+class UserContainer(db.Model):
+    __tablename__ = 'user_containers'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
+    container_id = Column(Integer, ForeignKey('docker_containers.id', ondelete='CASCADE'))
+    status = Column(Enum('active', 'inactive', 'suspended', name='user_container_status'), default='active')
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    expiry_date = Column(DateTime)
+    
+    # 关系定义
+    user = relationship("User")
+    container = relationship("DockerContainer")
+
+    __table_args__ = (
+        Index('idx_user_container_user', 'user_id'),
+        Index('idx_user_container_status', 'status'),
+        Index('idx_user_container_expiry', 'expiry_date'),
+    )
+
+
+class MonitoringLog(db.Model):
+    __tablename__ = 'monitoring_logs'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    server_id = Column(Integer, ForeignKey('servers.id', ondelete='CASCADE'))
+    log_type = Column(Enum('performance', 'health', 'traffic', name='monitoring_type'), nullable=False)
+    metrics = Column(JSON, default=dict)  # 存储监控指标
+    status = Column(Enum('normal', 'warning', 'critical', name='monitoring_status'), default='normal')
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    server = relationship("Server")
+
+    __table_args__ = (
+        Index('idx_monitoring_server', 'server_id'),
+        Index('idx_monitoring_type', 'log_type'),
+        Index('idx_monitoring_status', 'status'),
+        Index('idx_monitoring_created', 'created_at'),
+    )
+
+
+class SystemAlert(db.Model):
+    __tablename__ = 'system_alerts'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    alert_type = Column(Enum('server', 'container', 'traffic', 'security', name='alert_type'), nullable=False)
+    severity = Column(Enum('low', 'medium', 'high', 'critical', name='alert_severity'), nullable=False)
+    target_id = Column(Integer)  # 可以是服务器ID、容器ID等
+    target_type = Column(String(50))  # 标识target_id的类型
+    message = Column(String, nullable=False)
+    details = Column(JSON, default=dict)
+    status = Column(Enum('active', 'acknowledged', 'resolved', name='alert_status'), default='active')
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    resolved_at = Column(DateTime)
+    resolved_by = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+
+    resolved_by_user = relationship("User", foreign_keys=[resolved_by])
+
+    __table_args__ = (
+        Index('idx_alert_type', 'alert_type'),
+        Index('idx_alert_severity', 'severity'),
+        Index('idx_alert_status', 'status'),
+        Index('idx_alert_created', 'created_at'),
+    )
+
+
+class NotificationLog(db.Model):
+    __tablename__ = 'notification_logs'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
+    notification_type = Column(Enum('email', 'sms', 'push', 'system', name='notification_type'), nullable=False)
+    title = Column(String(255))
+    content = Column(String)
+    status = Column(Enum('pending', 'sent', 'failed', name='notification_status'), default='pending')
+    sent_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    error_message = Column(String)
+    
+    # 关系定义
+    user = relationship("User")
+
+    __table_args__ = (
+        Index('idx_notification_user', 'user_id'),
+        Index('idx_notification_type', 'notification_type'),
+        Index('idx_notification_status', 'status'),
+        Index('idx_notification_created', 'created_at'),
+    )
