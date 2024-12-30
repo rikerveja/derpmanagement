@@ -950,7 +950,7 @@ class SshConnectionLog(db.Model):
     ip_address = Column(String(255))
     details = Column(Text)
 
-    operation_logs = relationship('OperationLog', back_populates='target')  # 定义回引用关系
+    operation_logs = relationship('OperationLog', back_populates='OperationLog')  # 定义回引用关系
 
 
 class ContainerDeploymentLog(db.Model):
