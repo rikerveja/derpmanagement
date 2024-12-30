@@ -1028,3 +1028,24 @@ class UserHistory(db.Model):
         Index('idx_user_history_user', 'user_id'),
         Index('idx_user_history_created', 'created_at'),
     )
+
+
+class SystemLog(db.Model):
+    __tablename__ = 'system_logs'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    level = Column(Enum('debug', 'info', 'warning', 'error', 'critical', name='log_level'), nullable=False)
+    module = Column(String(255))  # 记录日志来源的模块
+    message = Column(String)
+    details = Column(String)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    ip_address = Column(String(255))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
+    __table_args__ = (
+        Index('idx_system_log_level', 'level'),
+        Index('idx_system_log_module', 'module'),
+        Index('idx_system_log_created', 'created_at'),
+    )
