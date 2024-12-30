@@ -46,9 +46,12 @@ def make_celery(app):
     return celery_instance
 
 
-def create_app():
+def create_app(config_class=Config):
     app = Flask(__name__)
-    app.config.from_object(Config)  # 从配置类加载配置
+    app.config.from_object(config_class)
+    
+    db.init_app(app)
+    migrate.init_app(app, db)
 
     # 设置日志
     setup_logging(app)
