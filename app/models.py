@@ -440,7 +440,7 @@ class ACLLog(db.Model):
     user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
     operation = Column(Enum('generate', 'update', 'delete', name='acl_operation'))
     acl_config_id = Column(Integer, ForeignKey('acl_configs.id', ondelete='CASCADE'))
-    details = Column(String)
+    details = Column(String(1024)) 
     ip_address = Column(String(255))
     location = Column(String(255))
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -587,7 +587,7 @@ class FinanceLog(db.Model):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey('users.id'))
     operation = Column(String(255), nullable=False)
-    details = Column(String)
+    details = Column(String(1024)) 
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User")
@@ -620,7 +620,7 @@ class DockerFailureLog(db.Model):
     status = Column(Enum('failed', 'repaired', 'pending', name='docker_failure_status'), default='failed')
     repair_attempts = Column(Integer, default=0)
     last_attempt_time = Column(DateTime)
-    failure_details = Column(String)
+    failure_details = Column(String(1024)) 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -633,7 +633,7 @@ class ContainerCleanupLog(db.Model):
     id = Column(Integer, primary_key=True, autoincrement=True)
     old_container_id = Column(Integer, ForeignKey('docker_containers.id'))
     cleanup_status = Column(Enum('completed', 'failed', name='cleanup_status'), nullable=False)
-    cleanup_details = Column(String)
+    cleanup_details = Column(String(1024)) 
     timestamp = Column(DateTime, default=datetime.utcnow)
 
     old_container = relationship("DockerContainer")
@@ -646,7 +646,7 @@ class ContainerAndServiceUpdateLog(db.Model):
     container_id = Column(Integer, ForeignKey('docker_containers.id'))
     service_type = Column(String(255))
     status = Column(Enum('started', 'updated', 'failed', name='update_status'), nullable=False)
-    details = Column(String)
+    details = Column(String(1024)) 
     timestamp = Column(DateTime, default=datetime.utcnow)
 
     container = relationship("DockerContainer")
