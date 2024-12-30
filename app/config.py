@@ -27,17 +27,17 @@ class Config:
     # 禁用对象修改追踪，提升性能
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-# 邮件服务器配置
-MAIL_SERVER = os.getenv('MAIL_SERVER', 'smtp.example.com')
-MAIL_PORT = int(os.getenv('MAIL_PORT', 587))
-MAIL_USERNAME = os.getenv('MAIL_USERNAME', 'your_email@example.com')
-MAIL_PASSWORD = os.getenv('MAIL_PASSWORD', 'your_password')
-MAIL_USE_TLS = os.getenv('MAIL_USE_TLS', 'True').lower() in ['true', '1']
-MAIL_USE_SSL = os.getenv('MAIL_USE_SSL', 'False').lower() in ['true', '1']
+    # 邮件服务器配置
+    MAIL_SERVER = os.getenv('MAIL_SERVER', 'smtp.example.com')
+    MAIL_PORT = int(os.getenv('MAIL_PORT', 587))
+    MAIL_USERNAME = os.getenv('MAIL_USERNAME', 'your_email@example.com')
+    MAIL_PASSWORD = os.getenv('MAIL_PASSWORD', 'your_password')
+    MAIL_USE_TLS = os.getenv('MAIL_USE_TLS', 'True').lower() in ['true', '1']
+    MAIL_USE_SSL = os.getenv('MAIL_USE_SSL', 'False').lower() in ['true', '1']
 
-# Redis 配置
-REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
-REDIS_PORT = int(os.getenv('REDIS_PORT', 6379))
+    # Redis 配置
+    REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
+    REDIS_PORT = int(os.getenv('REDIS_PORT', 6379))
 
     # Celery 配置（如果需要使用 Celery 进行异步任务处理）
     CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', f"redis://{REDIS_HOST}:{REDIS_PORT}/0")
