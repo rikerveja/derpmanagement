@@ -379,7 +379,7 @@ class DockerContainerEvents(db.Model):
     id = Column(Integer, primary_key=True, autoincrement=True)
     container_id = Column(Integer, ForeignKey('docker_containers.id', ondelete='CASCADE'))
     event_type = Column(Enum('start', 'stop', 'restart', 'pause', 'unpause', 'error', name='container_event_type'))
-    event_message = Column(String)
+    event_message = Column(String(1024))
     created_at = Column(DateTime, default=datetime.utcnow)
 
     container = relationship("DockerContainer")
@@ -391,7 +391,7 @@ class DockerContainerLogs(db.Model):
     id = Column(Integer, primary_key=True, autoincrement=True)
     container_id = Column(Integer, ForeignKey('docker_containers.id', ondelete='CASCADE'))
     log_level = Column(Enum('info', 'warn', 'error', name='log_level'))
-    log_message = Column(String)
+    log_message = Column(String(1024))
     created_at = Column(DateTime, default=datetime.utcnow)
 
     container = relationship("DockerContainer")
@@ -494,7 +494,7 @@ class AlarmLog(db.Model):
     server_id = Column(Integer, ForeignKey('servers.id', ondelete='SET NULL'))
     user_id = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'))
     alert_type = Column(String(255))
-    message = Column(String)
+    message = Column(String(1024))
     status = Column(Enum('active', 'resolved', 'acknowledged', name='alarm_status'))
     created_at = Column(DateTime, default=datetime.utcnow)
     resolved_at = Column(DateTime)
@@ -524,7 +524,7 @@ class AlarmNotification(db.Model):
     status = Column(Enum('sent', 'failed', 'pending', name='notification_status'), default='pending')
     sent_at = Column(DateTime)
     sent_to = Column(String(255))
-    notification_content = Column(String)
+    notification_content = Column(String(1024))
 
     alarm_log = relationship("AlarmLog")
 
@@ -534,7 +534,7 @@ class AlarmResolution(db.Model):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     alarm_log_id = Column(Integer, ForeignKey('alarm_logs.id', ondelete='CASCADE'))
-    action_taken = Column(String)
+    action_taken = Column(String(1024))
     resolved_by = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'))
     resolved_at = Column(DateTime)
     status = Column(Enum('resolved', 'ignored', 'escalated', name='resolution_status'))
@@ -601,7 +601,7 @@ class ContainerReplacementLog(db.Model):
     old_container_id = Column(Integer, ForeignKey('docker_containers.id'))
     new_container_id = Column(Integer, ForeignKey('docker_containers.id'))
     status = Column(Enum('replaced', 'failed', 'in-progress', name='container_replacement_status'), nullable=False)
-    reason = Column(String)
+    reason = Column(String(1024))
     operation_type = Column(Enum('automatic', 'manual', name='operation_type'), nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow)
     user_id = Column(Integer, ForeignKey('users.id'))
