@@ -16,7 +16,8 @@ const router = useRouter()
 const form = ref({
   username: '',
   password: '',
-  email: ''
+  email: '',
+  role: '普通用户' // 默认角色
 })
 
 const submit = async () => {
@@ -48,6 +49,13 @@ const submit = async () => {
           <FormControl v-model="form.email" type="email" />
         </FormField>
 
+        <FormField label="角色">
+          <select v-model="form.role">
+            <option value="普通用户">普通用户</option>
+            <option value="分销员">分销员</option>
+          </select>
+        </FormField>
+
         <template #footer>
           <BaseButtons>
             <BaseButton type="submit" color="info" label="添加" />
@@ -57,4 +65,8 @@ const submit = async () => {
       </CardBox>
     </SectionMain>
   </LayoutAuthenticated>
-</template> 
+</template>
+
+<style scoped>
+/* 样式可以根据需要进行调整 */
+</style> 
