@@ -40,6 +40,7 @@ class User(db.Model):
     rentals = relationship("Rental", back_populates="user")
     serial_numbers = relationship("SerialNumber", back_populates="user")
     notifications = relationship("RenewalNotification", back_populates="user")
+    operation_logs = relationship("OperationLog", back_populates="user")
 
     __table_args__ = (
         Index('idx_user_email', 'email'),
