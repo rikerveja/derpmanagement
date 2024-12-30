@@ -35,7 +35,6 @@ class User(Base):
     is_verified = Column(Boolean, default=False)
     verification_token = Column(String(255))
     password_encrypted = Column(Boolean, default=True)
-
     logs = relationship("UserLog", back_populates="user")
     commissions = relationship("DistributorCommission", back_populates="distributor")
     rentals = relationship("Rental", back_populates="user")
