@@ -1,43 +1,23 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useMainStore } from '@/stores/main'
-import { mdiCheckDecagram } from '@mdi/js'
 import BaseLevel from '@/components/BaseLevel.vue'
-import UserAvatarCurrentUser from '@/components/UserAvatarCurrentUser.vue'
-import CardBox from '@/components/CardBox.vue'
-import FormCheckRadio from '@/components/FormCheckRadio.vue'
-import PillTag from '@/components/PillTag.vue'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const mainStore = useMainStore()
 
 const userName = computed(() => mainStore.userName)
-
-const userSwitchVal = ref(false)
+const userEmail = computed(() => localStorage.getItem('userEmail') || '未登录')
 </script>
 
 <template>
-  <CardBox>
-    <BaseLevel type="justify-around lg:justify-center">
-      <UserAvatarCurrentUser class="lg:mx-12" />
-      <div class="space-y-3 text-center md:text-left lg:mx-12">
-        <div class="flex justify-center md:block">
-          <FormCheckRadio
-            v-model="userSwitchVal"
-            name="notifications-switch"
-            type="switch"
-            label="Notifications"
-            :input-value="true"
-          />
-        </div>
-        <h1 class="text-2xl">
-          Howdy, <b>{{ userName }}</b
-          >!
-        </h1>
-        <p>Last login <b>12 mins ago</b> from <b>127.0.0.1</b></p>
-        <div class="flex justify-center md:block">
-          <PillTag label="Verified" color="info" :icon="mdiCheckDecagram" />
-        </div>
+  <BaseLevel>
+    <div class="flex items-center justify-start">
+      <UserAvatar class="w-12 h-12 mr-3" />
+      <div class="flex flex-col">
+        <span class="text-lg font-semibold">{{ userEmail }}</span>
+        <span class="text-sm text-gray-500">管理员</span>
       </div>
-    </BaseLevel>
-  </CardBox>
+    </div>
+  </BaseLevel>
 </template>
