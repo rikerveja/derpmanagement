@@ -135,6 +135,7 @@
   
   <script>
   import SlideVerify from '@/components/SlideVerify.vue'
+  import { useMainStore } from '@/stores/main'
   
   export default {
     name: 'LoginView',
@@ -156,9 +157,6 @@
           agreement: false
         }
       }
-    },
-    created() {
-      this.refreshCaptcha()
     },
     methods: {
       async handleSubmit() {
@@ -215,7 +213,12 @@
             const data = await response.json()
             
             if (data.success) {
+              const mainStore = useMainStore()
               localStorage.setItem('token', data.token)
+              mainStore.setUser({ 
+                email: this.formData.email,
+                username: data.username
+              })
               this.$router.push('/dashboard')
             } else {
               throw new Error(data.message || '登录失败')
@@ -328,9 +331,6 @@
           emailCode: '',
           agreement: false
         }
-      },
-      refreshCaptcha() {
-        this.captchaUrl = `/api/captcha?t=${new Date().getTime()}`
       },
       showTerms() {
         // 实现显示服务条款的逻辑
