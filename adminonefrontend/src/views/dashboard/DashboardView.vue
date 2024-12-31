@@ -1,6 +1,5 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionMain from '@/components/SectionMain.vue'
 import CardBox from '@/components/CardBox.vue'
@@ -15,8 +14,6 @@ import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement
 
 // 注册 Chart.js 组件
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, ArcElement)
-
-const router = useRouter()
 
 // 添加更多状态管理
 const containers = ref([])
@@ -154,22 +151,9 @@ const salesChartData = ref({
   ]
 })
 
-// 检查认证状态
-const checkAuth = () => {
-  const token = localStorage.getItem('token')
-  if (!token) {
-    router.push('/login')
-    return false
-  }
-  return true
-}
-
 // 统一获取数据的函数
 const fetchDashboardData = async () => {
   try {
-    // 先检查认证状态
-    if (!checkAuth()) return
-
     const [
       containersData, 
       trafficData, 
@@ -178,8 +162,8 @@ const fetchDashboardData = async () => {
       serversData, 
       usersData, 
       statusData,
-      distributorsData,
-      salesData
+      distributorsData,  // 新增分销数据获取
+      salesData          // 新增销售数据获取
     ] = await Promise.all([
       api.getContainers(),
       api.getRealTimeTraffic(),
@@ -208,10 +192,6 @@ const fetchDashboardData = async () => {
     updateChartData()
   } catch (error) {
     console.error('获取数据失败:', error)
-    if (error.response?.status === 401) {
-      // 如果是认证错误，重定向到登录页
-      router.push('/login')
-    }
   }
 }
 
@@ -248,25 +228,15 @@ const handleAlert = async (alertId) => {
   }
 }
 
-// 组件挂载时初始化
-onMounted(() => {
-  if (checkAuth()) {
-    fetchDashboardData() // 首次加载数据
-    // 只在用户主动操作时刷新
-  }
+onMounted(async () => {
+  await fetchDashboardData()
+  startAutoRefresh()
 })
 
-// 组件卸载时清理
+// 组件卸载时清理定时器
 onUnmounted(() => {
   stopAutoRefresh()
 })
-
-// 可以添加一个手动刷新的方法
-const manualRefresh = async () => {
-  if (checkAuth()) {
-    await fetchDashboardData()
-  }
-}
 </script>
 
 <template>
