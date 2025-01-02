@@ -1,4 +1,5 @@
 <script setup>
+import { useRouter } from 'vue-router'
 import AsideMenuLayer from '@/components/AsideMenuLayer.vue'
 import OverlayLayer from '@/components/OverlayLayer.vue'
 
@@ -12,13 +13,23 @@ defineProps({
 })
 
 const emit = defineEmits(['menu-click', 'aside-lg-close-click'])
+const router = useRouter()
 
 const menuClick = (event, item) => {
-  emit('menu-click', event, item)
+  if (item.isLogout) {
+    logout()
+  } else {
+    emit('menu-click', event, item)
+  }
 }
 
 const asideLgCloseClick = (event) => {
   emit('aside-lg-close-click', event)
+}
+
+const logout = () => {
+  localStorage.removeItem('token')
+  router.push('/login')
 }
 </script>
 
