@@ -1,11 +1,12 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { mdiClose, mdiDotsVertical } from '@mdi/js'
 import { containerMaxW } from '@/config.js'
 import BaseIcon from '@/components/BaseIcon.vue'
 import NavBarMenuList from '@/components/NavBarMenuList.vue'
 import NavBarItemPlain from '@/components/NavBarItemPlain.vue'
+import { useStore } from 'vuex'
 
 defineProps({
   menu: {
@@ -16,6 +17,8 @@ defineProps({
 
 const emit = defineEmits(['menu-click'])
 const router = useRouter()
+const store = useStore()
+const user = computed(() => store.state.user)
 
 const menuClick = (event, item) => {
   if (item.isLogout) {
