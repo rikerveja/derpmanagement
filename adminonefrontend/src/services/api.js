@@ -2,7 +2,7 @@ import axios from 'axios'
 
 // 创建axios实例
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: 'http://100.82.38.13:8000/api',
   timeout: 5000,
   headers: {
     'Content-Type': 'application/json'
@@ -59,6 +59,11 @@ export default {
   
   downloadAcl() {
     return api.get('/user/download_acl')
+  },
+
+  // 新增的获取所有用户的方法
+  getAllUsers() {
+    return api.get('/users')
   },
 
   // 服务器相关 API
