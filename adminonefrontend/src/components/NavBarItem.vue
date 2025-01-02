@@ -114,7 +114,7 @@ onBeforeUnmount(() => {
       <UserAvatarCurrentUser v-if="item.isCurrentUser" class="w-6 h-6 mr-3 inline-flex" />
       <BaseIcon v-if="item.icon" :path="item.icon" class="transition-colors" />
       <span
-        class="px-2 transition-colors"
+        class="px-2 transition-colors text-sm font-medium text-gray-700 dark:text-gray-300"
         :class="{ 'lg:hidden': item.isDesktopNoLabel && item.icon }"
         >{{ itemLabel }}</span
       >
