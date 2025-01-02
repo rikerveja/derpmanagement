@@ -6,7 +6,7 @@ import { containerMaxW } from '@/config.js'
 import BaseIcon from '@/components/BaseIcon.vue'
 import NavBarMenuList from '@/components/NavBarMenuList.vue'
 import NavBarItemPlain from '@/components/NavBarItemPlain.vue'
-import { useStore } from 'vuex'
+import { useAuthStore } from '@/stores/auth'
 
 defineProps({
   menu: {
@@ -15,10 +15,10 @@ defineProps({
   }
 })
 
-const emit = defineEmits(['menu-click'])
+const authStore = useAuthStore()
 const router = useRouter()
-const store = useStore()
-const user = computed(() => store.state.user)
+
+const emit = defineEmits(['menu-click'])
 
 const menuClick = (event, item) => {
   if (item.isLogout) {
@@ -31,7 +31,7 @@ const menuClick = (event, item) => {
 const isMenuNavBarActive = ref(false)
 
 const logout = () => {
-  localStorage.removeItem('token')
+  authStore.logout()
   router.push('/login')
 }
 </script>
