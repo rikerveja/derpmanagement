@@ -133,238 +133,234 @@
     </div>
   </template>
   
-  <script>
+  <script setup>
   import SlideVerify from '@/components/SlideVerify.vue'
-  import { useMainStore } from '@/stores/main'
+  import { useStore } from 'vuex'
+  import { ref } from 'vue'
   
-  export default {
-    name: 'LoginView',
-    components: {
-      SlideVerify
-    },
-    data() {
-      return {
-        isLogin: true,
-        verifySuccess: false,
-        countdown: 0,
-        emailSending: false,
-        formData: {
-          username: '',
-          email: '',
-          password: '',
-          confirmPassword: '',
-          emailCode: '',
-          agreement: false
-        }
+  const store = useStore()
+  
+  const isLogin = ref(true)
+  const verifySuccess = ref(false)
+  const countdown = ref(0)
+  const emailSending = ref(false)
+  const formData = ref({
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    emailCode: '',
+    agreement: false
+  })
+  
+  const handleSubmit = async () => {
+    if (!isLogin.value) {
+      if (!verifySuccess.value) {
+        alert('请先完成滑动验证')
+        return
       }
-    },
-    methods: {
-      async handleSubmit() {
-        if (!this.isLogin) {
-          if (!this.verifySuccess) {
-            alert('请先完成滑动验证')
-            return
-          }
-
-          if (!this.validateForm()) {
-            return
-          }
-
-          try {
-            const response = await fetch('/api/add_user', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                username: this.formData.username,
-                email: this.formData.email,
-                password: this.formData.password,
-                verification_code: this.formData.emailCode
-              })
-            })
-
-            const data = await response.json()
-            
-            if (data.success) {
-              alert(data.message || '注册成功！请登录')
-              this.isLogin = true
-              this.resetForm()
-            } else {
-              throw new Error(data.message || '注册失败')
-            }
-          } catch (error) {
-            console.error(error)
-            alert(error.message)
-          }
-        } else {
-          try {
-            const response = await fetch('/api/login', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                email: this.formData.email,
-                password: this.formData.password
-              })
-            })
-
-            const data = await response.json()
-            
-            if (data.success) {
-              const mainStore = useMainStore()
-              localStorage.setItem('token', data.token)
-              mainStore.setUser({ 
-                email: this.formData.email,
-                username: data.username
-              })
-              this.$router.push('/dashboard')
-            } else {
-              throw new Error(data.message || '登录失败')
-            }
-          } catch (error) {
-            console.error(error)
-            alert(error.message)
-          }
-        }
-      },
-      validateForm() {
-        // 用户名验证
-        if (this.formData.username.length < 4 || this.formData.username.length > 20) {
-          alert('用户名长度必须在4-20个字符之间')
-          return false
-        }
   
-        // 邮箱验证
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-        if (!emailRegex.test(this.formData.email)) {
-          alert('请输入有效的邮箱地址')
-          return false
-        }
+      if (!validateForm()) {
+        return
+      }
   
-        // 密码验证
-        const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/
-        if (!passwordRegex.test(this.formData.password)) {
-          alert('密码必须至少包含6个字符，包括字母和数字')
-          return false
-        }
-  
-        // 确认密码
-        if (this.formData.password !== this.formData.confirmPassword) {
-          alert('两次输入的密码不一致')
-          return false
-        }
-  
-        return true
-      },
-      async sendEmailCode() {
-        if (!this.formData.email) {
-          alert('请先输入邮箱地址')
-          return
-        }
-  
-        if (!this.verifySuccess) {
-          alert('请先完成滑动验证')
-          return
-        }
-  
-        // 防止重复发送
-        if (this.emailSending || this.countdown > 0) {
-          return
-        }
-  
-        try {
-          this.emailSending = true
-          const response = await fetch('/api/send_verification_email', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              email: this.formData.email
-            })
+      try {
+        const response = await fetch('/api/add_user', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            username: formData.value.username,
+            email: formData.value.email,
+            password: formData.value.password,
+            verification_code: formData.value.emailCode
           })
+        })
   
-          if (response.ok) {
-            this.startCountdown()
-          } else {
-            const error = await response.json()
-            throw new Error(error.message || '发送验证码失败')
-          }
-        } catch (error) {
-          console.error(error)
-          alert(error.message)
-        } finally {
-          this.emailSending = false
-        }
-      },
-      startCountdown() {
-        this.countdown = 60
-        const timer = setInterval(() => {
-          this.countdown--
-          if (this.countdown <= 0) {
-            clearInterval(timer)
-          }
-        }, 1000)
-      },
-      toggleForm() {
-        const username = this.formData.username
-        this.isLogin = !this.isLogin
-        this.resetForm()
+        const data = await response.json()
         
-        if (this.isLogin && username) {
-          this.formData.username = username
+        if (data.success) {
+          alert(data.message || '注册成功！请登录')
+          isLogin.value = true
+          resetForm()
+        } else {
+          throw new Error(data.message || '注册失败')
         }
-
-        this.verifySuccess = false
-        if (this.$refs.slideVerify) {
-          this.$refs.slideVerify.reset()
+      } catch (error) {
+        console.error(error)
+        alert(error.message)
+      }
+    } else {
+      try {
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            email: formData.value.email,
+            password: formData.value.password
+          })
+        })
+  
+        const data = await response.json()
+        
+        if (data.success) {
+          localStorage.setItem('token', data.token)
+          store.commit('setUser', { 
+            email: formData.value.email,
+            username: data.username
+          })
+          this.$router.push('/dashboard')
+        } else {
+          throw new Error(data.message || '登录失败')
         }
-      },
-      resetForm() {
-        this.formData = {
-          username: '',
-          email: '',
-          password: '',
-          confirmPassword: '',
-          emailCode: '',
-          agreement: false
-        }
-      },
-      showTerms() {
-        // 实现显示服务条款的逻辑
-        alert('显示服务条款')
-      },
-      showPrivacy() {
-        // 实现显示隐私政策的逻辑
-        alert('显示隐私政策')
-      },
-      onSuccess() {
-        if (!this.verifySuccess) {  // 防止重复触发
-          this.verifySuccess = true
-          console.log('验证成功')
-          
-          // 验证成功后自动发送邮箱验证码
-          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-          if (emailRegex.test(this.formData.email)) {
-            this.sendEmailCode()
-          }
-        }
-      },
-      onRefresh() {
-        this.verifySuccess = false
-        console.log('刷新验证码')
-      },
-      handleEmailInput() {
-        // 当邮箱输入完整时，重置验证状态
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-        if (!emailRegex.test(this.formData.email)) {
-          this.verifySuccess = false
-          if (this.$refs.slideVerify) {
-            this.$refs.slideVerify.reset()
-          }
-        }
+      } catch (error) {
+        console.error(error)
+        alert(error.message)
+      }
+    }
+  }
+  
+  const validateForm = () => {
+    // 用户名验证
+    if (formData.value.username.length < 4 || formData.value.username.length > 20) {
+      alert('用户名长度必须在4-20个字符之间')
+      return false
+    }
+  
+    // 邮箱验证
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.value.email)) {
+      alert('请输入有效的邮箱地址')
+      return false
+    }
+  
+    // 密码验证
+    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/
+    if (!passwordRegex.test(formData.value.password)) {
+      alert('密码必须至少包含6个字符，包括字母和数字')
+      return false
+    }
+  
+    // 确认密码
+    if (formData.value.password !== formData.value.confirmPassword) {
+      alert('两次输入的密码不一致')
+      return false
+    }
+  
+    return true
+  }
+  
+  const sendEmailCode = async () => {
+    if (!formData.value.email) {
+      alert('请先输入邮箱地址')
+      return
+    }
+  
+    if (!verifySuccess.value) {
+      alert('请先完成滑动验证')
+      return
+    }
+  
+    // 防止重复发送
+    if (emailSending.value || countdown.value > 0) {
+      return
+    }
+  
+    try {
+      emailSending.value = true
+      const response = await fetch('/api/send_verification_email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: formData.value.email
+        })
+      })
+  
+      if (response.ok) {
+        startCountdown()
+      } else {
+        const error = await response.json()
+        throw new Error(error.message || '发送验证码失败')
+      }
+    } catch (error) {
+      console.error(error)
+      alert(error.message)
+    } finally {
+      emailSending.value = false
+    }
+  }
+  
+  const startCountdown = () => {
+    countdown.value = 60
+    const timer = setInterval(() => {
+      countdown.value--
+      if (countdown.value <= 0) {
+        clearInterval(timer)
+      }
+    }, 1000)
+  }
+  
+  const toggleForm = () => {
+    const username = formData.value.username
+    isLogin.value = !isLogin.value
+    resetForm()
+    
+    if (isLogin.value && username) {
+      formData.value.username = username
+    }
+  
+    verifySuccess.value = false
+    if (this.$refs.slideVerify) {
+      this.$refs.slideVerify.reset()
+    }
+  }
+  
+  const resetForm = () => {
+    formData.value = {
+      username: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      emailCode: '',
+      agreement: false
+    }
+  }
+  
+  const showTerms = () => {
+    // 实现显示服务条款的逻辑
+    alert('显示服务条款')
+  }
+  
+  const showPrivacy = () => {
+    // 实现显示隐私政策的逻辑
+    alert('显示隐私政策')
+  }
+  
+  const onSuccess = () => {
+    if (!verifySuccess.value) {  // 防止重复触发
+      verifySuccess.value = true
+      console.log('验证成功')
+      
+      // 验证成功后自动发送邮箱验证码
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (emailRegex.test(formData.value.email)) {
+        sendEmailCode()
+      }
+    }
+  }
+  
+  const handleEmailInput = () => {
+    // 当邮箱输入完整时，重置验证状态
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.value.email)) {
+      verifySuccess.value = false
+      if (this.$refs.slideVerify) {
+        this.$refs.slideVerify.reset()
       }
     }
   }
