@@ -135,10 +135,12 @@
   
   <script setup>
   import SlideVerify from '@/components/SlideVerify.vue'
-  import { useStore } from 'vuex'
   import { ref } from 'vue'
+  import { useRouter } from 'vue-router'
+  import { useAuthStore } from '@/stores/auth'
   
-  const store = useStore()
+  const authStore = useAuthStore()
+  const router = useRouter()
   
   const isLogin = ref(true)
   const verifySuccess = ref(false)
@@ -154,7 +156,38 @@
   })
   
   const handleSubmit = async () => {
-    if (!isLogin.value) {
+    if (isLogin.value) {
+      try {
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            email: formData.value.email,
+            password: formData.value.password
+          })
+        })
+  
+        const data = await response.json()
+        
+        if (data.success) {
+          localStorage.setItem('token', data.token)
+          authStore.user = { 
+            email: formData.value.email,
+            username: data.username
+          }
+          localStorage.setItem('user', JSON.stringify(authStore.user))
+          authStore.token = data.token
+          router.push('/dashboard')
+        } else {
+          throw new Error(data.message || '登录失败')
+        }
+      } catch (error) {
+        console.error(error)
+        alert(error.message)
+      }
+    } else {
       if (!verifySuccess.value) {
         alert('请先完成滑动验证')
         return
@@ -186,35 +219,6 @@
           resetForm()
         } else {
           throw new Error(data.message || '注册失败')
-        }
-      } catch (error) {
-        console.error(error)
-        alert(error.message)
-      }
-    } else {
-      try {
-        const response = await fetch('/api/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            email: formData.value.email,
-            password: formData.value.password
-          })
-        })
-  
-        const data = await response.json()
-        
-        if (data.success) {
-          localStorage.setItem('token', data.token)
-          store.commit('setUser', { 
-            email: formData.value.email,
-            username: data.username
-          })
-          this.$router.push('/dashboard')
-        } else {
-          throw new Error(data.message || '登录失败')
         }
       } catch (error) {
         console.error(error)
