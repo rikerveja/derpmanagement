@@ -1,6 +1,8 @@
 <script setup>
+import { useAuthStore } from '@/stores/auth'
 import NavBarItem from '@/components/NavBarItem.vue'
 
+const authStore = useAuthStore()
 defineProps({
   menu: {
     type: Array,
@@ -16,5 +18,12 @@ const menuClick = (event, item) => {
 </script>
 
 <template>
-  <NavBarItem v-for="(item, index) in menu" :key="index" :item="item" @menu-click="menuClick" />
+  <ul>
+    <li v-for="(item, index) in menu" :key="index">
+      <NavBarItem :item="item" @menu-click="menuClick" />
+    </li>
+    <li>
+      <span>{{ authStore.user?.email }}</span>
+    </li>
+  </ul>
 </template>
