@@ -64,38 +64,15 @@ const sortData = (data, key) => {
 // 刷新数据
 const refreshData = async () => {
   try {
-    const [
-      containersData,
-      trafficData,
-      alertsData,
-      rentalData,
-      serversData,
-      servicesData,
-      usersData
-    ] = await Promise.all([
-      api.getContainers(),
-      api.getRealTimeTraffic(),
-      api.getAlerts(),
-      api.getRentalInfo(),
-      api.getServers(),
-      api.getServices(),
-      api.get('/api/users')
-    ])
-
-    containers.value = containersData.containers
-    traffic.value = trafficData.traffic
-    alerts.value = alertsData.alerts
-    rentalInfo.value = rentalData
-    servers.value = serversData.servers
-    services.value = servicesData.services
-    users.value = usersData.users
-
-    // 获取全部容器流量
-    const allTrafficData = await api.get('/api/ha/container_traffic')
-    allContainers.value = allTrafficData.containers
-
+    console.log('开始刷新数据');
+    const usersData = await api.getAllUsers();
+    if (usersData && Array.isArray(usersData.users)) {
+      users.value = usersData.users;
+    } else {
+      console.error('用户数据格式不正确:', usersData);
+    }
   } catch (error) {
-    console.error('获取数据失败:', error)
+    console.error('获取数据失败:', error);
   }
 }
 
@@ -268,39 +245,39 @@ onMounted(() => {
         <BaseLevel class="mb-4">
           <h3 class="text-lg font-bold">用户列表</h3>
         </BaseLevel>
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead>
-            <tr>
-              <th @click="sortData(users, 'username')" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">用户名</th>
-              <th @click="sortData(users, 'email')" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">邮箱Email</th>
-              <th @click="sortData(users, 'role')" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">身份</th>
-              <th @click="sortData(users, 'rentalExpiry')" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">租约到期</th>
-              <th @click="sortData(users, 'createdAt')" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">创建时间</th>
-              <th @click="sortData(users, 'lastLogin')" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">最后登陆时间</th>
-              <th @click="sortData(users, 'isVerified')" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">是否验证</th>
-              <th @click="sortData(users, 'verificationCode')" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">验证租赁码</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-for="user in paginatedUsers" :key="user.id">
-              <td class="px-6 py-4 whitespace-nowrap">{{ user.username }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">{{ user.email }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">{{ user.role }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">{{ user.rentalExpiry }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">{{ user.createdAt }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">{{ user.lastLogin }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">{{ user.isVerified ? '是' : '否' }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">{{ user.verificationCode }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <BaseButton @click="viewRentalInfo(user.id)" label="查看租赁详情" />
-                <BaseButton @click="viewRentalHistory(user.id)" label="租赁历史" />
-                <BaseButton @click="downloadAcl(user.id)" label="下载ACL" />
-                <BaseButton @click="sendReminder(user.id)" label="发送续费通知" />
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-800">
+              <tr>
+                <th @click="sortData(users, 'username')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">用户名</th>
+                <th @click="sortData(users, 'email')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">Email</th>
+                <th @click="sortData(users, 'role')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">角色</th>
+                <th @click="sortData(users, 'rentalExpiry')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">租约到期</th>
+                <th @click="sortData(users, 'last_login')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">登陆时间</th>
+                <th @click="sortData(users, 'isVerified')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">验证</th>
+                <th @click="sortData(users, 'verificationCode')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">租赁码</th>
+                <th class="px-4 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">操作</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+              <tr v-for="user in paginatedUsers" :key="user.id">
+                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.username }}</td>
+                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.email }}</td>
+                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.role }}</td>
+                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.rentalExpiry }}</td>
+                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.last_login }}</td>
+                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.isVerified ? '是' : '否' }}</td>
+                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.verificationCode }}</td>
+                <td class="px-4 py-2 whitespace-nowrap text-sm text-center text-blue-600 dark:text-blue-400">
+                  <span @click="viewRentalInfo(user.id)" class="cursor-pointer hover:underline">租赁详情</span> |
+                  <span @click="viewRentalHistory(user.id)" class="cursor-pointer hover:underline">租赁历史</span> |
+                  <span @click="downloadAcl(user.id)" class="cursor-pointer hover:underline">下载ACL</span> |
+                  <span @click="sendReminder(user.id)" class="cursor-pointer hover:underline">续费通知</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
         <div class="mt-4">
           <BaseButton @click="currentPage--" :disabled="currentPage === 1" label="上一页" />
           <BaseButton @click="currentPage++" :disabled="currentPage * itemsPerPage >= users.length" label="下一页" />
@@ -326,5 +303,9 @@ onMounted(() => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.overflow-x-auto {
+  overflow-x: auto;
 }
 </style>
