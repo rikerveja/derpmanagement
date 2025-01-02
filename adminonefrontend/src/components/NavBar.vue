@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { mdiClose, mdiDotsVertical } from '@mdi/js'
 import { containerMaxW } from '@/config.js'
 import BaseIcon from '@/components/BaseIcon.vue'
@@ -14,12 +15,22 @@ defineProps({
 })
 
 const emit = defineEmits(['menu-click'])
+const router = useRouter()
 
 const menuClick = (event, item) => {
-  emit('menu-click', event, item)
+  if (item.isLogout) {
+    logout()
+  } else {
+    emit('menu-click', event, item)
+  }
 }
 
 const isMenuNavBarActive = ref(false)
+
+const logout = () => {
+  localStorage.removeItem('token')
+  router.push('/login')
+}
 </script>
 
 <template>
