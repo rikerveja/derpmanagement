@@ -7,6 +7,7 @@ import BaseIcon from '@/components/BaseIcon.vue'
 import UserAvatarCurrentUser from '@/components/UserAvatarCurrentUser.vue'
 import NavBarMenuList from '@/components/NavBarMenuList.vue'
 import BaseDivider from '@/components/BaseDivider.vue'
+import { useStore } from 'vuex'
 
 const props = defineProps({
   item: {
@@ -16,6 +17,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['menu-click'])
+const store = useStore()
 
 const is = computed(() => {
   if (props.item.href) {
@@ -45,7 +47,7 @@ const componentClass = computed(() => {
 })
 
 const itemLabel = computed(() =>
-  props.item.isCurrentUser ? useMainStore().userName : props.item.label
+  props.item.isCurrentUser ? store.state.user.email : props.item.label
 )
 
 const isDropdownActive = ref(false)
