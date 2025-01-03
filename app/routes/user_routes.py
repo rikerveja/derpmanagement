@@ -6,6 +6,7 @@ from app import db
 from app.utils.logging_utils import log_operation  # 引入统一日志记录工具
 import logging
 import os
+import traceback
 
 # 定义蓝图
 user_bp = Blueprint('user', __name__)
@@ -16,15 +17,59 @@ def validate_required_fields(data, fields):
     missing_fields = [field for field in fields if not data.get(field)]
     return missing_fields
 
-import traceback
+# 修改用户密码
+@user_bp.route('/api/user/change_password', methods=['POST'])
+def change_password():
+    data = request.json
+    required_fields = ['email', 'current_password', 'new_password', 'confirm_new_password']
+    missing_fields = validate_required_fields(data, required_fields)
 
+    if missing_fields:
+        log_operation(None, "change_password", "failed", f"Missing fields: {', '.join(missing_fields)}")
+        return jsonify({"success": False, "message": f"Missing fields: {', '.join(missing_fields)}"}), 400
+
+    email = data.get('email')
+    current_password = data.get('current_password')
+    new_password = data.get('new_password')
+    confirm_new_password = data.get('confirm_new_password')
+
+    # 确保新密码和确认密码匹配
+    if new_password != confirm_new_password:
+        log_operation(None, "change_password", "failed", f"Passwords do not match for email: {email}")
+        return jsonify({"success": False, "message": "New passwords do not match"}), 400
+
+    # 查找用户
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        log_operation(None, "change_password", "failed", f"User not found for email: {email}")
+        return jsonify({"success": False, "message": "User not found"}), 404
+
+    # 检查当前密码是否正确
+    if not check_password(current_password, user.password):
+        log_operation(None, "change_password", "failed", f"Incorrect current password for email: {email}")
+        return jsonify({"success": False, "message": "Current password is incorrect"}), 400
+
+    # 检查新密码的强度（可以根据需要调整密码规则）
+    if len(new_password) < 8:
+        log_operation(None, "change_password", "failed", f"Password too short for email: {email}")
+        return jsonify({"success": False, "message": "New password must be at least 8 characters long"}), 400
+
+    # 哈希处理新密码
+    hashed_password = hash_password(new_password)
+
+    # 更新数据库中的密码
+    user.password = hashed_password
+    db.session.commit()
+
+    log_operation(user.id, "change_password", "success", f"Password changed successfully for email: {email}")
+    return jsonify({"success": True, "message": "Password updated successfully"}), 200
+
+# 获取所有用户
 @user_bp.route('/api/users', methods=['GET'])
 def get_all_users():
     try:
-        # 查询所有用户
         users = User.query.all()
 
-        # 将用户数据转化为字典格式，便于返回 JSON
         users_data = []
         for user in users:
             user_data = {
@@ -44,11 +89,9 @@ def get_all_users():
             }
             users_data.append(user_data)
 
-        # 返回 JSON 响应
         return jsonify({"success": True, "users": users_data}), 200
 
     except Exception as e:
-        # 记录详细的错误信息，包括堆栈信息
         error_message = f"Error fetching users: {str(e)}\n{traceback.format_exc()}"
         log_operation(None, "get_all_users", "failed", error_message)
         return jsonify({"success": False, "message": "Internal server error"}), 500
@@ -116,7 +159,6 @@ def login():
     
     return jsonify({"success": True, "message": "Login successful", "token": token, "refresh_token": refresh_token}), 200
 
-
 # 发送邮箱验证码
 @user_bp.route('/api/send_verification_email', methods=['POST'])
 def send_verification_email_route():
@@ -139,7 +181,6 @@ def send_verification_email_route():
 
     log_operation(None, "send_verification_email", "failed", f"Failed to send verification email to {email}")
     return jsonify({"success": False, "message": "Failed to send email"}), 500
-
 
 # 用户租赁信息展示
 @user_bp.route('/api/user/rental_info', methods=['GET'])
@@ -179,13 +220,6 @@ def user_history(user_id):
 # 申请成为分销员
 @user_bp.route('/api/user/apply_distributor', methods=['POST'])
 def apply_distributor():
-    """
-    申请成为分销员接口
-    请求参数：
-        - user_id: 用户ID
-    返回：
-        - 成功或失败信息
-    """
     data = request.json
     user_id = data.get('user_id')
 
