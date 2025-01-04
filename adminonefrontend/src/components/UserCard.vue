@@ -25,17 +25,16 @@ const userSwitchVal = ref(false)
             v-model="userSwitchVal"
             name="notifications-switch"
             type="switch"
-            label="Notifications"
+            label="通知"
             :input-value="true"
           />
         </div>
         <h1 class="text-2xl">
-          Howdy, <b>{{ userName }}</b
-          >!
+          你好, <b>{{ userName }}</b>!
         </h1>
-        <p>Last login <b>12 mins ago</b> from <b>127.0.0.1</b></p>
+        <p>最近登录时间 <b>12分钟前</b> 来自 <b>127.0.0.1</b></p>
         <div class="flex justify-center md:block">
-          <PillTag label="Verified" color="info" :icon="mdiCheckDecagram" />
+          <PillTag label="已验证" color="info" :icon="mdiCheckDecagram" />
         </div>
       </div>
     </BaseLevel>
