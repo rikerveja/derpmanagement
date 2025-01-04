@@ -14,7 +14,11 @@ import {
   mdiCog,
   mdiClockAlert,
   mdiCurrencyUsd,
-  mdiKey
+  mdiKey,
+  mdiInformation,
+  mdiHistory,
+  mdiDownload,
+  mdiBellRing
 } from '@mdi/js'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
 import api from '@/services/api'
@@ -71,6 +75,10 @@ const sortData = (data, key) => {
     sortOrder.value = 1
   }
   data.sort((a, b) => {
+    // 对于日期类型的字段进行特殊处理
+    if (key === 'rental_expiry' || key === 'last_login') {
+      return (new Date(a[key] || 0) - new Date(b[key] || 0)) * sortOrder.value
+    }
     if (a[key] < b[key]) return -1 * sortOrder.value
     if (a[key] > b[key]) return 1 * sortOrder.value
     return 0
@@ -394,7 +402,7 @@ onMounted(() => {
                 <th @click="sortData(users, 'username')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">用户名</th>
                 <th @click="sortData(users, 'email')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">Email</th>
                 <th @click="sortData(users, 'role')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">角色</th>
-                <th @click="sortData(users, 'rentalExpiry')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">租约到期</th>
+                <th @click="sortData(users, 'rental_expiry')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">租约到期</th>
                 <th @click="sortData(users, 'last_login')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">登陆时间</th>
                 <th @click="sortData(users, 'isVerified')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">验证</th>
                 <th @click="sortData(users, 'verificationCode')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">租赁码</th>
@@ -406,15 +414,53 @@ onMounted(() => {
                 <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.username }}</td>
                 <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.email }}</td>
                 <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.role }}</td>
-                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.rentalExpiry }}</td>
+                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.rental_expiry }}</td>
                 <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.last_login }}</td>
                 <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.isVerified ? '是' : '否' }}</td>
                 <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.verificationCode }}</td>
-                <td class="px-4 py-2 whitespace-nowrap text-sm text-center text-blue-600 dark:text-blue-400">
-                  <span @click="viewRentalInfo(user.id)" class="cursor-pointer hover:underline">租赁详情</span> |
-                  <span @click="viewRentalHistory(user.id)" class="cursor-pointer hover:underline">租赁历史</span> |
-                  <span @click="downloadAcl(user.id)" class="cursor-pointer hover:underline">下载ACL</span> |
-                  <span @click="sendReminder(user.id)" class="cursor-pointer hover:underline">续费通知</span>
+                <td class="px-4 py-2 whitespace-nowrap text-sm text-center">
+                  <div class="flex justify-center space-x-2">
+                    <button 
+                      @click="viewRentalInfo(user.id)" 
+                      class="text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                      title="租赁详情"
+                    >
+                      <BaseIcon 
+                        :path="mdiInformation"
+                        size="18"
+                      />
+                    </button>
+                    <button 
+                      @click="viewRentalHistory(user.id)" 
+                      class="text-green-600 hover:text-green-800 dark:text-green-400"
+                      title="租赁历史"
+                    >
+                      <BaseIcon 
+                        :path="mdiHistory"
+                        size="18"
+                      />
+                    </button>
+                    <button 
+                      @click="downloadAcl(user.id)" 
+                      class="text-purple-600 hover:text-purple-800 dark:text-purple-400"
+                      title="下载ACL"
+                    >
+                      <BaseIcon 
+                        :path="mdiDownload"
+                        size="18"
+                      />
+                    </button>
+                    <button 
+                      @click="sendReminder(user.id)" 
+                      class="text-orange-600 hover:text-orange-800 dark:text-orange-400"
+                      title="续费通知"
+                    >
+                      <BaseIcon 
+                        :path="mdiBellRing"
+                        size="18"
+                      />
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -449,5 +495,25 @@ onMounted(() => {
 
 .overflow-x-auto {
   overflow-x: auto;
+}
+
+/* 添加工具提示的样式 */
+button {
+  position: relative;
+}
+
+button:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 10;
 }
 </style>
