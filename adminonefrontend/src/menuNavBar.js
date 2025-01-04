@@ -23,9 +23,6 @@ export default [
         to: '/settings'
       },
       {
-        isDivider: true
-      },
-      {
         icon: mdiLogout,
         label: '退出',
         isLogout: true
