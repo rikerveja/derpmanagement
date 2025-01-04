@@ -65,14 +65,23 @@ const sortData = (data, key) => {
 const refreshData = async () => {
   try {
     console.log('开始刷新数据');
-    const usersData = await api.getAllUsers();
-    if (usersData && Array.isArray(usersData.users)) {
-      users.value = usersData.users;
+    const response = await api.getAllUsers();
+    console.log('获取到的用户数据:', response); // 添加日志
+    
+    // 检查响应格式并正确提取数据
+    if (response && Array.isArray(response)) {
+      users.value = response;
+    } else if (response && Array.isArray(response.data)) {
+      users.value = response.data;
+    } else if (response && response.users && Array.isArray(response.users)) {
+      users.value = response.users;
     } else {
-      console.error('用户数据格式不正确:', usersData);
+      console.error('用户数据格式不符合预期:', response);
+      users.value = []; // 设置为空数组避免页面报错
     }
   } catch (error) {
     console.error('获取数据失败:', error);
+    users.value = []; // 出错时设置为空数组
   }
 }
 
@@ -102,8 +111,9 @@ const sendReminder = async (userId) => {
 
 onMounted(() => {
   refreshData()
-  const timer = setInterval(refreshData, 30000)
-  onUnmounted(() => clearInterval(timer))
+  // 可以暂时注释掉定时刷新，方便调试
+  // const timer = setInterval(refreshData, 30000)
+  // onUnmounted(() => clearInterval(timer))
 })
 </script>
 
@@ -231,7 +241,7 @@ onMounted(() => {
             </tr>
           </tbody>
         </table>
-        <div class="mt-4">
+        <div class="mt-4 space-x-2">
           <BaseButton @click="currentPage--" :disabled="currentPage === 1" label="上一页" />
           <BaseButton @click="currentPage++" :disabled="currentPage * itemsPerPage >= allContainers.length" label="下一页" />
         </div>
@@ -278,7 +288,7 @@ onMounted(() => {
             </tbody>
           </table>
         </div>
-        <div class="mt-4">
+        <div class="mt-4 space-x-2">
           <BaseButton @click="currentPage--" :disabled="currentPage === 1" label="上一页" />
           <BaseButton @click="currentPage++" :disabled="currentPage * itemsPerPage >= users.length" label="下一页" />
         </div>
