@@ -17,52 +17,60 @@ def validate_required_fields(data, fields):
     missing_fields = [field for field in fields if not data.get(field)]
     return missing_fields
 
-# 修改用户密码
-@user_bp.route('/api/user/change_password', methods=['POST'])
-def change_password():
+@user_bp.route('/api/user/update_info', methods=['POST'])
+def update_user_info():
     data = request.json
-    required_fields = ['email', 'current_password', 'new_password', 'confirm_new_password']
+    required_fields = ['email', 'password']
     missing_fields = validate_required_fields(data, required_fields)
 
     if missing_fields:
-        log_operation(None, "change_password", "failed", f"Missing fields: {', '.join(missing_fields)}")
+        log_operation(None, "update_user_info", "failed", f"Missing fields: {', '.join(missing_fields)}")
         return jsonify({"success": False, "message": f"Missing fields: {', '.join(missing_fields)}"}), 400
 
     email = data.get('email')
-    current_password = data.get('current_password')
-    new_password = data.get('new_password')
-    confirm_new_password = data.get('confirm_new_password')
-
-    # 确保新密码和确认密码匹配
-    if new_password != confirm_new_password:
-        log_operation(None, "change_password", "failed", f"Passwords do not match for email: {email}")
-        return jsonify({"success": False, "message": "New passwords do not match"}), 400
+    password = data.get('password')
 
     # 查找用户
     user = User.query.filter_by(email=email).first()
     if not user:
-        log_operation(None, "change_password", "failed", f"User not found for email: {email}")
+        log_operation(None, "update_user_info", "failed", f"User not found for email: {email}")
         return jsonify({"success": False, "message": "User not found"}), 404
 
-    # 检查当前密码是否正确
-    if not check_password(current_password, user.password):
-        log_operation(None, "change_password", "failed", f"Incorrect current password for email: {email}")
-        return jsonify({"success": False, "message": "Current password is incorrect"}), 400
+    # 检查密码是否正确
+    if not check_password(password, user.password):
+        log_operation(None, "update_user_info", "failed", f"Incorrect password for email: {email}")
+        return jsonify({"success": False, "message": "Incorrect password"}), 400
 
-    # 检查新密码的强度（可以根据需要调整密码规则）
-    if len(new_password) < 8:
-        log_operation(None, "change_password", "failed", f"Password too short for email: {email}")
-        return jsonify({"success": False, "message": "New password must be at least 8 characters long"}), 400
+    # 更新字段：支持更新所有用户信息
+    if 'username' in data:
+        user.username = data.get('username')
+    if 'role' in data:
+        user.role = data.get('role')
+    if 'rental_expiry' in data:
+        user.rental_expiry = data.get('rental_expiry')
+    if 'is_banned' in data:
+        user.is_banned = data.get('is_banned')
+    if 'banned_reason' in data:
+        user.banned_reason = data.get('banned_reason')
+    if 'is_verified' in data:
+        user.is_verified = data.get('is_verified')
+    if 'verification_token' in data:
+        user.verification_token = data.get('verification_token')
+    if 'password_encrypted' in data:
+        user.password_encrypted = data.get('password_encrypted')
+    # 更新 password 时，需要进行哈希加密
+    if 'password' in data:
+        hashed_password = hash_password(data.get('password'))
+        user.password = hashed_password
+    
+    # 更新 updated_at 时间戳
+    user.updated_at = db.func.now()
 
-    # 哈希处理新密码
-    hashed_password = hash_password(new_password)
-
-    # 更新数据库中的密码
-    user.password = hashed_password
+    # 提交更新
     db.session.commit()
 
-    log_operation(user.id, "change_password", "success", f"Password changed successfully for email: {email}")
-    return jsonify({"success": True, "message": "Password updated successfully"}), 200
+    log_operation(user.id, "update_user_info", "success", f"User info updated successfully for email: {email}")
+    return jsonify({"success": True, "message": "User information updated successfully"}), 200
 
 # 获取所有用户
 @user_bp.route('/api/users', methods=['GET'])
