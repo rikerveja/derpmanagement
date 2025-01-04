@@ -10,7 +10,7 @@ import {
 export default [
   {
     isCurrentUser: true,
-    label: 'admin',
+    label: 'user',
     menu: [
       {
         icon: mdiAccount,
