@@ -39,12 +39,12 @@ const submitPass = () => {
 <template>
   <LayoutAuthenticated>
     <SectionMain>
-      <SectionTitleLineWithButton :icon="mdiAccount" title="Profile" main>
+      <SectionTitleLineWithButton :icon="mdiAccount" title="个人资料" main>
         <BaseButton
           href="https://github.com/justboil/admin-one-vue-tailwind"
           target="_blank"
           :icon="mdiGithub"
-          label="Star on GitHub"
+          label="在 GitHub 上点赞"
           color="contrast"
           rounded-full
           small
@@ -55,11 +55,11 @@ const submitPass = () => {
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <CardBox is-form @submit.prevent="submitProfile">
-          <FormField label="Avatar" help="Max 500kb">
-            <FormFilePicker label="Upload" />
+          <FormField label="头像" help="最大 500kb">
+            <FormFilePicker label="上传" />
           </FormField>
 
-          <FormField label="Name" help="Required. Your name">
+          <FormField label="姓名" help="必填项。您的姓名">
             <FormControl
               v-model="profileForm.name"
               :icon="mdiAccount"
@@ -68,7 +68,7 @@ const submitPass = () => {
               autocomplete="username"
             />
           </FormField>
-          <FormField label="E-mail" help="Required. Your e-mail">
+          <FormField label="邮箱" help="必填项。您的邮箱">
             <FormControl
               v-model="profileForm.email"
               :icon="mdiMail"
@@ -81,14 +81,14 @@ const submitPass = () => {
 
           <template #footer>
             <BaseButtons>
-              <BaseButton color="info" type="submit" label="Submit" />
-              <BaseButton color="info" label="Options" outline />
+              <BaseButton color="info" type="submit" label="提交" />
+              <BaseButton color="info" label="选项" outline />
             </BaseButtons>
           </template>
         </CardBox>
 
         <CardBox is-form @submit.prevent="submitPass">
-          <FormField label="Current password" help="Required. Your current password">
+          <FormField label="当前密码" help="必填项。您的当前密码">
             <FormControl
               v-model="passwordForm.password_current"
               :icon="mdiAsterisk"
@@ -101,7 +101,7 @@ const submitPass = () => {
 
           <BaseDivider />
 
-          <FormField label="New password" help="Required. New password">
+          <FormField label="新密码" help="必填项。新密码">
             <FormControl
               v-model="passwordForm.password"
               :icon="mdiFormTextboxPassword"
@@ -112,7 +112,7 @@ const submitPass = () => {
             />
           </FormField>
 
-          <FormField label="Confirm password" help="Required. New password one more time">
+          <FormField label="确认密码" help="必填项。再次输入新密码">
             <FormControl
               v-model="passwordForm.password_confirmation"
               :icon="mdiFormTextboxPassword"
@@ -125,8 +125,8 @@ const submitPass = () => {
 
           <template #footer>
             <BaseButtons>
-              <BaseButton type="submit" color="info" label="Submit" />
-              <BaseButton color="info" label="Options" outline />
+              <BaseButton type="submit" color="info" label="提交" />
+              <BaseButton color="info" label="选项" outline />
             </BaseButtons>
           </template>
         </CardBox>
