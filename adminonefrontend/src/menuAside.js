@@ -106,12 +106,12 @@ export default [
     label: '序列号管理',
     menu: [
       {
-        to: '/serial',
-        label: '序列号列表'
+        to: '/serials/manage',
+        label: '序列号管理'
       },
       {
-        to: '/serial/generate',
-        label: '生成序列号'
+        to: '/serials/stats',
+        label: '序列号统计'
       }
     ]
   },
