@@ -20,9 +20,20 @@ api.interceptors.request.use(config => {
 
 // 响应拦截器 - 处理错误
 api.interceptors.response.use(
-  response => response.data,
+  response => {
+    // 确保返回完整的响应数据
+    if (response.data) {
+      return {
+        success: true,
+        token: response.data.token,
+        data: response.data.user || response.data, // 确保能获取到用户数据
+        message: response.data.message
+      }
+    }
+    return response.data
+  },
   error => {
-    if (error.response.status === 401) {
+    if (error.response?.status === 401) {
       // 未授权,清除token并跳转到登录页
       localStorage.removeItem('token')
       window.location.href = '/#/login'
@@ -33,8 +44,8 @@ api.interceptors.response.use(
 
 export default {
   // 用户相关 API
-  login(username, password) {
-    return api.post('/login', { username, password })
+  login(email, password) {
+    return api.post('/login', { email, password })
   },
   
   addUser(userData) {
