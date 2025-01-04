@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from '@/views/auth/LoginView.vue'
 import DashboardView from '@/views/dashboard/DashboardView.vue'
 import ProfileView from '@/views/ProfileView.vue'
+import SerialManageView from '@/views/serial/SerialManageView.vue'
 
 const routes = [
   {
@@ -35,6 +36,22 @@ const routes = [
     name: 'servers',
     component: () => import('@/views/servers/ServerListView.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/serials/manage',
+    name: 'SerialManage',
+    component: SerialManageView,
+    meta: {
+      requiresAuth: true
+    }
+  },
+  {
+    path: '/serials/stats',
+    name: 'SerialStats',
+    component: () => import('@/views/serial/SerialStatsView.vue'),
+    meta: {
+      requiresAuth: true
+    }
   }
 ]
 
