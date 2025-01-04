@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionMain from '@/components/SectionMain.vue'
 import CardBox from '@/components/CardBox.vue'
@@ -24,8 +24,27 @@ const currentPage = ref(1)
 const itemsPerPage = 10
 const searchQuery = ref('')
 const selectedStatus = ref('all')
-const selectedType = ref('all')
+const selectedTimeType = ref('all')
+const selectedTrafficType = ref('all')
 const selectedSerials = ref([])
+
+// 修改筛选选项的定义
+const timeTypeOptions = [
+  { value: 'all', label: '全部时长' },
+  { value: 'monthly', label: '月付版(30天)' },
+  { value: 'half_year', label: '半年版(180天)' },
+  { value: 'yearly', label: '年付版(360天)' },
+  { value: 'traffic_only', label: '纯流量包' }
+]
+
+// 修改流量类型选项的计算属性
+const availableTrafficTypeOptions = computed(() => {
+  return [
+    { value: 'all', label: '全部流量' },
+    { value: 'basic', label: '基础型(5G)' },
+    { value: 'premium', label: '加强型(10G)' }
+  ]
+})
 
 // 筛选和搜索后的序列号
 const filteredSerials = computed(() => {
@@ -33,8 +52,9 @@ const filteredSerials = computed(() => {
     const matchesSearch = serial.code.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
                          serial.remarks?.toLowerCase().includes(searchQuery.value.toLowerCase())
     const matchesStatus = selectedStatus.value === 'all' || serial.status === selectedStatus.value
-    const matchesType = selectedType.value === 'all' || serial.type === selectedType.value
-    return matchesSearch && matchesStatus && matchesType
+    const matchesTimeType = selectedTimeType.value === 'all' || serial.timeType === selectedTimeType.value
+    const matchesTrafficType = selectedTrafficType.value === 'all' || serial.trafficType === selectedTrafficType.value
+    return matchesSearch && matchesStatus && matchesTimeType && matchesTrafficType
   })
 })
 
@@ -94,14 +114,71 @@ const exportSerials = async () => {
   }
 }
 
-// 生成序列号的表单数据
-const serialForm = ref({
-  type: 'standard', // standard, premium, enterprise
-  duration: 30, // 有效期(天)
-  count: 1, // 生成数量
-  prefix: '', // 前缀(可选)
-  remarks: '' // 备注(可选)
+// 修改时间类型定义
+const timeTypes = [
+  { value: 'monthly', label: '月付版', days: 30 },
+  { value: 'half_year', label: '半年版', days: 180 },
+  { value: 'yearly', label: '年付版', days: 360 },
+  { value: 'traffic_only', label: '纯流量包', days: -1 }
+]
+
+// 修改流量类型定义
+const trafficTypes = [
+  { value: 'basic', label: '基础型(5G)', traffic: 5 },
+  { value: 'premium', label: '加强型(10G)', traffic: 10 }
+]
+
+// 简化计算属性：根据时间类型筛选可用的流量类型
+const availableTrafficTypes = computed(() => {
+  if (serialForm.value.timeType === 'trial') {
+    return [{ value: 'trial', label: '试用流量(1G)', traffic: 1 }]
+  }
+  return trafficTypes
 })
+
+// 修改表单数据结构
+const serialForm = ref({
+  timeType: 'monthly',
+  trafficType: 'basic',
+  count: 1,
+  prefix: '',
+  remarks: '',
+  validDays: 30,
+})
+
+// 监听时间类型变化
+watch(() => serialForm.value.timeType, (newType) => {
+  if (newType === 'trial') {
+    serialForm.value.trafficType = 'trial'
+  } else if (serialForm.value.trafficType === 'trial') {
+    serialForm.value.trafficType = 'basic'
+  }
+})
+
+// 修改生成序列号的方法
+const generateSerials = async () => {
+  try {
+    const data = {
+      ...serialForm.value,
+      duration: timeTypes.find(t => t.value === serialForm.value.timeType)?.days || 30,
+      traffic: availableTrafficTypes.value.find(t => t.value === serialForm.value.trafficType)?.traffic || 5,
+      validDays: serialForm.value.validDays
+    }
+    await api.generateSerials(data)
+    await fetchSerials()
+    // 重置表单
+    serialForm.value = {
+      timeType: 'monthly',
+      trafficType: 'basic',
+      count: 1,
+      prefix: '',
+      remarks: '',
+      validDays: 30
+    }
+  } catch (error) {
+    console.error('生成序列号失败:', error)
+  }
+}
 
 // 获取序列号列表
 const fetchSerials = async () => {
@@ -118,24 +195,6 @@ const fetchSerials = async () => {
   } catch (error) {
     console.error('获取序列号列表失败:', error)
     serials.value = []
-  }
-}
-
-// 生成序列号
-const generateSerials = async () => {
-  try {
-    await api.generateSerials(serialForm.value)
-    await fetchSerials() // 刷新列表
-    // 重置表单
-    serialForm.value = {
-      type: 'standard',
-      duration: 30,
-      count: 1,
-      prefix: '',
-      remarks: ''
-    }
-  } catch (error) {
-    console.error('生成序列号失败:', error)
   }
 }
 
@@ -202,7 +261,7 @@ onMounted(() => {
           
           <select
             v-model="selectedStatus"
-            class="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+            class="px-4 py-2 pr-6 rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
           >
             <option value="all">全部状态</option>
             <option value="unused">未使用</option>
@@ -211,13 +270,21 @@ onMounted(() => {
           </select>
 
           <select
-            v-model="selectedType"
-            class="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+            v-model="selectedTimeType"
+            class="px-4 py-2 pr-6 rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
           >
-            <option value="all">全部类型</option>
-            <option value="standard">标准版</option>
-            <option value="premium">高级版</option>
-            <option value="enterprise">企业版</option>
+            <option v-for="type in timeTypeOptions" :key="type.value" :value="type.value">
+              {{ type.label }}
+            </option>
+          </select>
+
+          <select
+            v-model="selectedTrafficType"
+            class="px-4 py-2 pr-6 rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+          >
+            <option v-for="type in availableTrafficTypeOptions" :key="type.value" :value="type.value">
+              {{ type.label }}
+            </option>
           </select>
 
           <!-- 批量操作按钮 -->
@@ -330,23 +397,37 @@ onMounted(() => {
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div class="form-group">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">类型</label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">时间类型</label>
             <select
-              v-model="serialForm.type"
+              v-model="serialForm.timeType"
               class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             >
-              <option value="standard">标准版</option>
-              <option value="premium">高级版</option>
-              <option value="enterprise">企业版</option>
+              <option v-for="type in timeTypes" :key="type.value" :value="type.value">
+                {{ type.label }}{{ type.days > 0 ? ` (${type.days}天)` : '' }}
+              </option>
             </select>
           </div>
 
           <div class="form-group">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">有效期(天)</label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">流量类型</label>
+            <select
+              v-model="serialForm.trafficType"
+              class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              :disabled="serialForm.timeType === 'trial'"
+            >
+              <option v-for="type in availableTrafficTypes" :key="type.value" :value="type.value">
+                {{ type.label }}
+              </option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">序列号有效期(天)</label>
             <input
-              v-model="serialForm.duration"
+              v-model="serialForm.validDays"
               type="number"
               min="1"
+              max="365"
               class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             >
           </div>
@@ -379,6 +460,31 @@ onMounted(() => {
               class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             >
           </div>
+        </div>
+
+        <!-- 显示当前选择的配置信息 -->
+        <div class="mt-4 text-sm text-gray-600 dark:text-gray-400">
+          当前配置：
+          <span v-if="serialForm.timeType === 'traffic_only'">
+            {{ trafficTypes.find(t => t.value === serialForm.trafficType)?.label }}
+          </span>
+          <span v-else>
+            {{ timeTypes.find(t => t.value === serialForm.timeType)?.label }} + 
+            {{ trafficTypes.find(t => t.value === serialForm.trafficType)?.label }}
+          </span>
+          <span class="ml-2">
+            (序列号有效期: {{ serialForm.validDays }}天)
+          </span>
+        </div>
+
+        <!-- 修改流量说明 -->
+        <div class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+          <template v-if="serialForm.timeType === 'traffic_only'">
+            纯流量包不限制使用时间，仅按流量计费
+          </template>
+          <template v-else>
+            选择的套餐将在到期时自动失效，请在到期前及时续费
+          </template>
         </div>
 
         <div class="mt-6">
