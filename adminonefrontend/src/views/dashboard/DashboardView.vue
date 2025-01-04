@@ -11,7 +11,10 @@ import {
   mdiEye,
   mdiServer,
   mdiAlertCircle,
-  mdiCog
+  mdiCog,
+  mdiClockAlert,
+  mdiCurrencyUsd,
+  mdiKey
 } from '@mdi/js'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
 import api from '@/services/api'
@@ -32,6 +35,19 @@ const currentPage = ref(1)
 const itemsPerPage = 10
 const sortKey = ref('name')
 const sortOrder = ref(1)
+
+// 新增的响应式数据
+const expiringUsers = ref([])
+const expiringIn5Days = ref(0)
+const expiringIn10Days = ref(0)
+const totalIncome = ref(0)
+const directIncome = ref(0)
+const distributorIncome = ref(0)
+const unpaidIncome = ref(0)
+const totalSerials = ref(0)
+const usedSerials = ref(0)
+const unusedSerials = ref(0)
+const deletedSerials = ref(0)
 
 // 计算分页数据
 const paginatedContainers = computed(() => {
@@ -79,34 +95,71 @@ const refreshData = async () => {
       console.error('用户数据格式不符合预期:', response);
       users.value = []; // 设置为空数组避免页面报错
     }
+
+    try {
+      // 获取到期用户数据
+      const expiryData = await api.getExpiringUsers()
+      expiringUsers.value = expiryData || []
+      expiringIn5Days.value = (expiryData || []).filter(u => u.daysRemaining <= 5).length
+      expiringIn10Days.value = (expiryData || []).filter(u => u.daysRemaining <= 10).length
+
+      // 获取收入统计
+      const incomeData = await api.getIncomeStats() || {}
+      totalIncome.value = incomeData.total || 0
+      directIncome.value = incomeData.direct || 0
+      distributorIncome.value = incomeData.distributor || 0
+      unpaidIncome.value = incomeData.unpaid || 0
+
+      // 获取序列号统计
+      const serialData = await api.getSerialStats() || {}
+      totalSerials.value = serialData.total || 0
+      usedSerials.value = serialData.used || 0
+      unusedSerials.value = serialData.unused || 0
+      deletedSerials.value = serialData.deleted || 0
+    } catch (error) {
+      console.error('获取额外统计数据失败:', error);
+      // 不影响用户列表显示
+    }
+
   } catch (error) {
-    console.error('获取数据失败:', error);
+    console.error('获取用户数据失败:', error);
     users.value = []; // 出错时设置为空数组
   }
 }
 
 const viewRentalInfo = async (userId) => {
-  const rentalInfo = await api.get(`/api/user/rental_info/${userId}`)
-  console.log('租赁详情:', rentalInfo)
+  try {
+    const rentalInfo = await api.getRentalInfo(userId)
+    console.log('租赁详情:', rentalInfo)
+  } catch (error) {
+    console.error('获取租赁详情失败:', error)
+  }
 }
 
 const viewRentalHistory = async (userId) => {
-  const rentalHistory = await api.get(`/api/rental/history/${userId}`)
-  console.log('租赁历史:', rentalHistory)
+  try {
+    const rentalHistory = await api.getRentalHistory(userId)
+    console.log('租赁历史:', rentalHistory)
+  } catch (error) {
+    console.error('获取租赁历史失败:', error)
+  }
 }
 
 const downloadAcl = async (userId) => {
-  window.open(`/api/user/download_acl/${userId}`, '_blank')
-}
-
-const replaceContainer = async (containerId) => {
-  await api.post('/api/ha/replace_container', { containerId })
-  console.log('容器替换成功')
+  try {
+    await api.downloadAcl(userId)
+  } catch (error) {
+    console.error('下载ACL失败:', error)
+  }
 }
 
 const sendReminder = async (userId) => {
-  await api.post('/api/notifications/send_reminder', { userId })
-  console.log('续费通知已发送')
+  try {
+    await api.sendReminderNotification({ userId })
+    console.log('续费通知已发送')
+  } catch (error) {
+    console.error('发送续费通知失败:', error)
+  }
 }
 
 onMounted(() => {
@@ -205,6 +258,85 @@ onMounted(() => {
               <p class="text-sm text-gray-500">
                 严重: {{ alerts.filter(a => a.level === 'critical').length }}
               </p>
+            </div>
+          </div>
+        </CardBox>
+
+        <!-- 用户统计 -->
+        <CardBox>
+          <div class="flex items-center">
+            <div class="flex-shrink-0 p-4">
+              <div class="rounded-full bg-blue-500 p-3">
+                <BaseIcon :path="mdiAccountMultiple" class="text-white" />
+              </div>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-600">用户统计</p>
+              <p class="text-lg font-semibold">{{ users.length }} 个</p>
+              <div class="text-sm text-gray-500">
+                <span>{{ users.filter(u => u.role === 'user').length }} 用户</span> /
+                <span>{{ users.filter(u => u.role === 'admin').length }} 管理</span> /
+                <span>{{ users.filter(u => u.role === 'distributor').length }} 分销</span>
+              </div>
+            </div>
+          </div>
+        </CardBox>
+
+        <!-- 租约到期 -->
+        <CardBox>
+          <div class="flex items-center">
+            <div class="flex-shrink-0 p-4">
+              <div class="rounded-full bg-yellow-500 p-3">
+                <BaseIcon :path="mdiClockAlert" class="text-white" />
+              </div>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-600">租约到期</p>
+              <p class="text-lg font-semibold">{{ expiringUsers.length }} 个</p>
+              <div class="text-sm text-gray-500">
+                <span>{{ expiringIn5Days }} 剩余5日内</span> /
+                <span>{{ expiringIn10Days }} 剩余10日内</span>
+              </div>
+            </div>
+          </div>
+        </CardBox>
+
+        <!-- 收入统计 -->
+        <CardBox>
+          <div class="flex items-center">
+            <div class="flex-shrink-0 p-4">
+              <div class="rounded-full bg-green-500 p-3">
+                <BaseIcon :path="mdiCurrencyUsd" class="text-white" />
+              </div>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-600">收入统计</p>
+              <p class="text-lg font-semibold">¥ {{ totalIncome }}</p>
+              <div class="text-sm text-gray-500">
+                <span>{{ directIncome }} 直营</span> /
+                <span>{{ distributorIncome }} 分销</span> /
+                <span>{{ unpaidIncome }} 未结</span>
+              </div>
+            </div>
+          </div>
+        </CardBox>
+
+        <!-- 序列号统计 -->
+        <CardBox>
+          <div class="flex items-center">
+            <div class="flex-shrink-0 p-4">
+              <div class="rounded-full bg-purple-500 p-3">
+                <BaseIcon :path="mdiKey" class="text-white" />
+              </div>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-600">序列号统计</p>
+              <p class="text-lg font-semibold">{{ totalSerials }} 个</p>
+              <div class="text-sm text-gray-500">
+                <span>{{ usedSerials }} 已用</span> /
+                <span>{{ unusedSerials }} 未用</span> /
+                <span>{{ deletedSerials }} 已删</span>
+              </div>
             </div>
           </div>
         </CardBox>
