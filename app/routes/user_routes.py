@@ -134,7 +134,6 @@ def add_user():
         return jsonify({"success": False, "message": "Internal server error"}), 500
 
 
-# 用户登录
 @user_bp.route('/api/login', methods=['POST'])
 def login():
     data = request.json
@@ -148,16 +147,44 @@ def login():
     email = data.get('email')
     password = data.get('password')
 
+    # 查找用户
     user = User.query.filter_by(email=email).first()
     if not user or not check_password(password, user.password):
         log_operation(None, "login", "failed", f"Invalid credentials for email: {email}")
         return jsonify({"success": False, "message": "Invalid credentials"}), 401
 
+    # 生成 JWT 和 Refresh Token
     token = generate_jwt({"user_id": user.id})
     refresh_token = generate_refresh_token({"user_id": user.id})
+
+    # 日志记录
     log_operation(user.id, "login", "success", f"Login successful for email: {email}")
     
-    return jsonify({"success": True, "message": "Login successful", "token": token, "refresh_token": refresh_token}), 200
+    # 构造用户信息返回
+    user_data = {
+        'id': user.id,
+        'username': user.username,
+        'email': user.email,
+        'role': user.role,
+        'rental_expiry': user.rental_expiry if user.rental_expiry is None else user.rental_expiry.strftime('%Y-%m-%d %H:%M:%S'),
+        'created_at': user.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+        'updated_at': user.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
+        'is_banned': user.is_banned,  # 0 或 1
+        'banned_reason': user.banned_reason if user.banned_reason else None,
+        'last_login': user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else None,
+        'is_verified': user.is_verified,  # 0 或 1
+        'verification_token': user.verification_token if user.verification_token else None,
+        'password_encrypted': user.password_encrypted  # 0 或 1
+    }
+    
+    return jsonify({
+        "success": True,
+        "message": "Login successful",
+        "token": token,
+        "refresh_token": refresh_token,
+        "user": user_data
+    }), 200
+
 
 # 发送邮箱验证码
 @user_bp.route('/api/send_verification_email', methods=['POST'])
