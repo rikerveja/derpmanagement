@@ -21,20 +21,20 @@ api.interceptors.request.use(config => {
 // 响应拦截器 - 处理错误
 api.interceptors.response.use(
   response => {
-    // 确保返回完整的响应数据
-    if (response.data) {
+    // 登录接口特殊处理
+    if (response.config.url === '/login') {
       return {
         success: true,
         token: response.data.token,
-        data: response.data.user || response.data, // 确保能获取到用户数据
+        data: response.data.user || response.data,
         message: response.data.message
       }
     }
+    // 其他接口直接返回数据
     return response.data
   },
   error => {
     if (error.response?.status === 401) {
-      // 未授权,清除token并跳转到登录页
       localStorage.removeItem('token')
       window.location.href = '/#/login'
     }
@@ -74,7 +74,10 @@ export default {
 
   // 新增的获取所有用户的方法
   getAllUsers() {
-    return api.get('/users')
+    return api.get('/users').then(response => {
+      console.log('API Response:', response) // 添加日志
+      return response
+    })
   },
 
   // 服务器相关 API
