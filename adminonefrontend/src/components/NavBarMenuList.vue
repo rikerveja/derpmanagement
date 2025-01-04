@@ -17,8 +17,8 @@ const menuClick = (event, item) => {
 </script>
 
 <template>
-  <ul>
-    <li v-for="(item, index) in menu" :key="index">
+  <ul class="flex items-center">
+    <li v-for="(item, index) in menu" :key="index" class="flex items-center">
       <NavBarItem :item="item" @menu-click="menuClick" />
     </li>
   </ul>
