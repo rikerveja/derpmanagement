@@ -158,30 +158,11 @@
   const handleSubmit = async () => {
     if (isLogin.value) {
       try {
-        const response = await fetch('/api/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            email: formData.value.email,
-            password: formData.value.password
-          })
-        })
-  
-        const data = await response.json()
-        
-        if (data.success) {
-          localStorage.setItem('token', data.token)
-          authStore.user = { 
-            email: formData.value.email,
-            username: data.username
-          }
-          localStorage.setItem('user', JSON.stringify(authStore.user))
-          authStore.token = data.token
+        const response = await authStore.login(formData.value.email, formData.value.password)
+        if (response.success) {
           router.push('/dashboard')
         } else {
-          throw new Error(data.message || '登录失败')
+          throw new Error(response.message || '登录失败')
         }
       } catch (error) {
         console.error(error)
