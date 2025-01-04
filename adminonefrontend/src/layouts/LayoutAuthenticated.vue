@@ -83,9 +83,6 @@ const menuClick = (event, item) => {
       <FooterBar>
         <!-- 移除 Premium version 链接 -->
       </FooterBar>
-      <div class="user-info">
-        <span class="username">{{ userEmail }}</span>
-      </div>
     </div>
   </div>
 </template>
@@ -93,10 +90,5 @@ const menuClick = (event, item) => {
 <script>
 export default {
   name: 'LayoutAuthenticated',
-  data() {
-    return {
-      userEmail: localStorage.getItem('userEmail') || '未登录'
-    }
-  }
 }
 </script>
