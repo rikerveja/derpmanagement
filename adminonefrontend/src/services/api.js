@@ -42,6 +42,23 @@ api.interceptors.response.use(
   }
 )
 
+// 序列号相关 API
+const getSerials = () => {
+  return api.get('/serials')
+}
+
+const generateSerials = (data) => {
+  return api.post('/serials/generate', data)
+}
+
+const deleteSerial = (id) => {
+  return api.delete(`/serials/${id}`)
+}
+
+const batchDeleteSerials = (ids) => {
+  return api.post('/serials/batch-delete', { ids })
+}
+
 export default {
   // 用户相关 API
   login(email, password) {
@@ -308,5 +325,11 @@ export default {
   },
   markNotificationAsRead(notificationId) {
     return api.put(`/notifications/${notificationId}/read`)
-  }
+  },
+
+  // 序列号相关 API
+  getSerials,
+  generateSerials,
+  deleteSerial,
+  batchDeleteSerials
 } 
