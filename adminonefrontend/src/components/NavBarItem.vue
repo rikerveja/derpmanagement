@@ -46,7 +46,7 @@ const componentClass = computed(() => {
 })
 
 const itemLabel = computed(() =>
-  props.item.isCurrentUser ? authStore.user?.email : props.item.label
+  props.item.isCurrentUser ? authStore.user?.username : props.item.label
 )
 
 const isDropdownActive = ref(false)
@@ -132,7 +132,7 @@ onBeforeUnmount(() => {
         <li v-for="(menuItem, index) in item.menu" :key="index">
           <a
             href="#"
-            class="flex items-center py-2 px-4 hover:bg-gray-100 dark:hover:bg-slate-700"
+            class="flex items-center py-2 px-4 hover:bg-gray-100 dark:hover:bg-slate-700 w-full"
             @click.prevent="menuClickDropdown($event, menuItem)"
           >
             <BaseIcon
