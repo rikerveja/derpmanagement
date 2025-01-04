@@ -1,95 +1,149 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { mdiChevronUp, mdiChevronDown } from '@mdi/js'
 import { RouterLink } from 'vue-router'
-import { mdiMinus, mdiPlus } from '@mdi/js'
-import { getButtonColor } from '@/colors.js'
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 import BaseIcon from '@/components/BaseIcon.vue'
-import AsideMenuList from '@/components/AsideMenuList.vue'
+import UserAvatarCurrentUser from '@/components/UserAvatarCurrentUser.vue'
+import NavBarMenuList from '@/components/NavBarMenuList.vue'
+import BaseDivider from '@/components/BaseDivider.vue'
 
 const props = defineProps({
   item: {
     type: Object,
     required: true
-  },
-  isDropdownList: Boolean
+  }
 })
 
 const emit = defineEmits(['menu-click'])
+const authStore = useAuthStore()
 
-const hasColor = computed(() => props.item && props.item.color)
+const is = computed(() => {
+  if (props.item.href) {
+    return 'a'
+  }
 
-const asideMenuItemActiveStyle = computed(() =>
-  hasColor.value ? '' : 'aside-menu-item-active font-bold'
+  if (props.item.to) {
+    return RouterLink
+  }
+
+  return 'div'
+})
+
+const componentClass = computed(() => {
+  const base = [
+    isDropdownActive.value
+      ? `navbar-item-label-active dark:text-slate-400`
+      : `navbar-item-label dark:text-white dark:hover:text-slate-400`,
+    props.item.menu ? 'lg:py-2 lg:px-3' : 'py-2 px-3'
+  ]
+
+  if (props.item.isDesktopNoLabel) {
+    base.push('lg:w-16', 'lg:justify-center')
+  }
+
+  return base
+})
+
+const itemLabel = computed(() =>
+  props.item.isCurrentUser ? authStore.user?.email : props.item.label
 )
 
 const isDropdownActive = ref(false)
 
-const componentClass = computed(() => [
-  props.isDropdownList ? 'py-3 px-6 text-sm' : 'py-3',
-  hasColor.value
-    ? getButtonColor(props.item.color, false, true)
-    : `aside-menu-item dark:text-slate-300 dark:hover:text-white`
-])
-
-const hasDropdown = computed(() => !!props.item.menu)
-
 const menuClick = (event) => {
   event.preventDefault()
   
-  if (hasDropdown.value) {
+  // 如果有子菜单，只切换下拉状态
+  if (props.item.menu) {
     isDropdownActive.value = !isDropdownActive.value
+  } else {
+    // 没有子菜单时才触发点击事件
+    emit('menu-click', event, props.item)
   }
-
-  emit('menu-click', event, props.item)
 }
 
-const handleSubmenuClick = (event, item) => {
+const menuClickDropdown = (event, item) => {
+  // 点击子菜单项时关闭下拉并触发事件
+  isDropdownActive.value = false
   emit('menu-click', event, item)
 }
+
+const root = ref(null)
+
+const forceClose = (event) => {
+  if (root.value && !root.value.contains(event.target)) {
+    isDropdownActive.value = false
+  }
+}
+
+onMounted(() => {
+  if (props.item.menu) {
+    window.addEventListener('click', forceClose)
+  }
+})
+
+onBeforeUnmount(() => {
+  if (props.item.menu) {
+    window.removeEventListener('click', forceClose)
+  }
+})
 </script>
 
 <template>
-  <li>
-    <component
-      :is="item.to ? RouterLink : 'a'"
-      v-slot="vSlot"
-      :to="item.to ?? null"
-      :href="item.href ?? null"
-      :target="item.target ?? null"
-      class="flex cursor-pointer"
-      :class="componentClass"
-      @click="menuClick"
+  <BaseDivider v-if="item.isDivider" nav-bar />
+  <component
+    :is="is"
+    v-else
+    ref="root"
+    class="block lg:flex items-center relative cursor-pointer"
+    :class="componentClass"
+    :to="item.to ?? null"
+    :href="item.href ?? null"
+    :target="item.target ?? null"
+    @click="menuClick"
+  >
+    <div
+      class="flex items-center"
+      :class="{
+        'bg-gray-100 dark:bg-slate-800 lg:bg-transparent lg:dark:bg-transparent p-3 lg:p-0':
+          item.menu
+      }"
     >
-      <BaseIcon
-        v-if="item.icon"
-        :path="item.icon"
-        class="flex-none"
-        :class="[vSlot && vSlot.isExactActive ? asideMenuItemActiveStyle : '']"
-        w="w-16"
-        :size="18"
-      />
+      <UserAvatarCurrentUser v-if="item.isCurrentUser" class="w-6 h-6 mr-3 inline-flex" />
+      <BaseIcon v-if="item.icon" :path="item.icon" class="transition-colors" />
       <span
-        class="grow text-ellipsis line-clamp-1"
-        :class="[
-          { 'pr-12': !hasDropdown },
-          vSlot && vSlot.isExactActive ? asideMenuItemActiveStyle : ''
-        ]"
-        >{{ item.label }}</span
+        class="px-2 transition-colors text-sm font-medium text-gray-700 dark:text-gray-300"
+        :class="{ 'lg:hidden': item.isDesktopNoLabel && item.icon }"
+        >{{ itemLabel }}</span
       >
       <BaseIcon
-        v-if="hasDropdown"
-        :path="isDropdownActive ? mdiMinus : mdiPlus"
-        class="flex-none"
-        :class="[vSlot && vSlot.isExactActive ? asideMenuItemActiveStyle : '']"
-        w="w-12"
+        v-if="item.menu"
+        :path="isDropdownActive ? mdiChevronUp : mdiChevronDown"
+        class="hidden lg:inline-flex transition-colors"
       />
-    </component>
-    <AsideMenuList
-      v-if="hasDropdown"
-      :menu="item.menu"
-      :class="['aside-menu-dropdown', isDropdownActive ? 'block dark:bg-slate-800/50' : 'hidden']"
-      is-dropdown-list
-      @menu-click="handleSubmenuClick"
-    />
-  </li>
+    </div>
+    <div
+      v-if="item.menu"
+      class="text-sm border-b border-gray-100 lg:border lg:bg-white lg:absolute lg:top-full lg:left-0 lg:min-w-full lg:z-20 lg:rounded-lg lg:shadow-lg lg:dark:bg-slate-800 dark:border-slate-700"
+      :class="{ 'lg:hidden': !isDropdownActive }"
+    >
+      <ul class="flex flex-col">
+        <li v-for="(menuItem, index) in item.menu" :key="index">
+          <a
+            href="#"
+            class="flex items-center py-2 px-4 hover:bg-gray-100 dark:hover:bg-slate-700"
+            @click.prevent="menuClickDropdown($event, menuItem)"
+          >
+            <BaseIcon
+              v-if="menuItem.icon"
+              :path="menuItem.icon"
+              class="w-4 h-4 mr-2"
+            />
+            <span>{{ menuItem.label }}</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </component>
 </template>
