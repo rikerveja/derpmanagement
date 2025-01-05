@@ -48,7 +48,7 @@ const getSerials = () => {
 }
 
 const generateSerials = (data) => {
-  return api.post('/serials/generate', data)
+  return api.post('/serial/generate', data)
 }
 
 const deleteSerial = (id) => {
