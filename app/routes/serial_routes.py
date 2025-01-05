@@ -1,8 +1,8 @@
+from flask import Blueprint, jsonify, request  # 添加 Blueprint 导入
 from datetime import datetime, timedelta
 import random
 import string
 import logging
-from flask import request, jsonify
 from app.models import SerialNumber
 from app import db
 import redis
