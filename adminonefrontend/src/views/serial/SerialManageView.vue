@@ -33,8 +33,7 @@ const timeTypeOptions = [
   { value: 'all', label: '全部时长' },
   { value: 'monthly', label: '月付版(30天)' },
   { value: 'half_year', label: '半年版(180天)' },
-  { value: 'yearly', label: '年付版(360天)' },
-  { value: 'traffic_only', label: '纯流量包' }
+  { value: 'yearly', label: '年付版(360天)' }
 ]
 
 // 修改流量类型选项的计算属性
@@ -118,8 +117,7 @@ const exportSerials = async () => {
 const timeTypes = [
   { value: 'monthly', label: '月付版', days: 30 },
   { value: 'half_year', label: '半年版', days: 180 },
-  { value: 'yearly', label: '年付版', days: 360 },
-  { value: 'traffic_only', label: '纯流量包', days: -1 }
+  { value: 'yearly', label: '年付版', days: 360 }
 ]
 
 // 修改流量类型定义
@@ -490,10 +488,7 @@ onMounted(() => {
         <!-- 显示当前选择的配置信息 -->
         <div class="mt-4 text-sm text-gray-600 dark:text-gray-400">
           当前配置：
-          <span v-if="serialForm.timeType === 'traffic_only'">
-            {{ trafficTypes.find(t => t.value === serialForm.trafficType)?.label }}
-          </span>
-          <span v-else>
+          <span>
             {{ timeTypes.find(t => t.value === serialForm.timeType)?.label }} + 
             {{ trafficTypes.find(t => t.value === serialForm.trafficType)?.label }}
           </span>
@@ -507,12 +502,7 @@ onMounted(() => {
 
         <!-- 修改流量说明 -->
         <div class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          <template v-if="serialForm.timeType === 'traffic_only'">
-            纯流量包不限制使用时间，仅按流量计费
-          </template>
-          <template v-else>
-            选择的套餐将在到期时自动失效，请在到期前及时续费
-          </template>
+          选择的套餐将在到期时自动失效，请在到期前及时续费
         </div>
 
         <div class="mt-6">
