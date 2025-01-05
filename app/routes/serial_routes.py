@@ -1,10 +1,10 @@
-from flask import Blueprint, jsonify, request
-from app.models import SerialNumber
-from app import db
+from datetime import datetime, timedelta
 import random
 import string
-from datetime import datetime, timedelta
 import logging
+from flask import request, jsonify
+from app.models import SerialNumber
+from app import db
 import redis
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -49,7 +49,7 @@ def check_serial(serial_code):
             "success": True,
             "serial_code": serial_number.code,
             "status": serial_number.status,
-            "duration_days": serial_number.duration_days,
+            "duration_days": serial_number.valid_days,
             "created_at": serial_number.created_at.isoformat(),
             "expires_at": serial_number.expires_at.isoformat() if serial_number.expires_at else None,
             "expired": expired
@@ -67,28 +67,46 @@ def generate_serial():
     """
     data = request.json
     count = data.get('count', 1)
-    duration_days = data.get('duration_days', 30)
-    serial_length = data.get('serial_length', 12)  # 序列号长度参数，默认12位
+    valid_days = data.get('valid_days', 30)
+    prefix = data.get('prefix', '')  # 序列号的前半部分
+
+    # 序列号后半部分长度
+    serial_length = 6
 
     # 参数验证
-    if count <= 0 or duration_days <= 0 or serial_length <= 0:
+    if count <= 0 or valid_days <= 0 or serial_length <= 0:
         return jsonify({"success": False, "message": "Invalid parameters"}), 400
 
     serial_numbers = []
+    activated_at = datetime.utcnow()  # 获取当前时间，作为 activated_at
+    start_date = activated_at  # 激活时间作为起始时间
+    end_date = start_date + timedelta(days=valid_days)  # 过期时间 = 激活时间 + 有效天数
+
     try:
         for _ in range(count):
             # 确保序列号唯一性
             while True:
-                code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=serial_length))
+                # 拼接前半部分和后半部分（6位随机字符）
+                suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=serial_length))
+                code = prefix + suffix  # 完整序列号
+
+                # 检查序列号是否唯一
                 existing_serial = SerialNumber.query.filter_by(code=code).first()
                 if not existing_serial:  # 如果序列号不重复，跳出循环
                     break
 
-            # 设置序列号的默认状态为 "unused"
-            expires_at = datetime.utcnow() + timedelta(days=duration_days)
-            serial_number = SerialNumber(code=code, duration_days=duration_days, status='unused', expires_at=expires_at)
+            # 创建新的序列号对象并加入数据库
+            serial_number = SerialNumber(
+                code=code,
+                status='unused',  # 默认状态为 "unused"
+                valid_days=valid_days,
+                start_date=start_date,
+                end_date=end_date,
+                activated_at=activated_at,
+                expires_at=end_date
+            )
             db.session.add(serial_number)
-            serial_numbers.append(code)
+            serial_numbers.append(code)  # 将生成的序列号加入返回的列表
 
         # 提交事务
         db.session.commit()
