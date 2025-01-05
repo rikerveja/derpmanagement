@@ -48,12 +48,13 @@ const availableTrafficTypeOptions = computed(() => {
 // 筛选和搜索后的序列号
 const filteredSerials = computed(() => {
   return serials.value.filter(serial => {
-    const matchesSearch = serial.serial_code.toLowerCase().includes(searchQuery.value.toLowerCase())
+    const matchesSearch = (serial.serial_code || '').toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+                         (serial.remarks || '').toLowerCase().includes(searchQuery.value.toLowerCase())
     const matchesStatus = selectedStatus.value === 'all' || serial.status === selectedStatus.value
     // 从序列号代码中提取时间和流量类型
-    const timeType = serial.serial_code.includes('030D') ? 'monthly' : 
-                     serial.serial_code.includes('180D') ? 'half_year' : 'yearly'
-    const trafficType = serial.serial_code.includes('05G') ? 'basic' : 'premium'
+    const timeType = (serial.serial_code || '').includes('030D') ? 'monthly' : 
+                     (serial.serial_code || '').includes('180D') ? 'half_year' : 'yearly'
+    const trafficType = (serial.serial_code || '').includes('05G') ? 'basic' : 'premium'
     const matchesTimeType = selectedTimeType.value === 'all' || timeType === selectedTimeType.value
     const matchesTrafficType = selectedTrafficType.value === 'all' || trafficType === selectedTrafficType.value
     return matchesSearch && matchesStatus && matchesTimeType && matchesTrafficType
@@ -164,15 +165,19 @@ const generateSerials = async () => {
     
     // 构造请求数据
     const requestData = {
-      count: serialForm.value.count,
-      valid_days: serialForm.value.validDays,
-      prefix: prefix
+      "count": parseInt(serialForm.value.count),
+      "valid_days": parseInt(serialForm.value.validDays),
+      "prefix": prefix
     }
 
     const response = await api.generateSerials(requestData)
-    alert('序列号生成成功!')
+    if (response.success && response.serial_numbers) {
+      alert('序列号生成成功!')
+      await fetchSerials()
+    } else {
+      throw new Error('生成序列号失败')
+    }
     
-    await fetchSerials()
     // 重置表单
     serialForm.value = {
       timeType: 'monthly',
@@ -207,10 +212,10 @@ const fetchSerials = async () => {
 }
 
 // 删除序列号
-const deleteSerial = async (serialId) => {
+const deleteSerial = async (serialCode) => {
   try {
     if (!confirm('确定要删除这个序列号吗？')) return
-    await api.deleteSerial(serialId)
+    await api.deleteSerial(serialCode)
     await fetchSerials()
   } catch (error) {
     console.error('删除序列号失败:', error)
@@ -357,7 +362,7 @@ onMounted(() => {
                     :icon="mdiDelete"
                     color="danger"
                     small
-                    @click="deleteSerial(serial.id)"
+                    @click="deleteSerial(serial.serial_code)"
                     title="删除"
                   />
                 </td>
