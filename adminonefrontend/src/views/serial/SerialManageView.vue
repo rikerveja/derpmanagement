@@ -156,13 +156,19 @@ watch(() => serialForm.value.timeType, (newType) => {
 // 修改生成序列号的方法
 const generateSerials = async () => {
   try {
-    const data = {
-      ...serialForm.value,
-      duration: timeTypes.find(t => t.value === serialForm.value.timeType)?.days || 30,
-      traffic: availableTrafficTypes.value.find(t => t.value === serialForm.value.trafficType)?.traffic || 5,
-      validDays: serialForm.value.validDays,
+    // 构造前缀
+    const prefix = `${serialForm.value.prefix || ''}${serialForm.value.timeType === 'monthly' ? '030D' : serialForm.value.timeType === 'half_year' ? '180D' : '360D'}${serialForm.value.trafficType === 'basic' ? '05G' : '10G'}`
+    
+    // 构造请求数据
+    const requestData = {
+      count: serialForm.value.count,
+      valid_days: serialForm.value.validDays,
+      prefix: prefix
     }
-    await api.generateSerials(data)
+
+    const response = await api.generateSerials(requestData)
+    alert('序列号生成成功!')
+    
     await fetchSerials()
     // 重置表单
     serialForm.value = {
@@ -175,6 +181,7 @@ const generateSerials = async () => {
     }
   } catch (error) {
     console.error('生成序列号失败:', error)
+    alert('生成序列号失败: ' + error.message)
   }
 }
 
