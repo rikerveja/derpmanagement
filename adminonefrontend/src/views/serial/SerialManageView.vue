@@ -134,15 +134,6 @@ const availableTrafficTypes = computed(() => {
   return trafficTypes
 })
 
-// 添加付款方式选项
-const paymentTypes = [
-  { value: 'idle', label: '闲鱼' },
-  { value: 'alipay', label: '支付宝' },
-  { value: 'wechat', label: '微信' },
-  { value: 'bank', label: '网银转账' },
-  { value: 'other', label: '其它' }
-]
-
 // 修改表单数据结构
 const serialForm = ref({
   timeType: 'monthly',
@@ -151,7 +142,6 @@ const serialForm = ref({
   prefix: '',
   remarks: '',
   validDays: 30,
-  paymentType: '',
 })
 
 // 监听时间类型变化
@@ -171,7 +161,6 @@ const generateSerials = async () => {
       duration: timeTypes.find(t => t.value === serialForm.value.timeType)?.days || 30,
       traffic: availableTrafficTypes.value.find(t => t.value === serialForm.value.trafficType)?.traffic || 5,
       validDays: serialForm.value.validDays,
-      paymentType: serialForm.value.paymentType
     }
     await api.generateSerials(data)
     await fetchSerials()
@@ -183,7 +172,6 @@ const generateSerials = async () => {
       prefix: '',
       remarks: '',
       validDays: 30,
-      paymentType: ''
     }
   } catch (error) {
     console.error('生成序列号失败:', error)
@@ -462,19 +450,6 @@ onMounted(() => {
             >
           </div>
 
-          <div class="form-group">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">付款方式</label>
-            <select
-              v-model="serialForm.paymentType"
-              class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            >
-              <option value="">请选择付款方式</option>
-              <option v-for="type in paymentTypes" :key="type.value" :value="type.value">
-                {{ type.label }}
-              </option>
-            </select>
-          </div>
-
           <div class="form-group md:col-span-2">
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">备注(可选)</label>
             <input
@@ -494,9 +469,6 @@ onMounted(() => {
           </span>
           <span class="ml-2">
             (序列号有效期: {{ serialForm.validDays }}天)
-          </span>
-          <span v-if="serialForm.paymentType" class="ml-2">
-            - 付款方式: {{ paymentTypes.find(t => t.value === serialForm.paymentType)?.label }}
           </span>
         </div>
 
