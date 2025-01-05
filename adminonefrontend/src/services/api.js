@@ -48,15 +48,27 @@ const getSerials = () => {
 }
 
 const generateSerials = (data) => {
-  return api.post('/serial/generate', data)
+  return api.post('/serial/generate', {
+    "count": data.count,
+    "valid_days": parseInt(data.valid_days),
+    "prefix": data.prefix
+  })
 }
 
-const deleteSerial = (id) => {
-  return api.delete(`/serials/${id}`)
+const deleteSerial = (code) => {
+  return api.delete('/serial/delete', {
+    data: {
+      "serial_code": code
+    }
+  })
 }
 
-const batchDeleteSerials = (ids) => {
-  return api.post('/serials/batch-delete', { ids })
+const batchDeleteSerials = (codes) => {
+  return api.delete('/serial/delete', {
+    data: {
+      "serial_codes": codes
+    }
+  })
 }
 
 export default {
