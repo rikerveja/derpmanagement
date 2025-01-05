@@ -157,13 +157,21 @@ def update_serial_number(id):
 
 
 # 删除序列号
-@serial_bp.route('/api/serial/delete/<int:id>', methods=['DELETE'])
-def delete_serial_number(id):
+@serial_bp.route('/api/serial/delete', methods=['DELETE'])
+def delete_serial_number():
     """
     删除指定序列号
-    :param id: 序列号 ID
+    :param serial_code: 序列号的代码
     """
-    serial = SerialNumber.query.get(id)
+    data = request.json
+    serial_code = data.get('serial_code')
+
+    if not serial_code:
+        return jsonify({"success": False, "message": "Serial code is required"}), 400
+
+    # 查找序列号
+    serial = SerialNumber.query.filter_by(code=serial_code).first()
+
     if not serial:
         return jsonify({"success": False, "message": "Serial number not found"}), 404
 
