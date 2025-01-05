@@ -168,34 +168,38 @@ def update_serial_number(id):
         return jsonify({"success": False, "message": f"Error updating serial number: {str(e)}"}), 500
 
 
-# 删除序列号
+# 删除序列号（支持批量删除）
 @serial_bp.route('/api/serial/delete', methods=['DELETE'])
-def delete_serial_number():
+def delete_serial_numbers():
     """
-    删除指定序列号
-    :param serial_code: 序列号的代码
+    删除指定多个序列号
+    :param serial_codes: 序列号的代码列表
     """
     data = request.json
-    serial_code = data.get('serial_code')
+    serial_codes = data.get('serial_codes')
 
-    if not serial_code:
-        return jsonify({"success": False, "message": "Serial code is required"}), 400
-
-    # 查找序列号
-    serial = SerialNumber.query.filter_by(code=serial_code).first()
-
-    if not serial:
-        return jsonify({"success": False, "message": "Serial number not found"}), 404
+    if not serial_codes:
+        return jsonify({"success": False, "message": "Serial codes are required"}), 400
 
     try:
-        db.session.delete(serial)
+        # 查找所有序列号
+        serials_to_delete = SerialNumber.query.filter(SerialNumber.code.in_(serial_codes)).all()
+
+        # 如果没有找到任何序列号
+        if not serials_to_delete:
+            return jsonify({"success": False, "message": "No serial numbers found"}), 404
+
+        # 删除找到的所有序列号
+        for serial in serials_to_delete:
+            db.session.delete(serial)
+        
         db.session.commit()
-        return jsonify({"success": True, "message": "Serial number deleted successfully"}), 200
+        return jsonify({"success": True, "message": f"{len(serials_to_delete)} serial numbers deleted successfully"}), 200
+
     except Exception as e:
         db.session.rollback()
-        logging.error(f"Error deleting serial number: {e}")
-        return jsonify({"success": False, "message": f"Error deleting serial number: {str(e)}"}), 500
-
+        logging.error(f"Error deleting serial numbers: {e}")
+        return jsonify({"success": False, "message": f"Error deleting serial numbers: {str(e)}"}), 500
 
 
 # 显示所有序列号列表
