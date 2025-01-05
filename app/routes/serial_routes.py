@@ -49,7 +49,7 @@ def check_serial(serial_code):
             "success": True,
             "serial_code": serial_number.code,
             "status": serial_number.status,
-            "duration_days": serial_number.duration_days,
+            "valid_days": serial_number.valid_days,
             "created_at": serial_number.created_at.isoformat(),
             "expires_at": serial_number.expires_at.isoformat() if serial_number.expires_at else None,
             "expired": expired
@@ -67,11 +67,11 @@ def generate_serial():
     """
     data = request.json
     count = data.get('count', 1)
-    duration_days = data.get('duration_days', 30)
+    valid_days = data.get('valid_days', 30)
     serial_length = data.get('serial_length', 12)  # 序列号长度参数，默认12位
 
     # 参数验证
-    if count <= 0 or duration_days <= 0 or serial_length <= 0:
+    if count <= 0 or valid_days <= 0 or serial_length <= 0:
         return jsonify({"success": False, "message": "Invalid parameters"}), 400
 
     serial_numbers = []
@@ -85,8 +85,8 @@ def generate_serial():
                     break
 
             # 设置序列号的默认状态为 "unused"
-            expires_at = datetime.utcnow() + timedelta(days=duration_days)
-            serial_number = SerialNumber(code=code, duration_days=duration_days, status='unused', expires_at=expires_at)
+            expires_at = datetime.utcnow() + timedelta(days=valid_days)
+            serial_number = SerialNumber(code=code, valid_days=valid_days, status='unused', expires_at=expires_at)
             db.session.add(serial_number)
             serial_numbers.append(code)
 
