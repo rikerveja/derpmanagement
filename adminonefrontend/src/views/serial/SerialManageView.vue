@@ -48,11 +48,14 @@ const availableTrafficTypeOptions = computed(() => {
 // 筛选和搜索后的序列号
 const filteredSerials = computed(() => {
   return serials.value.filter(serial => {
-    const matchesSearch = serial.code.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-                         serial.remarks?.toLowerCase().includes(searchQuery.value.toLowerCase())
+    const matchesSearch = serial.serial_code.toLowerCase().includes(searchQuery.value.toLowerCase())
     const matchesStatus = selectedStatus.value === 'all' || serial.status === selectedStatus.value
-    const matchesTimeType = selectedTimeType.value === 'all' || serial.timeType === selectedTimeType.value
-    const matchesTrafficType = selectedTrafficType.value === 'all' || serial.trafficType === selectedTrafficType.value
+    // 从序列号代码中提取时间和流量类型
+    const timeType = serial.serial_code.includes('030D') ? 'monthly' : 
+                     serial.serial_code.includes('180D') ? 'half_year' : 'yearly'
+    const trafficType = serial.serial_code.includes('05G') ? 'basic' : 'premium'
+    const matchesTimeType = selectedTimeType.value === 'all' || timeType === selectedTimeType.value
+    const matchesTrafficType = selectedTrafficType.value === 'all' || trafficType === selectedTrafficType.value
     return matchesSearch && matchesStatus && matchesTimeType && matchesTrafficType
   })
 })
@@ -78,6 +81,7 @@ const handleBatchDelete = async () => {
       selectedSerials.value = []
     } catch (error) {
       console.error('批量删除失败:', error)
+      alert('批量删除失败: ' + error.message)
     }
   }
 }
@@ -91,14 +95,13 @@ const exportSerials = async () => {
 
     // 构造CSV数据
     const csvContent = [
-      ['序列号', '类型', '有效期(天)', '创建时间', '状态', '备注'].join(','),
+      ['序列号代码', '创建时间', '过期时间', '有效期(天)', '状态'].join(','),
       ...data.map(serial => [
-        serial.code,
-        serial.type,
-        serial.duration,
-        serial.created_at,
-        serial.status,
-        serial.remarks || ''
+        serial.serial_code,
+        new Date(serial.created_at).toLocaleString(),
+        new Date(serial.expires_at).toLocaleString(),
+        serial.valid_days,
+        serial.expired ? '已过期' : (serial.status === 'unused' ? '未使用' : '已使用')
       ].join(','))
     ].join('\n')
 
@@ -191,8 +194,8 @@ const fetchSerials = async () => {
     console.log('开始获取序列号列表')
     const response = await api.getSerials()
     console.log('获取到的数据:', response)
-    if (response && response.data) {
-      serials.value = response.data
+    if (response && response.serial_numbers) {
+      serials.value = response.serial_numbers
     } else {
       console.error('返回数据格式不正确:', response)
       serials.value = []
@@ -206,10 +209,12 @@ const fetchSerials = async () => {
 // 删除序列号
 const deleteSerial = async (serialId) => {
   try {
+    if (!confirm('确定要删除这个序列号吗？')) return
     await api.deleteSerial(serialId)
     await fetchSerials()
   } catch (error) {
     console.error('删除序列号失败:', error)
+    alert('删除序列号失败: ' + error.message)
   }
 }
 
@@ -306,53 +311,46 @@ onMounted(() => {
           <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead class="bg-gray-50 dark:bg-gray-800">
               <tr>
-                <th class="px-4 py-3 text-left">
-                  <input
-                    type="checkbox"
-                    :checked="selectedSerials.length === paginatedSerials.length"
-                    @change="e => {
-                      selectedSerials = e.target.checked 
-                        ? paginatedSerials.map(s => s.id)
-                        : []
-                    }"
-                    class="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-700"
+                <th class="px-4 py-3">
+                  <input type="checkbox" @change="e => 
+                    selectedSerials = e.target.checked 
+                      ? paginatedSerials.map(s => s.serial_code)
+                      : []"
                   >
                 </th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">序列号</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">类型</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">有效期(天)</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">创建时间</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">使用状态</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">备注</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">操作</th>
+                <th>序列号代码</th>
+                <th>创建时间</th>
+                <th>过期时间</th>
+                <th>有效期(天)</th>
+                <th>状态</th>
+                <th>操作</th>
               </tr>
             </thead>
             <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-              <tr v-for="serial in paginatedSerials" :key="serial.id" 
+              <tr v-for="serial in paginatedSerials" :key="serial.serial_code" 
                   class="hover:bg-gray-50 dark:hover:bg-gray-800">
                 <td class="px-4 py-3">
                   <input
                     type="checkbox"
                     v-model="selectedSerials"
-                    :value="serial.id"
+                    :value="serial.serial_code"
                     class="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-700"
                   >
                 </td>
-                <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">{{ serial.code }}</td>
-                <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">{{ serial.type }}</td>
-                <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">{{ serial.duration }}</td>
-                <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">{{ serial.created_at }}</td>
+                <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">{{ serial.serial_code }}</td>
+                <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">{{ new Date(serial.created_at).toLocaleString() }}</td>
+                <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">{{ new Date(serial.expires_at).toLocaleString() }}</td>
+                <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">{{ serial.valid_days }}</td>
                 <td class="px-4 py-3 text-sm">
                   <span :class="{
                     'px-2 py-1 rounded text-xs font-medium': true,
-                    'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300': serial.status === 'unused',
-                    'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300': serial.status === 'used',
-                    'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300': serial.status === 'expired'
+                    'bg-green-100 text-green-800': serial.status === 'unused',
+                    'bg-red-100 text-red-800': serial.status === 'used',
+                    'bg-gray-100 text-gray-800': serial.expired
                   }">
-                    {{ serial.status === 'unused' ? '未使用' : serial.status === 'used' ? '已使用' : '已过期' }}
+                    {{ serial.expired ? '已过期' : (serial.status === 'unused' ? '未使用' : '已使用') }}
                   </span>
                 </td>
-                <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-300">{{ serial.remarks }}</td>
                 <td class="px-4 py-3 text-sm">
                   <BaseButton
                     v-if="serial.status === 'unused'"
