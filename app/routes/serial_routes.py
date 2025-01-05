@@ -66,12 +66,15 @@ def generate_serial():
     生成序列号
     """
     data = request.json
-    count = data.get('count', 1)
-    valid_days = data.get('valid_days', 30)
-    serial_length = data.get('serial_length', 12)  # 序列号长度参数，默认12位
+    count = data.get('count', 1)  # 序列号数量
+    valid_days = data.get('valid_days', 30)  # 序列号有效天数
+    prefix = data.get('prefix', '')  # 序列号的前半部分，从请求的 JSON 获取
+
+    # 序列号后半部分长度
+    serial_length = 6  # 后半部分长度可以自行定义为6位，或者根据需求调整
 
     # 参数验证
-    if count <= 0 or valid_days <= 0 or serial_length <= 0:
+    if count <= 0 or valid_days <= 0:
         return jsonify({"success": False, "message": "Invalid parameters"}), 400
 
     serial_numbers = []
@@ -79,26 +82,35 @@ def generate_serial():
         for _ in range(count):
             # 确保序列号唯一性
             while True:
-                code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=serial_length))
+                # 拼接前半部分和后半部分（6位随机字符）
+                suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=serial_length))
+                code = prefix + suffix  # 完整的序列号
+
+                # 检查序列号是否唯一
                 existing_serial = SerialNumber.query.filter_by(code=code).first()
                 if not existing_serial:  # 如果序列号不重复，跳出循环
                     break
 
-            # 设置序列号的默认状态为 "unused"
-            expires_at = datetime.utcnow() + timedelta(days=valid_days)
-            serial_number = SerialNumber(code=code, valid_days=valid_days, status='unused', expires_at=expires_at)
+            # 创建新的序列号对象并加入数据库
+            expires_at = datetime.utcnow() + timedelta(days=valid_days)  # 设置过期时间
+            serial_number = SerialNumber(
+                code=code,
+                valid_days=valid_days,
+                status='unused',  # 默认状态为 "unused"
+                activated_at=datetime.utcnow(),
+                expires_at=expires_at
+            )
             db.session.add(serial_number)
-            serial_numbers.append(code)
+            serial_numbers.append(code)  # 将生成的序列号加入返回的列表
 
         # 提交事务
         db.session.commit()
         logging.info(f"Generated {count} serial numbers successfully.")
         return jsonify({"success": True, "serial_numbers": serial_numbers}), 201
     except Exception as e:
-        db.session.rollback()
+        db.session.rollback()  # 如果发生错误，回滚事务
         logging.error(f"Error generating serial numbers: {e}")
         return jsonify({"success": False, "message": f"Error generating serial numbers: {str(e)}"}), 500
-
 
 # 检测暴力猜解行为
 def is_suspected_brute_force(ip_address):
