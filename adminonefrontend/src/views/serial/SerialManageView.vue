@@ -144,7 +144,6 @@ const serialForm = ref({
   trafficType: 'basic',
   count: 1,
   prefix: '',
-  remarks: '',
   validDays: 30,
 })
 
@@ -160,6 +159,20 @@ watch(() => serialForm.value.timeType, (newType) => {
 // 修改生成序列号的方法
 const generateSerials = async () => {
   try {
+    // 输入验证
+    if (serialForm.value.count > 30) {
+      alert('一次最多只能生成30个序列号')
+      return
+    }
+    if (serialForm.value.validDays > 100) {
+      alert('序列号有效期最长为100天')
+      return
+    }
+    if (serialForm.value.prefix && serialForm.value.prefix.length > 10) {
+      alert('前缀最长为10个字符')
+      return
+    }
+
     // 构造前缀
     const prefix = `${serialForm.value.prefix || ''}${serialForm.value.timeType === 'monthly' ? '030D' : serialForm.value.timeType === 'half_year' ? '180D' : '360D'}${serialForm.value.trafficType === 'basic' ? '05G' : '10G'}`
     
@@ -184,7 +197,6 @@ const generateSerials = async () => {
       trafficType: 'basic',
       count: 1,
       prefix: '',
-      remarks: '',
       validDays: 30,
     }
   } catch (error) {
@@ -436,7 +448,7 @@ onMounted(() => {
               v-model="serialForm.validDays"
               type="number"
               min="1"
-              max="365"
+              max="100"
               class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             >
           </div>
@@ -447,7 +459,7 @@ onMounted(() => {
               v-model="serialForm.count"
               type="number"
               min="1"
-              max="100"
+              max="30"
               class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             >
           </div>
@@ -457,15 +469,7 @@ onMounted(() => {
             <input
               v-model="serialForm.prefix"
               type="text"
-              class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            >
-          </div>
-
-          <div class="form-group md:col-span-2">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">备注(可选)</label>
-            <input
-              v-model="serialForm.remarks"
-              type="text"
+              maxlength="10"
               class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             >
           </div>
