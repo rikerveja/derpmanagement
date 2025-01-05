@@ -185,6 +185,7 @@ def delete_serial_number():
         return jsonify({"success": False, "message": f"Error deleting serial number: {str(e)}"}), 500
 
 
+
 # 显示所有序列号列表
 @serial_bp.route('/api/serials', methods=['GET'])
 def get_serials():
