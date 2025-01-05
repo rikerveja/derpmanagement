@@ -40,8 +40,8 @@ const timeTypeOptions = [
 const availableTrafficTypeOptions = computed(() => {
   return [
     { value: 'all', label: '全部流量' },
-    { value: 'basic', label: '基础型(5G)' },
-    { value: 'premium', label: '加强型(10G)' }
+    { value: 'basic', label: '基础型(5G/月)' },
+    { value: 'premium', label: '加强型(10G/月)' }
   ]
 })
 
@@ -122,8 +122,8 @@ const timeTypes = [
 
 // 修改流量类型定义
 const trafficTypes = [
-  { value: 'basic', label: '基础型(5G)', traffic: 5 },
-  { value: 'premium', label: '加强型(10G)', traffic: 10 }
+  { value: 'basic', label: '基础型(5G/月)', traffic: 5 },
+  { value: 'premium', label: '加强型(10G/月)', traffic: 10 }
 ]
 
 // 简化计算属性：根据时间类型筛选可用的流量类型
