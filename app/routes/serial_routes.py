@@ -198,7 +198,7 @@ def get_serials():
             serial_list.append({
                 "serial_code": serial.code,
                 "status": serial.status,
-                "duration_days": serial.duration_days,
+                "valid_days": serial.valid_days,  # 使用 valid_days
                 "created_at": serial.created_at.isoformat(),
                 "expires_at": serial.expires_at.isoformat() if serial.expires_at else None,
                 "expired": expired
@@ -209,3 +209,4 @@ def get_serials():
     except Exception as e:
         logging.error(f"Error fetching serial numbers: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching serial numbers: {str(e)}"}), 500
+
