@@ -217,6 +217,7 @@ const deleteSerial = async (serialCode) => {
     if (!confirm('确定要删除这个序列号吗？')) return
     await api.deleteSerial(serialCode)
     await fetchSerials()
+    selectedSerials.value = []
   } catch (error) {
     console.error('删除序列号失败:', error)
     alert('删除序列号失败: ' + error.message)
