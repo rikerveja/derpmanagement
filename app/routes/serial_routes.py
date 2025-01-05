@@ -1,10 +1,10 @@
-from flask import Blueprint, jsonify, request  # 添加 Blueprint 导入
-from datetime import datetime, timedelta
-import random
-import string
-import logging
+from flask import Blueprint, jsonify, request 
 from app.models import SerialNumber
 from app import db
+import random
+import string
+from datetime import datetime, timedelta
+import logging
 import redis
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -49,7 +49,7 @@ def check_serial(serial_code):
             "success": True,
             "serial_code": serial_number.code,
             "status": serial_number.status,
-            "duration_days": serial_number.valid_days,
+            "duration_days": serial_number.duration_days,
             "created_at": serial_number.created_at.isoformat(),
             "expires_at": serial_number.expires_at.isoformat() if serial_number.expires_at else None,
             "expired": expired
@@ -67,46 +67,28 @@ def generate_serial():
     """
     data = request.json
     count = data.get('count', 1)
-    valid_days = data.get('valid_days', 30)
-    prefix = data.get('prefix', '')  # 序列号的前半部分
-
-    # 序列号后半部分长度
-    serial_length = 6
+    duration_days = data.get('duration_days', 30)
+    serial_length = data.get('serial_length', 12)  # 序列号长度参数，默认12位
 
     # 参数验证
-    if count <= 0 or valid_days <= 0 or serial_length <= 0:
+    if count <= 0 or duration_days <= 0 or serial_length <= 0:
         return jsonify({"success": False, "message": "Invalid parameters"}), 400
 
     serial_numbers = []
-    activated_at = datetime.utcnow()  # 获取当前时间，作为 activated_at
-    start_date = activated_at  # 激活时间作为起始时间
-    end_date = start_date + timedelta(days=valid_days)  # 过期时间 = 激活时间 + 有效天数
-
     try:
         for _ in range(count):
             # 确保序列号唯一性
             while True:
-                # 拼接前半部分和后半部分（6位随机字符）
-                suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=serial_length))
-                code = prefix + suffix  # 完整序列号
-
-                # 检查序列号是否唯一
+                code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=serial_length))
                 existing_serial = SerialNumber.query.filter_by(code=code).first()
                 if not existing_serial:  # 如果序列号不重复，跳出循环
                     break
 
-            # 创建新的序列号对象并加入数据库
-            serial_number = SerialNumber(
-                code=code,
-                status='unused',  # 默认状态为 "unused"
-                valid_days=valid_days,
-                start_date=start_date,
-                end_date=end_date,
-                activated_at=activated_at,
-                expires_at=end_date
-            )
+            # 设置序列号的默认状态为 "unused"
+            expires_at = datetime.utcnow() + timedelta(days=duration_days)
+            serial_number = SerialNumber(code=code, duration_days=duration_days, status='unused', expires_at=expires_at)
             db.session.add(serial_number)
-            serial_numbers.append(code)  # 将生成的序列号加入返回的列表
+            serial_numbers.append(code)
 
         # 提交事务
         db.session.commit()
@@ -139,7 +121,7 @@ def log_failed_attempt(ip_address):
 # 用户封禁或删除
 def ban_user(user_id):
     """
-    临时封禁用户的功能（可进一步扩展）
+    临时封禁用户的功能（可进一步扩展） 
     """
     user = User.query.get(user_id)
     if user:
@@ -193,3 +175,37 @@ def delete_serial_number(id):
         db.session.rollback()
         logging.error(f"Error deleting serial number: {e}")
         return jsonify({"success": False, "message": f"Error deleting serial number: {str(e)}"}), 500
+
+
+# 显示所有序列号列表
+@serial_bp.route('/api/serials', methods=['GET'])
+def get_serials():
+    """
+    显示所有序列号的列表
+    """
+    try:
+        # 查询所有序列号
+        serial_numbers = SerialNumber.query.all()
+
+        # 如果没有序列号，则返回空列表
+        if not serial_numbers:
+            return jsonify({"success": True, "message": "No serial numbers found", "serial_numbers": []}), 200
+
+        # 返回序列号列表
+        serial_list = []
+        for serial in serial_numbers:
+            expired = serial.expires_at < datetime.utcnow() if serial.expires_at else False
+            serial_list.append({
+                "serial_code": serial.code,
+                "status": serial.status,
+                "duration_days": serial.duration_days,
+                "created_at": serial.created_at.isoformat(),
+                "expires_at": serial.expires_at.isoformat() if serial.expires_at else None,
+                "expired": expired
+            })
+
+        return jsonify({"success": True, "serial_numbers": serial_list}), 200
+
+    except Exception as e:
+        logging.error(f"Error fetching serial numbers: {str(e)}")
+        return jsonify({"success": False, "message": f"Error fetching serial numbers: {str(e)}"}), 500
