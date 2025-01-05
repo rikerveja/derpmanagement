@@ -48,8 +48,9 @@ const availableTrafficTypeOptions = computed(() => {
 // 筛选和搜索后的序列号
 const filteredSerials = computed(() => {
   return serials.value.filter(serial => {
-    const matchesSearch = (serial.serial_code || '').toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-                         (serial.remarks || '').toLowerCase().includes(searchQuery.value.toLowerCase())
+    // 搜索序列号，支持任意位置的部分匹配
+    const matchesSearch = searchQuery.value === '' || 
+                        (serial.serial_code || '').toLowerCase().includes(searchQuery.value.trim().toLowerCase())
     const matchesStatus = selectedStatus.value === 'all' || serial.status === selectedStatus.value
     // 从序列号代码中提取时间和流量类型
     const timeType = (serial.serial_code || '').includes('030D') ? 'monthly' : 
@@ -276,7 +277,7 @@ onMounted(() => {
               <input
                 v-model="searchQuery"
                 type="text"
-                placeholder="搜索序列号或备注"
+                placeholder="搜索序列号（支持部分匹配）"
                 class="w-full pl-10 pr-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
               >
               <BaseIcon
