@@ -55,11 +55,9 @@ const generateSerials = (data) => {
   })
 }
 
-const deleteSerial = (code) => {
+const deleteSerial = (data) => {
   return api.delete('/serial/delete', {
-    data: {
-      "serial_code": code
-    }
+    data: data // 这里直接使用传入的对象
   })
 }
 
