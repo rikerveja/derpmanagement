@@ -10,7 +10,9 @@ import {
   mdiShieldAccount,
   mdiServerNetwork,
   mdiMonitor,
-  mdiAlertCircle
+  mdiAlertCircle,
+  mdiServer,
+  mdiHeartPulse
 } from '@mdi/js'
 
 export default [
@@ -24,16 +26,14 @@ export default [
     label: '服务器管理',
     menu: [
       {
-        to: '/servers',
-        label: '服务器列表'
-      },
-      {
-        to: '/servers/add',
-        label: '添加服务器'
+        to: '/servers/list',
+        label: '服务器列表',
+        icon: mdiServer
       },
       {
         to: '/servers/health',
-        label: '健康检查'
+        label: '健康检查',
+        icon: mdiHeartPulse
       }
     ]
   },
