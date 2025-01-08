@@ -18,15 +18,15 @@ def add_server():
     # 获取输入数据
     ip_address = data.get('ip')  # 修正：从请求中获取 ip 并存储为 ip_address
     region = data.get('region')
-    load = data.get('load', 0.0)
+    storage = data.get('storage', 0.0)  # 这里用 storage 替代 load 字段
     cpu = data.get('cpu')  # 新增：CPU 配置
     memory = data.get('memory')  # 新增：内存配置
     category_id = data.get('category_id')  # 新增：服务器分类ID
 
     # 检查必填字段
-    if not ip_address or not region or not cpu or not memory or not category_id:
-        logging.error("Missing required fields: ip_address, region, cpu, memory, category_id")
-        return jsonify({"success": False, "message": "Missing required fields (ip_address, region, cpu, memory, category_id)"}), 400
+    if not ip_address or not region or not cpu or not memory or not storage or not category_id:
+        logging.error("Missing required fields: ip_address, region, cpu, memory, storage, category_id")
+        return jsonify({"success": False, "message": "Missing required fields (ip_address, region, cpu, memory, storage, category_id)"}), 400
 
     # 检查服务器是否已存在
     existing_server = Server.query.filter_by(ip_address=ip_address).first()  # 使用 ip_address 查询
@@ -41,7 +41,7 @@ def add_server():
         return jsonify({"success": False, "message": f"Category with ID {category_id} not found"}), 404
 
     # 创建新服务器对象
-    server = Server(ip_address=ip_address, region=region, load=load, cpu=cpu, memory=memory, category_id=category_id)
+    server = Server(ip_address=ip_address, region=region, storage=storage, cpu=cpu, memory=memory, category_id=category_id)
 
     # 保存新服务器到数据库
     db.session.add(server)
@@ -53,6 +53,7 @@ def add_server():
             "message": "Server added successfully", 
             "server_id": server.id, 
             "ip_address": ip_address,  # 返回 ip_address
+            "storage": storage,  # 返回 storage
             "cpu": cpu, 
             "memory": memory
         }), 201
@@ -80,7 +81,7 @@ def get_servers():
                 'id': server.id,
                 'ip_address': server.ip_address,  # 使用 ip_address
                 'region': server.region,
-                'load': server.load,
+                'storage': server.storage,  # 使用 storage
                 'cpu': server.cpu,
                 'memory': server.memory,
                 'category': server.category.category_name if server.category else None,
@@ -162,7 +163,7 @@ def server_status(server_id):
         # 获取服务器状态
         status = get_server_status(server.ip_address)  # 使用 ip_address
         logging.info(f"Fetched status for server {server_id}: {status}")
-        return jsonify({"success": True, "status": status, "load": server.load}), 200
+        return jsonify({"success": True, "status": status, "storage": server.storage}), 200  # 使用 storage
     except Exception as e:
         logging.error(f"Error getting server status for server {server_id}: {e}")
         return jsonify({"success": False, "message": f"Error getting server status: {str(e)}"}), 500
