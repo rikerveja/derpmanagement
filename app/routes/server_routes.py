@@ -16,7 +16,7 @@ def add_server():
     data = request.json
 
     # 获取输入数据
-    ip_address = data.get('ip')  # 修正：从请求中获取 ip 并存储为 ip_address
+    ip_address = data.get('ip_address')  # 修正：从请求中获取 ip 并存储为 ip_address
     region = data.get('region')
     storage = data.get('storage', 0.0)  # 这里用 storage 替代 load 字段
     cpu = data.get('cpu')  # 新增：CPU 配置
