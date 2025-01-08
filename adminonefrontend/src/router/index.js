@@ -32,10 +32,13 @@ const routes = [
     redirect: '/login'
   },
   {
-    path: '/servers',
-    name: 'servers',
+    path: '/servers/list',
+    name: 'servers.list',
     component: () => import('@/views/servers/ServerListView.vue'),
-    meta: { requiresAuth: true }
+    meta: { 
+      requiresAuth: true,
+      layout: 'authenticated'
+    }
   },
   {
     path: '/serials/manage',
