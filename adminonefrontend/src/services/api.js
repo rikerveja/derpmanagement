@@ -69,6 +69,50 @@ const batchDeleteSerials = (codes) => {
   })
 }
 
+// 服务器相关 API
+const getServers = () => {
+  return api.get('/get_servers')  // 修改为正确的端点
+}
+
+const getServerCategories = () => {
+  return api.get('/server/categories')  // 获取服务器分类
+}
+
+const addServer = (serverData) => {
+  console.log('准备发送的服务器数据:', serverData)
+  const requestData = {
+    ip_address: serverData.ip_address,
+    region: serverData.region,
+    cpu: serverData.cpu,
+    memory: serverData.memory,
+    category_id: serverData.category_id,
+    server_name: serverData.server_name,
+    storage: serverData.storage,
+    bandwidth: serverData.bandwidth,
+    user_count: serverData.user_count,
+    total_traffic: serverData.total_traffic
+  }
+  console.log('转换后的请求数据:', requestData)
+  console.log('请求URL:', '/add_server')
+  return api.post('/add_server', requestData)
+}
+
+const deleteServer = (serverId) => {
+  return api.delete(`/delete_server/${serverId}`)
+}
+
+const updateServerStatus = (serverId, status) => {
+  return api.put(`/update_server/${serverId}`, { status })
+}
+
+const getServerStatus = (serverId) => {
+  return api.get(`/server/status/${serverId}`)
+}
+
+const getServerHealthCheck = () => {
+  return api.get('/server/health_check')
+}
+
 export default {
   // 用户相关 API
   login(email, password) {
@@ -108,17 +152,12 @@ export default {
   },
 
   // 服务器相关 API
-  addServer(serverData) {
-    return api.post('/add_server', serverData)
-  },
-  
-  getServerStatus(serverId) {
-    return api.get(`/server/status/${serverId}`)
-  },
-  
-  checkServerHealth() {
-    return api.get('/server/health_check')
-  },
+  getServers,
+  getServerCategories,
+  addServer,
+  deleteServer,
+  getServerStatus,
+  getServerHealthCheck,
 
   // 日志相关 API
   getSystemLogs() {
