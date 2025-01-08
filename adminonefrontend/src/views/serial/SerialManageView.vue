@@ -226,16 +226,19 @@ const fetchSerials = async () => {
 
 // 删除序列号
 const deleteSerial = async (serialCode) => {
-  try {
-    if (!confirm('确定要删除这个序列号吗？')) return
-    await api.deleteSerial(serialCode)
-    await fetchSerials()
-    selectedSerials.value = []
-  } catch (error) {
-    console.error('删除序列号失败:', error)
-    alert('删除序列号失败: ' + error.message)
+  if (confirm(`确定要删除序列号 ${serialCode} 吗？`)) {
+    try {
+      const requestData = { "serial_codes": [serialCode] };
+      console.log('要删除的序列号数据:', JSON.stringify(requestData)); // 打印请求数据
+      await api.deleteSerial(requestData); // 确保传入的格式正确
+      await fetchSerials(); // 刷新序列号列表
+    } catch (error) {
+      console.error('删除序列号失败:', error);
+      alert('删除序列号失败: ' + error.message); // 显示错误信息
+    }
   }
 }
+
 
 // 确保在组件挂载时获取数据
 onMounted(() => {
