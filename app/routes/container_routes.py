@@ -1,7 +1,8 @@
 from flask import Blueprint, request, jsonify
 from app.utils.docker_utils import create_container, stop_container, get_container_status, list_containers, update_docker_container, update_traffic_for_container, delete_container_by_id
+from app import db
+from app.models import DockerContainer  # 假设你有一个名为 DockerContainer 的模型类
 import logging
-
 
 # 定义蓝图
 container_bp = Blueprint('container', __name__)
@@ -36,18 +37,18 @@ def create_new_container():
         return jsonify({"success": False, "message": "Missing required parameters"}), 400
 
     try:
-        # 创建容器实例
-        # 假设你有 DockerContainer 模型，你需要在数据库中保存新容器
+        # 创建容器实例并保存到数据库
+        # 假设你有 DockerContainer 模型
         new_container = DockerContainer(
-            container_id=f"container_{container_name}",  # 假设容器 ID 按照一定规则生成
+            container_id=f"container_{container_name}",  # 根据容器名称生成容器ID
             container_name=container_name,
             image=image_name,
-            port=ports.split(":")[0],  # 假设获取前端端口
-            stun_port=ports.split(":")[1] if len(ports.split(":")) > 1 else None,
+            port=ports.split(":")[0],  # 获取前端端口（例如：8080）
+            stun_port=ports.split(":")[1] if len(ports.split(":")) > 1 else None,  # 获取STUN端口（例如：80）
             node_exporter_port=None,  # 根据需求生成或传入
             status='running',  # 默认状态
-            max_upload_traffic=0,  # 初始最大上传流量，可以根据需要调整
-            max_download_traffic=0,  # 初始最大下载流量，可以根据需要调整
+            max_upload_traffic=0,  # 初始最大上传流量
+            max_download_traffic=0,  # 初始最大下载流量
             upload_traffic=0,  # 初始上传流量
             download_traffic=0,  # 初始下载流量
         )
@@ -60,7 +61,6 @@ def create_new_container():
     except Exception as e:
         db.session.rollback()  # 回滚事务
         return jsonify({"success": False, "message": f"Error creating container: {str(e)}"}), 500
-
 
 # 停止容器
 @container_bp.route('/api/containers/<container_name>/stop', methods=['POST'])
