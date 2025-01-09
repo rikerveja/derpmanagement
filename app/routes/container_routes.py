@@ -36,13 +36,31 @@ def create_new_container():
         return jsonify({"success": False, "message": "Missing required parameters"}), 400
 
     try:
-        container = create_container(image_name, container_name, ports, environment)
-        if container:
-            return jsonify({"success": True, "message": f"Container {container_name} created successfully"}), 201
-        else:
-            return jsonify({"success": False, "message": "Failed to create container"}), 500
+        # 创建容器实例
+        # 假设你有 DockerContainer 模型，你需要在数据库中保存新容器
+        new_container = DockerContainer(
+            container_id=f"container_{container_name}",  # 假设容器 ID 按照一定规则生成
+            container_name=container_name,
+            image=image_name,
+            port=ports.split(":")[0],  # 假设获取前端端口
+            stun_port=ports.split(":")[1] if len(ports.split(":")) > 1 else None,
+            node_exporter_port=None,  # 根据需求生成或传入
+            status='running',  # 默认状态
+            max_upload_traffic=0,  # 初始最大上传流量，可以根据需要调整
+            max_download_traffic=0,  # 初始最大下载流量，可以根据需要调整
+            upload_traffic=0,  # 初始上传流量
+            download_traffic=0,  # 初始下载流量
+        )
+
+        # 将新容器保存到数据库
+        db.session.add(new_container)
+        db.session.commit()
+
+        return jsonify({"success": True, "message": f"Container {container_name} created successfully"}), 201
     except Exception as e:
+        db.session.rollback()  # 回滚事务
         return jsonify({"success": False, "message": f"Error creating container: {str(e)}"}), 500
+
 
 # 停止容器
 @container_bp.route('/api/containers/<container_name>/stop', methods=['POST'])
