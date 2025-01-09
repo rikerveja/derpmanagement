@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from app.utils.docker_utils import create_container, stop_container, get_container_status, list_containers, update_docker_container
+from app.utils.docker_utils import create_container, stop_container, get_container_status, list_containers, update_docker_container, update_traffic_for_container, delete_container_by_id
 import logging
 
 # 定义蓝图
@@ -73,6 +73,20 @@ def get_container_status_route(container_name):
     except Exception as e:
         return jsonify({"success": False, "message": f"Error retrieving status for container {container_name}: {str(e)}"}), 500
 
+# 获取容器详情
+@container_bp.route('/api/containers/<container_id>', methods=['GET'])
+def get_container_details(container_id):
+    """
+    获取指定容器的详细信息
+    """
+    try:
+        container = get_container_by_id(container_id)
+        if container:
+            return jsonify({"success": True, "container": container}), 200
+        else:
+            return jsonify({"success": False, "message": "Container not found"}), 404
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Error fetching container: {str(e)}"}), 500
 
 # 更新容器
 @container_bp.route('/api/containers/<container_name>', methods=['PUT'])
@@ -98,3 +112,40 @@ def update_existing_container(container_name):
             return jsonify({"success": False, "message": f"Failed to update container {container_name}"}), 500
     except Exception as e:
         return jsonify({"success": False, "message": f"Error updating container: {str(e)}"}), 500
+
+# 更新容器流量
+@container_bp.route('/api/containers/<container_id>/update_traffic', methods=['PUT'])
+def update_traffic(container_id):
+    """
+    更新容器的流量（上传和下载）
+    """
+    data = request.json
+    upload_traffic = data.get('upload_traffic')
+    download_traffic = data.get('download_traffic')
+
+    if upload_traffic is None and download_traffic is None:
+        return jsonify({"success": False, "message": "Missing traffic parameters"}), 400
+
+    try:
+        result = update_traffic_for_container(container_id, upload_traffic, download_traffic)
+        if result:
+            return jsonify({"success": True, "message": "Container traffic updated successfully"}), 200
+        else:
+            return jsonify({"success": False, "message": "Failed to update traffic"}), 500
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Error updating traffic: {str(e)}"}), 500
+
+# 删除容器
+@container_bp.route('/api/containers/<container_id>', methods=['DELETE'])
+def delete_container(container_id):
+    """
+    删除指定容器
+    """
+    try:
+        result = delete_container_by_id(container_id)
+        if result:
+            return jsonify({"success": True, "message": "Container deleted successfully"}), 200
+        else:
+            return jsonify({"success": False, "message": "Failed to delete container"}), 500
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Error deleting container: {str(e)}"}), 500
