@@ -47,14 +47,6 @@ const routes = [
     meta: {
       requiresAuth: true
     }
-  },
-  {
-    path: '/serials/stats',
-    name: 'SerialStats',
-    component: () => import('@/views/serial/SerialStatsView.vue'),
-    meta: {
-      requiresAuth: true
-    }
   }
 ]
 
@@ -75,6 +67,14 @@ router.beforeEach((to, from, next) => {
     next('/dashboard')
   } else {
     next()
+  }
+})
+
+// 添加全局错误处理
+router.onError((error) => {
+  console.error('路由错误:', error)
+  if (error.message.includes('Failed to fetch dynamically imported module')) {
+    window.location.reload()
   }
 })
 
