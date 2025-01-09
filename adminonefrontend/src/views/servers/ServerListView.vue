@@ -16,6 +16,7 @@ import {
 import BaseButton from '@/components/BaseButton.vue'
 import BaseButtons from '@/components/BaseButtons.vue'
 import BaseIcon from '@/components/BaseIcon.vue'
+import BaseDialog from '@/components/BaseDialog.vue'
 import api from '@/services/api'
 
 // 服务器列表数据
@@ -56,6 +57,22 @@ const defaultCategories = [
   { id: 1, category_name: '4坑位版' },
   { id: 2, category_name: '2坑位版' }
 ]
+
+// 添加编辑对话框的状态控制
+const showEditDialog = ref(false)
+const editServerForm = ref({
+  id: null,
+  server_name: '',
+  ip_address: '',
+  region: '上海',
+  cpu: 2,
+  memory: 2,
+  storage: 40,
+  category_id: '',
+  bandwidth: 100,
+  user_count: 0,
+  total_traffic: 20
+})
 
 // 获取服务器列表
 const fetchServers = async () => {
@@ -220,8 +237,44 @@ const checkServerHealth = async () => {
 
 // 编辑服务器
 const editServer = (server) => {
-  console.log('编辑服务器:', server)
-  // TODO: 实现编辑服务器功能
+  console.log('编辑服务器被点击:', server)
+  if (!server) {
+    console.error('未获取到服务器数据')
+    return
+  }
+  editServerForm.value = { 
+    id: server.id,
+    server_name: server.server_name,
+    ip_address: server.ip_address,
+    region: server.region,
+    cpu: server.cpu,
+    memory: server.memory,
+    storage: server.storage,
+    category_id: server.category_id,
+    bandwidth: server.bandwidth,
+    user_count: server.user_count,
+    total_traffic: server.total_traffic
+  }
+  console.log('设置表单数据:', editServerForm.value)
+  showEditDialog.value = true
+  console.log('对话框显示状态:', showEditDialog.value)
+}
+
+// 更新服务器
+const updateServer = async () => {
+  try {
+    const response = await api.updateServer(editServerForm.value.id, editServerForm.value)
+    if (response.success) {
+      alert('更新服务器成功!')
+      await fetchServers()  // 刷新列表
+      showEditDialog.value = false  // 关闭对话框
+    } else {
+      throw new Error(response.message)
+    }
+  } catch (error) {
+    console.error('更新服务器失败:', error)
+    alert('更新服务器失败: ' + error.message)
+  }
 }
 
 // 初始化加载
@@ -364,13 +417,17 @@ onMounted(async () => {
                       :icon="mdiPencil"
                       color="info"
                       small
+                      type="button"
                       @click="editServer(server)"
+                      title="编辑"
                     />
                     <BaseButton
                       :icon="mdiDelete"
                       color="danger"
                       small
+                      type="button"
                       @click="deleteServer(server.id)"
+                      title="删除"
                     />
                   </div>
                 </td>
@@ -528,29 +585,6 @@ onMounted(async () => {
             >
           </div>
 
-          <!-- 显示配置和带宽 -->
-          <div class="form-group">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              配置和带宽
-            </label>
-            <p class="text-gray-700 dark:text-gray-300">
-              {{ serverForm.cpu }} 核 / {{ serverForm.memory }} GB / {{ serverForm.storage }} GB / 带宽: {{ serverForm.bandwidth }} M
-            </p>
-          </div>
-
-          <!-- 服务器类型 -->
-          <div class="form-group">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              服务器类型
-            </label>
-            <input
-              v-model="serverForm.server_type"
-              type="text"
-              required
-              class="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-            >
-          </div>
-
           <!-- 总流量配置 -->
           <div class="form-group">
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -576,6 +610,150 @@ onMounted(async () => {
           />
         </div>
       </CardBox>
+
+      <!-- 添加编辑对话框 -->
+      <BaseDialog
+        :show="showEditDialog"
+        @close="showEditDialog = false"
+        @confirm="updateServer"
+      >
+        <template #title>
+          <div class="flex items-center">
+            <BaseIcon :path="mdiPencil" class="mr-2" />
+            编辑服务器
+          </div>
+        </template>
+        
+        <template #body>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="form-group">
+              <label class="block text-sm font-medium mb-2">服务器名称</label>
+              <input
+                v-model="editServerForm.server_name"
+                type="text"
+                class="w-full px-3 py-2 border rounded-md"
+              />
+            </div>
+            
+            <div class="form-group">
+              <label class="block text-sm font-medium mb-2">IP地址</label>
+              <input
+                v-model="editServerForm.ip_address"
+                type="text"
+                class="w-full px-3 py-2 border rounded-md"
+              />
+            </div>
+
+            <!-- 服务器分类 -->
+            <div class="form-group">
+              <label class="block text-sm font-medium mb-2">服务器分类</label>
+              <select
+                v-model="editServerForm.category_id"
+                class="w-full px-3 py-2 border rounded-md"
+              >
+                <option value="">请选择分类</option>
+                <option v-for="category in categories" 
+                        :key="category.id" 
+                        :value="category.id"
+                >
+                  {{ category.category_name }}
+                </option>
+              </select>
+            </div>
+            
+            <!-- 地区选择 -->
+            <div class="form-group">
+              <label class="block text-sm font-medium mb-2">地区</label>
+              <select
+                v-model="editServerForm.region"
+                class="w-full px-3 py-2 border rounded-md"
+              >
+                <option v-for="region in regions" 
+                        :key="region" 
+                        :value="region"
+                >
+                  {{ region }}
+                </option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label class="block text-sm font-medium mb-2">CPU核心数</label>
+              <input
+                v-model="editServerForm.cpu"
+                type="number"
+                class="w-full px-3 py-2 border rounded-md"
+              />
+            </div>
+            
+            <div class="form-group">
+              <label class="block text-sm font-medium mb-2">内存(GB)</label>
+              <input
+                v-model="editServerForm.memory"
+                type="number"
+                class="w-full px-3 py-2 border rounded-md"
+              />
+            </div>
+            
+            <div class="form-group">
+              <label class="block text-sm font-medium mb-2">硬盘(GB)</label>
+              <input
+                v-model="editServerForm.storage"
+                type="number"
+                class="w-full px-3 py-2 border rounded-md"
+              />
+            </div>
+
+            <!-- 带宽配置 -->
+            <div class="form-group">
+              <label class="block text-sm font-medium mb-2">带宽(M)</label>
+              <input
+                v-model="editServerForm.bandwidth"
+                type="number"
+                min="1"
+                class="w-full px-3 py-2 border rounded-md"
+              />
+            </div>
+            
+            <!-- 用户数量 -->
+            <div class="form-group">
+              <label class="block text-sm font-medium mb-2">用户数量</label>
+              <input
+                v-model="editServerForm.user_count"
+                type="number"
+                min="0"
+                class="w-full px-3 py-2 border rounded-md"
+              />
+            </div>
+            
+            <!-- 总流量配置 -->
+            <div class="form-group">
+              <label class="block text-sm font-medium mb-2">总流量(GB)</label>
+              <input
+                v-model="editServerForm.total_traffic"
+                type="number"
+                min="1"
+                class="w-full px-3 py-2 border rounded-md"
+              />
+            </div>
+          </div>
+        </template>
+        
+        <template #footer>
+          <div class="flex justify-end space-x-2">
+            <BaseButton
+              color="info"
+              label="取消"
+              @click="showEditDialog = false"
+            />
+            <BaseButton
+              color="success"
+              label="保存"
+              @click="updateServer"
+            />
+          </div>
+        </template>
+      </BaseDialog>
     </SectionMain>
   </LayoutAuthenticated>
 </template>
@@ -594,4 +772,3 @@ input[type="number"]::-webkit-inner-spin-button {
   @apply appearance-none m-0;
 }
 </style>
-
