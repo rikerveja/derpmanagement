@@ -240,6 +240,24 @@ def update_traffic_for_container(ssh_host, ssh_user, ssh_password, container_nam
         manager.close()
 
 
+def delete_container_by_id(ssh_host, ssh_user, ssh_password, container_name):
+    """
+    删除指定的 Docker 容器。
+    """
+    manager = DockerSSHManager(ssh_host, ssh_user, ssh_password=ssh_password)
+    try:
+        # 停止容器并删除
+        manager.stop_container(container_name)
+        manager.execute_command(f"docker rm {container_name}")
+        logger.info(f"Container {container_name} deleted successfully.")
+        return True
+    except Exception as e:
+        logger.error(f"Error deleting container {container_name}: {e}")
+        return False
+    finally:
+        manager.close()
+
+
 # 导出模块
 __all__ = [
     "DockerSSHManager",
