@@ -128,33 +128,55 @@ def get_servers():
         return jsonify({"success": False, "message": f"Error retrieving servers: {str(e)}"}), 500
 
 
-# 更新服务器状态
+# 更新服务器
 @server_bp.route('/api/update_server/<int:server_id>', methods=['PUT'])
 def update_server(server_id):
     """
-    更新指定服务器的状态
+    更新指定服务器的信息
     """
     data = request.json
-    new_status = data.get('status')
 
-    if not new_status:
-        logging.error("Missing 'status' field")
-        return jsonify({"success": False, "message": "Missing 'status' field"}), 400
+    # 获取要更新的字段
+    server_name = data.get('server_name')
+    ip_address = data.get('ip_address')
+    region = data.get('region')
+    storage = data.get('storage')
+    cpu = data.get('cpu')
+    memory = data.get('memory')
+    category_id = data.get('category_id')
+    bandwidth = data.get('bandwidth')
+    server_type = data.get('server_type')
+    user_count = data.get('user_count')
+    total_traffic = data.get('total_traffic')
 
+    # 查找服务器
     server = Server.query.get(server_id)
     if not server:
         logging.error(f"Server with ID {server_id} not found")
         return jsonify({"success": False, "message": "Server not found"}), 404
 
+    # 更新字段
+    if server_name: server.server_name = server_name
+    if ip_address: server.ip_address = ip_address
+    if region: server.region = region
+    if storage: server.storage = storage
+    if cpu: server.cpu = cpu
+    if memory: server.memory = memory
+    if category_id: server.category_id = category_id
+    if bandwidth: server.bandwidth = bandwidth
+    if server_type: server.server_type = server_type
+    if user_count is not None: server.user_count = user_count  # user_count can be 0
+    if total_traffic: server.total_traffic = total_traffic
+
     try:
-        server.status = new_status
         db.session.commit()
-        logging.info(f"Updated server {server_id} status to {new_status}")
-        return jsonify({"success": True, "message": "Server status updated successfully", "server_id": server_id, "status": new_status}), 200
+        logging.info(f"Updated server {server_id} information successfully")
+        return jsonify({"success": True, "message": "Server updated successfully", "server_id": server_id}), 200
     except Exception as e:
         db.session.rollback()
-        logging.error(f"Error updating server {server_id} status: {e}")
-        return jsonify({"success": False, "message": f"Error updating server status: {str(e)}"}), 500
+        logging.error(f"Error updating server {server_id} information: {e}")
+        return jsonify({"success": False, "message": f"Error updating server: {str(e)}"}), 500
+
 
 
 # 删除服务器
