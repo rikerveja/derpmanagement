@@ -27,28 +27,32 @@ def create_new_container():
     创建一个新的 Docker 容器
     """
     data = request.json
-    image_name = data.get('image_name')
     container_name = data.get('container_name')
-    ports = data.get('ports')
-    environment = data.get('environment', None)
+    server_id = data.get('server_id')
+    image = data.get('image')
+    port = data.get('port')
+    stun_port = data.get('stun_port')
+    node_exporter_port = data.get('node_exporter_port')
+    max_upload_traffic = data.get('max_upload_traffic', 5)  # 默认值为 5 GB
+    max_download_traffic = data.get('max_download_traffic', 5)  # 默认值为 5 GB
 
     # 检查必填字段
-    if not image_name or not container_name or not ports:
+    if not container_name or not server_id or not image or not port:
         return jsonify({"success": False, "message": "Missing required parameters"}), 400
 
     try:
         # 创建容器实例并保存到数据库
-        # 假设你有 DockerContainer 模型
         new_container = DockerContainer(
             container_id=f"container_{container_name}",  # 根据容器名称生成容器ID
             container_name=container_name,
-            image=image_name,
-            port=ports.split(":")[0],  # 获取前端端口（例如：8080）
-            stun_port=ports.split(":")[1] if len(ports.split(":")) > 1 else None,  # 获取STUN端口（例如：80）
-            node_exporter_port=None,  # 根据需求生成或传入
+            server_id=server_id,
+            image=image,
+            port=port,
+            stun_port=stun_port,
+            node_exporter_port=node_exporter_port,
+            max_upload_traffic=max_upload_traffic,
+            max_download_traffic=max_download_traffic,
             status='running',  # 默认状态
-            max_upload_traffic=0,  # 初始最大上传流量
-            max_download_traffic=0,  # 初始最大下载流量
             upload_traffic=0,  # 初始上传流量
             download_traffic=0,  # 初始下载流量
         )
@@ -57,7 +61,15 @@ def create_new_container():
         db.session.add(new_container)
         db.session.commit()
 
-        return jsonify({"success": True, "message": f"Container {container_name} created successfully"}), 201
+        # 假设调用 Docker 工具创建容器
+        result = create_container(new_container)
+        if result:
+            return jsonify({"success": True, "message": f"Container {container_name} created successfully"}), 201
+        else:
+            # 若容器创建失败，则回滚
+            db.session.rollback()
+            return jsonify({"success": False, "message": f"Failed to create container {container_name}"}), 500
+
     except Exception as e:
         db.session.rollback()  # 回滚事务
         return jsonify({"success": False, "message": f"Error creating container: {str(e)}"}), 500
