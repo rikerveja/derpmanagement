@@ -20,7 +20,6 @@ def get_containers():
     except Exception as e:
         return jsonify({"success": False, "message": f"Error fetching containers: {str(e)}"}), 500
 
-# 创建新容器
 @container_bp.route('/api/containers', methods=['POST'])
 def create_new_container():
     """
@@ -61,18 +60,13 @@ def create_new_container():
         db.session.add(new_container)
         db.session.commit()
 
-        # 假设调用 Docker 工具创建容器
-        result = create_container(new_container)
-        if result:
-            return jsonify({"success": True, "message": f"Container {container_name} created successfully"}), 201
-        else:
-            # 若容器创建失败，则回滚
-            db.session.rollback()
-            return jsonify({"success": False, "message": f"Failed to create container {container_name}"}), 500
+        # 不再调用 Docker 工具创建容器，只保存数据库
+        return jsonify({"success": True, "message": f"Container {container_name} created successfully in the database"}), 201
 
     except Exception as e:
         db.session.rollback()  # 回滚事务
         return jsonify({"success": False, "message": f"Error creating container: {str(e)}"}), 500
+
 
 # 停止容器
 @container_bp.route('/api/containers/<container_name>/stop', methods=['POST'])
