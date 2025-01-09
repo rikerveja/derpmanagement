@@ -7,7 +7,7 @@ import logging
 # 定义蓝图
 container_bp = Blueprint('container', __name__)
 
-# 获取容器列表
+# 获取容器列表 
 @container_bp.route('/api/containers', methods=['GET'])
 def get_containers():
     """
@@ -27,19 +27,25 @@ def get_containers():
             else:
                 containers = DockerContainer.query.all()  # 默认查询所有容器
 
-        # 将查询结果转为字典形式
+        # 将查询结果转为字典形式，返回所有字段
         containers_list = [
             {
+                "id": container.id,
                 "container_id": container.container_id,
-                "container_name": container.container_name,
                 "server_id": container.server_id,
-                "image": container.image,
+                "user_id": container.user_id,
                 "port": container.port,
                 "stun_port": container.stun_port,
-                "node_exporter_port": container.node_exporter_port,
                 "status": container.status,
+                "image": container.image,
+                "max_upload_traffic": container.max_upload_traffic,
+                "max_download_traffic": container.max_download_traffic,
                 "upload_traffic": container.upload_traffic,
                 "download_traffic": container.download_traffic,
+                "created_at": container.created_at,
+                "updated_at": container.updated_at,
+                "node_exporter_port": container.node_exporter_port,
+                "container_name": container.container_name
             }
             for container in containers
         ]
