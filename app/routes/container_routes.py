@@ -14,11 +14,41 @@ def get_containers():
     获取容器列表，支持过滤所有容器和仅获取当前用户容器。
     """
     all_containers = request.args.get('all', 'false').lower() == 'true'
+    
     try:
-        containers = list_containers(all=all_containers)
-        return jsonify({"success": True, "containers": containers}), 200
+        # 如果 all_containers 为 True，查询所有容器，否则只查询当前用户的容器
+        if all_containers:
+            containers = DockerContainer.query.all()  # 查询所有容器
+        else:
+            # 这里假设可以根据当前用户的服务器ID或者其他标识符来过滤
+            user_id = request.args.get('user_id')  # 假设需要用户ID作为过滤条件
+            if user_id:
+                containers = DockerContainer.query.filter_by(user_id=user_id).all()  # 根据用户ID过滤
+            else:
+                containers = DockerContainer.query.all()  # 默认查询所有容器
+
+        # 将查询结果转为字典形式
+        containers_list = [
+            {
+                "container_id": container.container_id,
+                "container_name": container.container_name,
+                "server_id": container.server_id,
+                "image": container.image,
+                "port": container.port,
+                "stun_port": container.stun_port,
+                "node_exporter_port": container.node_exporter_port,
+                "status": container.status,
+                "upload_traffic": container.upload_traffic,
+                "download_traffic": container.download_traffic,
+            }
+            for container in containers
+        ]
+        
+        return jsonify({"success": True, "containers": containers_list}), 200
+
     except Exception as e:
         return jsonify({"success": False, "message": f"Error fetching containers: {str(e)}"}), 500
+
 
 @container_bp.route('/api/containers', methods=['POST'])
 def create_new_container():
