@@ -227,12 +227,12 @@ class Server(db.Model):
         Index('idx_server_region', 'region'),
     )
 
-
 class DockerContainer(db.Model):
     __tablename__ = 'docker_containers'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     container_id = Column(String(255), unique=True, nullable=False)
+    container_name = Column(String(255), nullable=False)  # 新增字段: container_name
     server_id = Column(Integer, ForeignKey('servers.id', ondelete='CASCADE'))
     user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
     port = Column(Integer)
@@ -255,8 +255,6 @@ class DockerContainer(db.Model):
         Index('idx_container_server', 'server_id'),
         Index('idx_container_user', 'user_id'),
     )
-
-
 
 class SerialServerAssociation(db.Model):
     __tablename__ = 'serial_server_association'
