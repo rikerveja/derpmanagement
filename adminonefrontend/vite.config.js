@@ -20,6 +20,11 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true
       }
+    },
+    historyApiFallback: {
+      rewrites: [
+        { from: /^\/adminonefrontend\/.*$/, to: '/adminonefrontend/index.html' }
+      ]
     }
   }
 });
