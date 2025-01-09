@@ -208,6 +208,38 @@ def get_docker_traffic(ssh_host, ssh_user, ssh_password, container_name):
         manager.close()
 
 
+def update_traffic_for_container(ssh_host, ssh_user, ssh_password, container_name, upload_traffic, download_traffic):
+    """
+    更新容器的上传和下载流量。
+    """
+    manager = DockerSSHManager(ssh_host, ssh_user, ssh_password=ssh_password)
+    try:
+        # 获取当前的流量数据
+        traffic = manager.get_docker_traffic(container_name)
+        if "error" in traffic:
+            logger.error(f"Failed to fetch traffic for container {container_name}.")
+            return False
+        
+        # 更新流量数据
+        current_upload = traffic["received"]
+        current_download = traffic["transmitted"]
+
+        # 将新的流量添加到当前流量
+        new_upload_traffic = f"{float(current_upload) + upload_traffic}MB"
+        new_download_traffic = f"{float(current_download) + download_traffic}MB"
+
+        # 你可以根据需要更新数据库中的流量字段
+        # 例如：DockerContainer.query.filter_by(container_id=container_name).update(...)
+
+        logger.info(f"Updated traffic for container {container_name}: Upload: {new_upload_traffic}, Download: {new_download_traffic}")
+        return True
+    except Exception as e:
+        logger.error(f"Error updating traffic for container {container_name}: {e}")
+        return False
+    finally:
+        manager.close()
+
+
 # 导出模块
 __all__ = [
     "DockerSSHManager",
