@@ -43,11 +43,13 @@ export default [
     menu: [
       {
         to: '/containers',
-        label: '容器列表'
+        label: '容器列表',
+        icon: mdiDocker
       },
       {
         to: '/containers/add',
-        label: '新建容器'
+        label: '新建容器',
+        icon: mdiServer
       }
     ]
   },
@@ -57,15 +59,18 @@ export default [
     menu: [
       {
         to: '/traffic/realtime',
-        label: '实时流量'
+        label: '实时流量',
+        icon: mdiChartLine
       },
       {
         to: '/traffic/history',
-        label: '历史流量'
+        label: '历史流量',
+        icon: mdiChartLine
       },
       {
         to: '/traffic/stats',
-        label: '流量统计'
+        label: '流量统计',
+        icon: mdiChartLine
       }
     ]
   },
@@ -75,11 +80,13 @@ export default [
     menu: [
       {
         to: '/users',
-        label: '用户列表'
+        label: '用户列表',
+        icon: mdiAccountGroup
       },
       {
         to: '/users/add',
-        label: '添加用户'
+        label: '添加用户',
+        icon: mdiAccountGroup
       }
     ]
   },
