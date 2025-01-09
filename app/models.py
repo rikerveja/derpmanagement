@@ -237,6 +237,7 @@ class DockerContainer(db.Model):
     user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
     port = Column(Integer)
     stun_port = Column(Integer)
+    node_exporter_port = Column(Integer)  # 新增字段: node_exporter_port
     status = Column(Enum('running', 'stopped', 'paused', 'restarting', 'exited', name='container_status'), default='running', nullable=False)
     image = Column(String(255))
     max_upload_traffic = Column(DECIMAL(10, 2))
@@ -254,6 +255,7 @@ class DockerContainer(db.Model):
         Index('idx_container_server', 'server_id'),
         Index('idx_container_user', 'user_id'),
     )
+
 
 
 class SerialServerAssociation(db.Model):
