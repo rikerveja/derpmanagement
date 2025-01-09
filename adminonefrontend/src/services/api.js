@@ -2,7 +2,7 @@ import axios from 'axios'
 
 // 创建axios实例
 const api = axios.create({
-  baseURL: 'http://100.82.38.13:8000/api',
+  baseURL: '/api',
   timeout: 5000,
   headers: {
     'Content-Type': 'application/json'
@@ -97,12 +97,28 @@ const addServer = (serverData) => {
   return api.post('/add_server', requestData)
 }
 
-const deleteServer = (serverId) => {
-  return api.delete(`/delete_server/${serverId}`)
+// 更新服务器
+const updateServer = (serverId, serverData) => {
+  console.log('准备更新服务器数据:', serverData)
+  const requestData = {
+    ip_address: serverData.ip_address,
+    region: serverData.region,
+    cpu: serverData.cpu,
+    memory: serverData.memory,
+    category_id: serverData.category_id,
+    server_name: serverData.server_name,
+    storage: serverData.storage,
+    bandwidth: serverData.bandwidth,
+    user_count: serverData.user_count,
+    total_traffic: serverData.total_traffic
+  }
+  console.log('转换后的请求数据:', requestData)
+  console.log('请求URL:', `/update_server/${serverId}`)
+  return api.put(`/update_server/${serverId}`, requestData)
 }
 
-const updateServerStatus = (serverId, status) => {
-  return api.put(`/update_server/${serverId}`, { status })
+const deleteServer = (serverId) => {
+  return api.delete(`/delete_server/${serverId}`)
 }
 
 const getServerStatus = (serverId) => {
@@ -156,6 +172,7 @@ export default {
   getServerCategories,
   addServer,
   deleteServer,
+  updateServer,
   getServerStatus,
   getServerHealthCheck,
 
