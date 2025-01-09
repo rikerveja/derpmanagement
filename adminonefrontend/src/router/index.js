@@ -26,7 +26,6 @@ const routes = [
     name: 'UserProfile',
     component: ProfileView
   },
-  // 重定向根路径到登录页
   {
     path: '/',
     redirect: '/login'
@@ -47,6 +46,18 @@ const routes = [
     meta: {
       requiresAuth: true
     }
+  },
+  {
+    path: '/containers',
+    name: 'containers',
+    component: () => import('@/views/containers/ContainerListView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/containers/add',
+    name: 'containers.add',
+    component: () => import('@/views/containers/ContainerAddView.vue'),
+    meta: { requiresAuth: true }
   }
 ]
 
