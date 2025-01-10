@@ -48,7 +48,7 @@ const currentPage = ref(1)
 const itemsPerPage = 5 // 减少每页显示数量
 
 // 当前选中的展示类型
-const selectedView = ref('traffic')  // 默认显示流量警报概况
+const selectedView = ref('users')  // 默认显示用户概况
 
 // 详细数据
 const detailData = ref({
@@ -197,91 +197,78 @@ onMounted(() => {
 <template>
   <LayoutAuthenticated>
     <SectionMain>
-      <SectionTitleLineWithButton :icon="mdiChartTimelineVariant" title="系统概览" main>
-        <BaseButton :icon="mdiRefresh" label="刷新" @click="fetchDashboardData" />
+      <SectionTitleLineWithButton :icon="mdiAccountMultiple" title="系统概览" main>
+        <BaseButton
+          :icon="mdiRefresh"
+          color="info"
+          outline
+          label="刷新数据"
+          @click="refreshData"
+        />
       </SectionTitleLineWithButton>
 
-      <!-- 核心状态卡片 -->
-      <div class="grid grid-cols-1 gap-4 lg:grid-cols-3 mb-6">
-        <!-- 用户与租约状态 -->
-        <CardBox @click="switchView('users')" 
-                :class="{
-                  'transform -translate-y-1 shadow-lg': selectedView === 'users',
-                  'hover:shadow-md hover:-translate-y-0.5': selectedView !== 'users'
-                }"
-                class="cursor-pointer transition-all duration-200">
-          <div class="flex flex-col">
-            <div class="flex items-center mb-4">
-              <div class="flex-shrink-0 p-4">
-                <div class="rounded-full bg-green-500 p-3">
-                  <BaseIcon :path="mdiAccountMultiple" class="text-white" />
-                </div>
-              </div>
-              <div>
-                <p class="text-sm font-medium text-gray-600">用户与租约</p>
-                <p class="text-lg font-semibold">{{ stats.users.total }} 个用户</p>
+      <!-- 第一行：用户和租约状态 -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- 用户状态卡片 -->
+        <CardBox 
+          class="bg-gradient-to-r from-purple-50 to-pink-50 hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
+          @click="switchView('users')"
+        >
+          <div class="flex items-center">
+            <div class="flex-shrink-0 p-4">
+              <div class="rounded-full bg-purple-500 p-3">
+                <BaseIcon :path="mdiAccountMultiple" class="text-white" />
               </div>
             </div>
-            <div class="grid grid-cols-2 gap-2 px-4">
-              <div class="text-sm">
-                <span class="text-green-500">{{ stats.users.active }}</span> 活跃
-              </div>
-              <div class="text-sm">
-                <span class="text-yellow-500">{{ stats.users.expired }}</span> 到期
-              </div>
-              <div class="text-sm">
-                <span class="text-orange-500">{{ stats.expiring.in5days }}</span> 即将到期
-              </div>
-              <div class="text-sm">
-                <span class="text-blue-500">{{ stats.serials.unused }}</span> 可用序列号
+            <div>
+              <p class="text-lg font-medium text-gray-800">用户状态</p>
+              <p class="text-2xl font-bold text-purple-600">{{ stats.users.total }} 个</p>
+              <div class="text-sm mt-2">
+                <span class="bg-green-100 text-green-800 px-2 py-1 rounded">
+                  {{ stats.users.active }} 活跃
+                </span>
+                <span class="bg-red-100 text-red-800 px-2 py-1 rounded ml-2">
+                  {{ stats.users.expired }} 过期
+                </span>
               </div>
             </div>
           </div>
         </CardBox>
 
-        <!-- 收入与财务状态 -->
-        <CardBox @click="switchView('finance')" 
-                :class="{
-                  'transform -translate-y-1 shadow-lg': selectedView === 'finance',
-                  'hover:shadow-md hover:-translate-y-0.5': selectedView !== 'finance'
-                }"
-                class="cursor-pointer transition-all duration-200">
-          <div class="flex flex-col">
-            <div class="flex items-center mb-4">
-              <div class="flex-shrink-0 p-4">
-                <div class="rounded-full bg-green-500 p-3">
-                  <BaseIcon :path="mdiCurrencyUsd" class="text-white" />
-                </div>
-              </div>
-              <div>
-                <p class="text-sm font-medium text-gray-600">收入与财务</p>
-                <p class="text-lg font-semibold">¥{{ stats.income.total }}</p>
+        <!-- 租约到期卡片 -->
+        <CardBox 
+          class="bg-gradient-to-r from-orange-50 to-red-50 hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
+          @click="switchView('users')"
+        >
+          <div class="flex items-center">
+            <div class="flex-shrink-0 p-4">
+              <div class="rounded-full bg-orange-500 p-3">
+                <BaseIcon :path="mdiClockAlert" class="text-white" />
               </div>
             </div>
-            <div class="grid grid-cols-2 gap-2 px-4">
-              <div class="text-sm">
-                <span class="text-green-500">¥{{ stats.income.direct }}</span> 直接收入
-              </div>
-              <div class="text-sm">
-                <span class="text-purple-500">¥{{ stats.income.distributor }}</span> 分销收入
-              </div>
-              <div class="text-sm">
-                <span class="text-red-500">¥{{ stats.income.unpaid }}</span> 未结算
-              </div>
-              <div class="text-sm">
-                <span class="text-gray-500">{{ stats.serials.total }}</span> 总序列号
+            <div>
+              <p class="text-lg font-medium text-gray-800">租约到期</p>
+              <p class="text-2xl font-bold text-red-600">{{ stats.expiring.in5days }} 个</p>
+              <div class="text-sm mt-2">
+                <span class="bg-orange-100 text-orange-800 px-2 py-1 rounded">
+                  5天内: {{ stats.expiring.in5days }}
+                </span>
+                <span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded ml-2">
+                  10天内: {{ stats.expiring.in10days }}
+                </span>
               </div>
             </div>
           </div>
         </CardBox>
+      </div>
 
-        <!-- 系统运行状态 -->
-        <CardBox @click="switchView('traffic')" 
-                :class="{
-                  'transform -translate-y-1 shadow-lg': selectedView === 'traffic',
-                  'hover:shadow-md hover:-translate-y-0.5': selectedView !== 'traffic'
-                }"
-                class="cursor-pointer transition-all duration-200">
+      <!-- 第二行：系统状态、流量统计和告警信息 -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <!-- 系统运行状态卡片 -->
+        <CardBox 
+          class="bg-gradient-to-r from-blue-50 to-cyan-50 hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
+          @click="switchView('traffic')"
+        >
           <div class="flex flex-col">
             <div class="flex items-center mb-4">
               <div class="flex-shrink-0 p-4">
@@ -310,17 +297,12 @@ onMounted(() => {
             </div>
           </div>
         </CardBox>
-      </div>
 
-      <!-- 第二行：流量和告警 -->
-      <div class="grid grid-cols-1 gap-4 lg:grid-cols-2 mb-6">
-        <!-- 流量统计 -->
-        <CardBox @click="switchView('traffic')" 
-                :class="{
-                  'transform -translate-y-1 shadow-lg': selectedView === 'traffic',
-                  'hover:shadow-md hover:-translate-y-0.5': selectedView !== 'traffic'
-                }"
-                class="cursor-pointer transition-all duration-200">
+        <!-- 流量统计卡片 -->
+        <CardBox 
+          class="bg-gradient-to-r from-green-50 to-emerald-50 hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
+          @click="switchView('traffic')"
+        >
           <div class="flex flex-col">
             <div class="flex items-center mb-4">
               <div class="flex-shrink-0 p-4">
@@ -346,9 +328,11 @@ onMounted(() => {
           </div>
         </CardBox>
 
-        <!-- 系统日志 -->
+        <!-- 系统日志卡片 -->
         <CardBox 
-                class="cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+          class="bg-gradient-to-r from-red-50 to-rose-50 hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
+          @click="switchView('traffic')"
+        >
           <div class="flex flex-col">
             <div class="flex items-center mb-4">
               <div class="flex-shrink-0 p-4">
@@ -374,16 +358,36 @@ onMounted(() => {
         </CardBox>
       </div>
 
-      <!-- 详细信息展示区域 -->
+      <div class="mb-6">
+        <BaseButtons>
+          <BaseButton
+            :color="selectedView === 'users' ? 'info' : 'white'"
+            :label="'用户概况'"
+            :icon="mdiAccountMultiple"
+            @click="switchView('users')"
+          />
+          <BaseButton
+            :color="selectedView === 'traffic' ? 'info' : 'white'"
+            :label="'流量概况'"
+            :icon="mdiChartLine"
+            @click="switchView('traffic')"
+          />
+          <BaseButton
+            :color="selectedView === 'finance' ? 'info' : 'white'"
+            :label="'财务概况'"
+            :icon="mdiCurrencyUsd"
+            @click="switchView('finance')"
+          />
+        </BaseButtons>
+      </div>
+
       <CardBox>
-        <!-- 流量警报概况 -->
         <div v-if="selectedView === 'traffic'">
           <BaseLevel class="mb-4">
             <h3 class="text-lg font-bold">流量警报概况</h3>
           </BaseLevel>
           
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <!-- 异常流量警报 -->
             <div class="p-4 bg-red-50 rounded-lg">
               <h4 class="font-semibold mb-2">异常流量警报</h4>
               <div v-for="alert in detailData.traffic.alerts" :key="alert.id"
@@ -538,5 +542,14 @@ button:hover::after {
   font-size: 12px;
   white-space: nowrap;
   z-index: 10;
+}
+
+/* 添加渐变背景和阴影效果 */
+.card-box-highlight {
+  @apply shadow-lg transition-all duration-300;
+}
+
+.card-box-highlight:hover {
+  @apply shadow-xl transform -translate-y-1;
 }
 </style>
