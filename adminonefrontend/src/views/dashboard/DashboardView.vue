@@ -211,23 +211,23 @@ onMounted(() => {
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <!-- 用户状态卡片 -->
         <CardBox 
-          class="bg-gradient-to-r from-purple-50 to-pink-50 hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
+          class="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30 hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
           @click="switchView('users')"
         >
           <div class="flex items-center">
             <div class="flex-shrink-0 p-4">
-              <div class="rounded-full bg-purple-500 p-3">
+              <div class="rounded-full bg-purple-500 dark:bg-purple-400 p-3">
                 <BaseIcon :path="mdiAccountMultiple" class="text-white" />
               </div>
             </div>
             <div>
-              <p class="text-lg font-medium text-gray-800">用户状态</p>
-              <p class="text-2xl font-bold text-purple-600">{{ stats.users.total }} 个</p>
+              <p class="text-lg font-medium text-gray-800 dark:text-gray-200">用户状态</p>
+              <p class="text-2xl font-bold text-purple-600 dark:text-purple-400">{{ stats.users.total }} 个</p>
               <div class="text-sm mt-2">
-                <span class="bg-green-100 text-green-800 px-2 py-1 rounded">
+                <span class="bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 px-2 py-1 rounded">
                   {{ stats.users.active }} 活跃
                 </span>
-                <span class="bg-red-100 text-red-800 px-2 py-1 rounded ml-2">
+                <span class="bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300 px-2 py-1 rounded ml-2">
                   {{ stats.users.expired }} 过期
                 </span>
               </div>
@@ -237,7 +237,7 @@ onMounted(() => {
 
         <!-- 租约到期卡片 -->
         <CardBox 
-          class="bg-gradient-to-r from-orange-50 to-red-50 hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
+          class="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/30 dark:to-red-900/30 hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
           @click="switchView('users')"
         >
           <div class="flex items-center">
@@ -266,7 +266,7 @@ onMounted(() => {
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <!-- 系统运行状态卡片 -->
         <CardBox 
-          class="bg-gradient-to-r from-blue-50 to-cyan-50 hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
+          class="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/30 dark:to-cyan-900/30 hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
           @click="switchView('traffic')"
         >
           <div class="flex flex-col">
@@ -277,7 +277,7 @@ onMounted(() => {
                 </div>
               </div>
               <div>
-                <p class="text-sm font-medium text-gray-600">系统运行状态</p>
+                <p class="text-sm font-medium text-gray-600 dark:text-gray-300">系统运行状态</p>
                 <p class="text-lg font-semibold">{{ stats.servers.total }} 台服务器</p>
               </div>
             </div>
@@ -300,7 +300,7 @@ onMounted(() => {
 
         <!-- 流量统计卡片 -->
         <CardBox 
-          class="bg-gradient-to-r from-green-50 to-emerald-50 hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
+          class="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
           @click="switchView('traffic')"
         >
           <div class="flex flex-col">
@@ -330,7 +330,7 @@ onMounted(() => {
 
         <!-- 系统日志卡片 -->
         <CardBox 
-          class="bg-gradient-to-r from-red-50 to-rose-50 hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
+          class="bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-900/30 dark:to-rose-900/30 hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
           @click="switchView('traffic')"
         >
           <div class="flex flex-col">
@@ -361,19 +361,19 @@ onMounted(() => {
       <div class="mb-6">
         <BaseButtons>
           <BaseButton
-            :color="selectedView === 'users' ? 'info' : 'white'"
+            :color="selectedView === 'users' ? 'info' : 'white dark:gray'"
             :label="'用户概况'"
             :icon="mdiAccountMultiple"
             @click="switchView('users')"
           />
           <BaseButton
-            :color="selectedView === 'traffic' ? 'info' : 'white'"
+            :color="selectedView === 'traffic' ? 'info' : 'white dark:gray'"
             :label="'流量概况'"
             :icon="mdiChartLine"
             @click="switchView('traffic')"
           />
           <BaseButton
-            :color="selectedView === 'finance' ? 'info' : 'white'"
+            :color="selectedView === 'finance' ? 'info' : 'white dark:gray'"
             :label="'财务概况'"
             :icon="mdiCurrencyUsd"
             @click="switchView('finance')"
@@ -384,11 +384,11 @@ onMounted(() => {
       <CardBox>
         <div v-if="selectedView === 'traffic'">
           <BaseLevel class="mb-4">
-            <h3 class="text-lg font-bold">流量警报概况</h3>
+            <h3 class="text-lg font-bold dark:text-white">流量警报概况</h3>
           </BaseLevel>
           
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div class="p-4 bg-red-50 rounded-lg">
+            <div class="p-4 bg-red-50 dark:bg-red-900/30 rounded-lg">
               <h4 class="font-semibold mb-2">异常流量警报</h4>
               <div v-for="alert in detailData.traffic.alerts" :key="alert.id"
                    class="mb-2 p-2 bg-white rounded shadow">
@@ -398,7 +398,7 @@ onMounted(() => {
             </div>
             
             <!-- 高流量用户 -->
-            <div class="p-4 bg-blue-50 rounded-lg">
+            <div class="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
               <h4 class="font-semibold mb-2">高流量用户</h4>
               <div v-for="user in detailData.traffic.topUsers" :key="user.id"
                    class="mb-2 p-2 bg-white rounded shadow">
@@ -412,7 +412,7 @@ onMounted(() => {
             </div>
             
             <!-- 月度统计 -->
-            <div class="p-4 bg-green-50 rounded-lg">
+            <div class="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
               <h4 class="font-semibold mb-2">月度流量统计</h4>
               <div class="space-y-2">
                 <p class="text-sm">总流量: {{ detailData.traffic.monthlyStats.total }}GB</p>
@@ -426,37 +426,37 @@ onMounted(() => {
         <!-- 用户概况 -->
         <div v-if="selectedView === 'users'">
           <BaseLevel class="mb-4">
-            <h3 class="text-lg font-bold">用户概况</h3>
+            <h3 class="text-lg font-bold dark:text-white">用户概况</h3>
           </BaseLevel>
           
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <!-- 新增用户 -->
-            <div class="p-4 bg-green-50 rounded-lg">
-              <h4 class="font-semibold mb-2">新增用户</h4>
+            <div class="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
+              <h4 class="font-semibold mb-2 dark:text-gray-200">新增用户</h4>
               <div v-for="user in detailData.users.newUsers" :key="user.id"
-                   class="mb-2 p-2 bg-white rounded shadow">
-                <p class="text-sm">{{ user.username }}</p>
-                <p class="text-xs text-gray-500">注册时间: {{ new Date(user.created_at).toLocaleString() }}</p>
+                   class="mb-2 p-2 bg-white dark:bg-gray-800 rounded shadow">
+                <p class="text-sm dark:text-gray-300">{{ user.username }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">注册时间: {{ new Date(user.created_at).toLocaleString() }}</p>
               </div>
             </div>
             
             <!-- 即将到期 -->
-            <div class="p-4 bg-yellow-50 rounded-lg">
-              <h4 class="font-semibold mb-2">即将到期用户</h4>
+            <div class="p-4 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg">
+              <h4 class="font-semibold mb-2 dark:text-gray-200">即将到期用户</h4>
               <div v-for="user in detailData.users.expiringUsers" :key="user.id"
-                   class="mb-2 p-2 bg-white rounded shadow">
-                <p class="text-sm">{{ user.username }}</p>
-                <p class="text-xs text-gray-500">到期时间: {{ new Date(user.expiry_date).toLocaleString() }}</p>
+                   class="mb-2 p-2 bg-white dark:bg-gray-800 rounded shadow">
+                <p class="text-sm dark:text-gray-300">{{ user.username }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">到期时间: {{ new Date(user.expiry_date).toLocaleString() }}</p>
               </div>
             </div>
             
             <!-- 活跃度统计 -->
-            <div class="p-4 bg-blue-50 rounded-lg">
-              <h4 class="font-semibold mb-2">用户活跃度</h4>
+            <div class="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+              <h4 class="font-semibold mb-2 dark:text-gray-200">用户活跃度</h4>
               <div class="space-y-2">
-                <p class="text-sm">日活跃: {{ detailData.users.activeStats.daily }}</p>
-                <p class="text-sm">周活跃: {{ detailData.users.activeStats.weekly }}</p>
-                <p class="text-sm">月活跃: {{ detailData.users.activeStats.monthly }}</p>
+                <p class="text-sm dark:text-gray-300">日活跃: {{ detailData.users.activeStats.daily }}</p>
+                <p class="text-sm dark:text-gray-300">周活跃: {{ detailData.users.activeStats.weekly }}</p>
+                <p class="text-sm dark:text-gray-300">月活跃: {{ detailData.users.activeStats.monthly }}</p>
               </div>
             </div>
           </div>
@@ -465,12 +465,12 @@ onMounted(() => {
         <!-- 财务概况 -->
         <div v-if="selectedView === 'finance'">
           <BaseLevel class="mb-4">
-            <h3 class="text-lg font-bold">财务概况</h3>
+            <h3 class="text-lg font-bold dark:text-white">财务概况</h3>
           </BaseLevel>
           
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <!-- 最近交易 -->
-            <div class="p-4 bg-green-50 rounded-lg">
+            <div class="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
               <h4 class="font-semibold mb-2">最近交易</h4>
               <div v-for="transaction in detailData.finance.recentTransactions" :key="transaction.id"
                    class="mb-2 p-2 bg-white rounded shadow">
@@ -480,7 +480,7 @@ onMounted(() => {
             </div>
             
             <!-- 月度收入 -->
-            <div class="p-4 bg-blue-50 rounded-lg">
+            <div class="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
               <h4 class="font-semibold mb-2">月度收入</h4>
               <div class="space-y-2">
                 <p class="text-sm">本月收入: ¥{{ detailData.finance.monthlyRevenue.current }}</p>
@@ -489,7 +489,7 @@ onMounted(() => {
             </div>
             
             <!-- 分销商统计 -->
-            <div class="p-4 bg-purple-50 rounded-lg">
+            <div class="p-4 bg-purple-50 dark:bg-purple-900/30 rounded-lg">
               <h4 class="font-semibold mb-2">分销商统计</h4>
               <div class="space-y-2">
                 <p class="text-sm">分销商数量: {{ detailData.finance.distributorStats.total }}</p>
