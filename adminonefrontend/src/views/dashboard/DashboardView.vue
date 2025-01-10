@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionMain from '@/components/SectionMain.vue'
 import CardBox from '@/components/CardBox.vue'
@@ -18,7 +18,8 @@ import {
   mdiInformation,
   mdiHistory,
   mdiDownload,
-  mdiBellRing
+  mdiBellRing,
+  mdiRefresh
 } from '@mdi/js'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
 import api from '@/services/api'
@@ -26,155 +27,170 @@ import BaseIcon from '@/components/BaseIcon.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseLevel from '@/components/BaseLevel.vue'
 
-// 扩展状态管理
-const containers = ref([])
-const traffic = ref(null)
-const alerts = ref([])
-const rentalInfo = ref(null)
-const servers = ref([])
-const services = ref([])
-const allContainers = ref([]) // 显示全部容器流量
+// 核心状态数据
+const stats = ref({
+  containers: { total: 0, running: 0, stopped: 0, error: 0 },
+  servers: { total: 0, running: 0, stopped: 0, error: 0 },
+  users: { total: 0, active: 0, expired: 0 },
+  alerts: { total: 0, critical: 0 },
+  traffic: { used: 0, total: 0 },
+  expiring: { in5days: 0, in10days: 0 },
+  income: { total: 0, direct: 0, distributor: 0, unpaid: 0 },
+  serials: { total: 0, used: 0, unused: 0, deleted: 0 }
+})
+
+const allContainers = ref([])
 const users = ref([])
+const serials = ref([])
+
+// 分页设置
 const currentPage = ref(1)
-const itemsPerPage = 10
-const sortKey = ref('name')
-const sortOrder = ref(1)
+const itemsPerPage = 5 // 减少每页显示数量
 
-// 新增的响应式数据
-const expiringUsers = ref([])
-const expiringIn5Days = ref(0)
-const expiringIn10Days = ref(0)
-const totalIncome = ref(0)
-const directIncome = ref(0)
-const distributorIncome = ref(0)
-const unpaidIncome = ref(0)
-const totalSerials = ref(0)
-const usedSerials = ref(0)
-const unusedSerials = ref(0)
-const deletedSerials = ref(0)
+// 当前选中的展示类型
+const selectedView = ref('traffic')  // 默认显示流量警报概况
 
-// 计算分页数据
-const paginatedContainers = computed(() => {
-  const start = (currentPage.value - 1) * itemsPerPage
-  const end = start + itemsPerPage
-  return allContainers.value.slice(start, end)
-})
-
-const paginatedUsers = computed(() => {
-  const start = (currentPage.value - 1) * itemsPerPage
-  const end = start + itemsPerPage
-  return users.value.slice(start, end)
-})
-
-// 排序函数
-const sortData = (data, key) => {
-  if (sortKey.value === key) {
-    sortOrder.value *= -1
-  } else {
-    sortKey.value = key
-    sortOrder.value = 1
+// 详细数据
+const detailData = ref({
+  traffic: {
+    alerts: [],
+    topUsers: [],
+    monthlyStats: []
+  },
+  users: {
+    newUsers: [],
+    expiringUsers: [],
+    activeStats: {}
+  },
+  finance: {
+    recentTransactions: [],
+    monthlyRevenue: [],
+    distributorStats: {}
   }
-  data.sort((a, b) => {
-    // 对于日期类型的字段进行特殊处理
-    if (key === 'rental_expiry' || key === 'last_login') {
-      return (new Date(a[key] || 0) - new Date(b[key] || 0)) * sortOrder.value
-    }
-    if (a[key] < b[key]) return -1 * sortOrder.value
-    if (a[key] > b[key]) return 1 * sortOrder.value
-    return 0
-  })
+})
+
+// 切换展示视图
+const switchView = async (type) => {
+  selectedView.value = type
+  await fetchDetailData(type)
 }
 
-// 刷新数据
-const refreshData = async () => {
+// 获取详细数据
+const fetchDetailData = async (type) => {
   try {
-    console.log('开始刷新数据');
-    const response = await api.getAllUsers();
-    console.log('获取到的用户数据:', response); // 添加日志
+    switch(type) {
+      case 'traffic':
+        const [trafficAlerts, trafficStats, overlimitUsers] = await Promise.all([
+          api.getAlerts(),
+          api.getTrafficStats(),
+          api.getOverlimitUsers()
+        ])
+        
+        detailData.value.traffic = {
+          alerts: trafficAlerts?.data || [],
+          topUsers: overlimitUsers?.data || [],
+          monthlyStats: trafficStats?.data || {
+            total: 0,
+            avgPerUser: 0,
+            overlimitUsers: 0
+          }
+        }
+        break
+
+      case 'users':
+        const [newUsers, expiringUsers, activeStats] = await Promise.all([
+          api.getAllUsers(),
+          api.checkRentalExpiry(),
+          api.getMonitoringStatus()
+        ])
+        
+        detailData.value.users = {
+          newUsers: (newUsers?.data || [])
+            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+            .slice(0, 5),
+          expiringUsers: expiringUsers?.data || [],
+          activeStats: activeStats?.data?.users || {
+            daily: 0,
+            weekly: 0,
+            monthly: 0
+          }
+        }
+        break
+
+      case 'finance':
+        const [transactions, revenue, distributors] = await Promise.all([
+          api.getIncomeStats(),
+          api.getTrafficStats(), // 假设这个API也返回收入数据
+          api.getAllUsers()
+        ])
+        
+        detailData.value.finance = {
+          recentTransactions: transactions?.data?.recent || [],
+          monthlyRevenue: {
+            current: revenue?.data?.currentMonth || 0,
+            growth: revenue?.data?.growth || 0
+          },
+          distributorStats: {
+            total: distributors?.data?.filter(u => u.role === 'distributor')?.length || 0,
+            commission: transactions?.data?.distributorCommission || 0
+          }
+        }
+        break
+    }
+  } catch (error) {
+    console.error('获取详细数据失败:', error)
+  }
+}
+
+// 获取仪表盘数据
+const fetchDashboardData = async () => {
+  try {
+    console.log('开始获取仪表盘数据...')
     
-    // 检查响应格式并正确提取数据
-    if (response && Array.isArray(response)) {
-      users.value = response;
-    } else if (response && Array.isArray(response.data)) {
-      users.value = response.data;
-    } else if (response && response.users && Array.isArray(response.users)) {
-      users.value = response.users;
-    } else {
-      console.error('用户数据格式不符合预期:', response);
-      users.value = []; // 设置为空数组避免页面报错
+    // 获取系统概览数据
+    const [overview, alerts, traffic, users, income] = await Promise.all([
+      api.getSystemOverview(),
+      api.getAlerts(),
+      api.getRealTimeTraffic(),
+      api.getAllUsers(),
+      api.getIncomeStats()
+    ])
+
+    if (overview && overview.data) {
+      stats.value = {
+        containers: overview.data.containers || { total: 0, running: 0, stopped: 0, error: 0 },
+        servers: overview.data.servers || { total: 0, running: 0, stopped: 0, error: 0 },
+        users: {
+          total: users?.data?.length || 0,
+          active: users?.data?.filter(u => !u.expired)?.length || 0,
+          expired: users?.data?.filter(u => u.expired)?.length || 0
+        },
+        alerts: {
+          total: alerts?.data?.length || 0,
+          critical: alerts?.data?.filter(a => a.level === 'critical')?.length || 0
+        },
+        traffic: traffic?.data || { used: 0, total: 0 },
+        income: income?.data || { total: 0, direct: 0, distributor: 0, unpaid: 0 }
+      }
     }
 
-    try {
-      // 获取到期用户数据
-      const expiryData = await api.getExpiringUsers()
-      expiringUsers.value = expiryData || []
-      expiringIn5Days.value = (expiryData || []).filter(u => u.daysRemaining <= 5).length
-      expiringIn10Days.value = (expiryData || []).filter(u => u.daysRemaining <= 10).length
-
-      // 获取收入统计
-      const incomeData = await api.getIncomeStats() || {}
-      totalIncome.value = incomeData.total || 0
-      directIncome.value = incomeData.direct || 0
-      distributorIncome.value = incomeData.distributor || 0
-      unpaidIncome.value = incomeData.unpaid || 0
-
-      // 获取序列号统计
-      const serialData = await api.getSerialStats() || {}
-      totalSerials.value = serialData.total || 0
-      usedSerials.value = serialData.used || 0
-      unusedSerials.value = serialData.unused || 0
-      deletedSerials.value = serialData.deleted || 0
-    } catch (error) {
-      console.error('获取额外统计数据失败:', error);
-      // 不影响用户列表显示
-    }
+    // 获取详细数据
+    await fetchDetailData(selectedView.value)
 
   } catch (error) {
-    console.error('获取用户数据失败:', error);
-    users.value = []; // 出错时设置为空数组
+    console.error('获取仪表盘数据失败:', error)
   }
 }
 
-const viewRentalInfo = async (userId) => {
-  try {
-    const rentalInfo = await api.getRentalInfo(userId)
-    console.log('租赁详情:', rentalInfo)
-  } catch (error) {
-    console.error('获取租赁详情失败:', error)
-  }
-}
-
-const viewRentalHistory = async (userId) => {
-  try {
-    const rentalHistory = await api.getRentalHistory(userId)
-    console.log('租赁历史:', rentalHistory)
-  } catch (error) {
-    console.error('获取租赁历史失败:', error)
-  }
-}
-
-const downloadAcl = async (userId) => {
-  try {
-    await api.downloadAcl(userId)
-  } catch (error) {
-    console.error('下载ACL失败:', error)
-  }
-}
-
-const sendReminder = async (userId) => {
-  try {
-    await api.sendReminderNotification({ userId })
-    console.log('续费通知已发送')
-  } catch (error) {
-    console.error('发送续费通知失败:', error)
-  }
-}
-
+// 修改 onMounted
 onMounted(() => {
-  refreshData()
-  // 可以暂时注释掉定时刷新，方便调试
-  // const timer = setInterval(refreshData, 30000)
-  // onUnmounted(() => clearInterval(timer))
+  fetchDashboardData()
+  fetchDetailData('traffic')  // 默认加载流量详情
+  const timer = setInterval(fetchDashboardData, 30000)
+  
+  onUnmounted(() => {
+    clearInterval(timer)
+  })
 })
 </script>
 
@@ -182,296 +198,303 @@ onMounted(() => {
   <LayoutAuthenticated>
     <SectionMain>
       <SectionTitleLineWithButton :icon="mdiChartTimelineVariant" title="系统概览" main>
-        <BaseButton
-          :icon="mdiEye"
-          color="info"
-          outline
-          label="刷新"
-          @click="refreshData"
-        />
+        <BaseButton :icon="mdiRefresh" label="刷新" @click="fetchDashboardData" />
       </SectionTitleLineWithButton>
 
-      <!-- 系统状态卡片 -->
-      <div class="grid grid-cols-1 gap-6 lg:grid-cols-4 mb-6">
-        <!-- 容器状态 -->
-        <CardBox>
-          <div class="flex items-center">
-            <div class="flex-shrink-0 p-4">
-              <div class="rounded-full bg-blue-500 p-3">
-                <BaseIcon :path="mdiDocker" class="text-white" />
+      <!-- 核心状态卡片 -->
+      <div class="grid grid-cols-1 gap-4 lg:grid-cols-3 mb-6">
+        <!-- 用户与租约状态 -->
+        <CardBox @click="switchView('users')" 
+                :class="{
+                  'transform -translate-y-1 shadow-lg': selectedView === 'users',
+                  'hover:shadow-md hover:-translate-y-0.5': selectedView !== 'users'
+                }"
+                class="cursor-pointer transition-all duration-200">
+          <div class="flex flex-col">
+            <div class="flex items-center mb-4">
+              <div class="flex-shrink-0 p-4">
+                <div class="rounded-full bg-green-500 p-3">
+                  <BaseIcon :path="mdiAccountMultiple" class="text-white" />
+                </div>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-gray-600">用户与租约</p>
+                <p class="text-lg font-semibold">{{ stats.users.total }} 个用户</p>
               </div>
             </div>
-            <div>
-              <p class="text-sm font-medium text-gray-600">容器状态</p>
-              <p class="text-lg font-semibold">{{ containers.length }} 个</p>
-              <div class="text-sm text-gray-500">
-                <span class="text-green-500">{{ containers.filter(c => c.status === 'running').length }} 运行</span> /
-                <span class="text-gray-500">{{ containers.filter(c => c.status === 'stopped').length }} 停止</span> /
-                <span class="text-red-500">{{ containers.filter(c => c.status === 'error').length }} 异常</span>
+            <div class="grid grid-cols-2 gap-2 px-4">
+              <div class="text-sm">
+                <span class="text-green-500">{{ stats.users.active }}</span> 活跃
               </div>
-            </div>
-          </div>
-        </CardBox>
-
-        <!-- 服务器状态 -->
-        <CardBox>
-          <div class="flex items-center">
-            <div class="flex-shrink-0 p-4">
-              <div class="rounded-full bg-purple-500 p-3">
-                <BaseIcon :path="mdiServer" class="text-white" />
+              <div class="text-sm">
+                <span class="text-yellow-500">{{ stats.users.expired }}</span> 到期
               </div>
-            </div>
-            <div>
-              <p class="text-sm font-medium text-gray-600">服务器状态</p>
-              <p class="text-lg font-semibold">{{ servers.length }} 台</p>
-              <div class="text-sm text-gray-500">
-                <span class="text-green-500">{{ servers.filter(s => s.status === 'running').length }} 运行</span> /
-                <span class="text-gray-500">{{ servers.filter(s => s.status === 'stopped').length }} 停止</span> /
-                <span class="text-red-500">{{ servers.filter(s => s.status === 'error').length }} 异常</span>
+              <div class="text-sm">
+                <span class="text-orange-500">{{ stats.expiring.in5days }}</span> 即将到期
+              </div>
+              <div class="text-sm">
+                <span class="text-blue-500">{{ stats.serials.unused }}</span> 可用序列号
               </div>
             </div>
           </div>
         </CardBox>
 
-        <!-- 系统状态 -->
-        <CardBox>
-          <div class="flex items-center">
-            <div class="flex-shrink-0 p-4">
-              <div class="rounded-full bg-green-500 p-3">
-                <BaseIcon :path="mdiChartLine" class="text-white" />
+        <!-- 收入与财务状态 -->
+        <CardBox @click="switchView('finance')" 
+                :class="{
+                  'transform -translate-y-1 shadow-lg': selectedView === 'finance',
+                  'hover:shadow-md hover:-translate-y-0.5': selectedView !== 'finance'
+                }"
+                class="cursor-pointer transition-all duration-200">
+          <div class="flex flex-col">
+            <div class="flex items-center mb-4">
+              <div class="flex-shrink-0 p-4">
+                <div class="rounded-full bg-green-500 p-3">
+                  <BaseIcon :path="mdiCurrencyUsd" class="text-white" />
+                </div>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-gray-600">收入与财务</p>
+                <p class="text-lg font-semibold">¥{{ stats.income.total }}</p>
               </div>
             </div>
-            <div>
-              <p class="text-sm font-medium text-gray-600">系统状态</p>
-              <p class="text-lg font-semibold text-green-500">正常</p>
-              <div class="text-sm text-gray-500 space-y-1">
-                <div>邮件服务器：<span class="text-green-500 font-bold">正常</span></div>
-                <div>Derp system：<span class="text-green-500 font-bold">正常</span></div>
+            <div class="grid grid-cols-2 gap-2 px-4">
+              <div class="text-sm">
+                <span class="text-green-500">¥{{ stats.income.direct }}</span> 直接收入
               </div>
-            </div>
-          </div>
-        </CardBox>
-
-        <!-- 告警信息 -->
-        <CardBox>
-          <div class="flex items-center">
-            <div class="flex-shrink-0 p-4">
-              <div class="rounded-full bg-red-500 p-3">
-                <BaseIcon :path="mdiAlertCircle" class="text-white" />
+              <div class="text-sm">
+                <span class="text-purple-500">¥{{ stats.income.distributor }}</span> 分销收入
               </div>
-            </div>
-            <div>
-              <p class="text-sm font-medium text-gray-600">告警信息</p>
-              <p class="text-lg font-semibold">{{ alerts.length }} 个</p>
-              <p class="text-sm text-gray-500">
-                严重: {{ alerts.filter(a => a.level === 'critical').length }}
-              </p>
-            </div>
-          </div>
-        </CardBox>
-
-        <!-- 用户统计 -->
-        <CardBox>
-          <div class="flex items-center">
-            <div class="flex-shrink-0 p-4">
-              <div class="rounded-full bg-blue-500 p-3">
-                <BaseIcon :path="mdiAccountMultiple" class="text-white" />
+              <div class="text-sm">
+                <span class="text-red-500">¥{{ stats.income.unpaid }}</span> 未结算
               </div>
-            </div>
-            <div>
-              <p class="text-sm font-medium text-gray-600">用户统计</p>
-              <p class="text-lg font-semibold">{{ users.length }} 个</p>
-              <div class="text-sm text-gray-500">
-                <span>{{ users.filter(u => u.role === 'user').length }} 用户</span> /
-                <span>{{ users.filter(u => u.role === 'admin').length }} 管理</span> /
-                <span>{{ users.filter(u => u.role === 'distributor').length }} 分销</span>
+              <div class="text-sm">
+                <span class="text-gray-500">{{ stats.serials.total }}</span> 总序列号
               </div>
             </div>
           </div>
         </CardBox>
 
-        <!-- 租约到期 -->
-        <CardBox>
-          <div class="flex items-center">
-            <div class="flex-shrink-0 p-4">
-              <div class="rounded-full bg-yellow-500 p-3">
-                <BaseIcon :path="mdiClockAlert" class="text-white" />
+        <!-- 系统运行状态 -->
+        <CardBox @click="switchView('traffic')" 
+                :class="{
+                  'transform -translate-y-1 shadow-lg': selectedView === 'traffic',
+                  'hover:shadow-md hover:-translate-y-0.5': selectedView !== 'traffic'
+                }"
+                class="cursor-pointer transition-all duration-200">
+          <div class="flex flex-col">
+            <div class="flex items-center mb-4">
+              <div class="flex-shrink-0 p-4">
+                <div class="rounded-full bg-blue-500 p-3">
+                  <BaseIcon :path="mdiServer" class="text-white" />
+                </div>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-gray-600">系统运行状态</p>
+                <p class="text-lg font-semibold">{{ stats.servers.total }} 台服务器</p>
               </div>
             </div>
-            <div>
-              <p class="text-sm font-medium text-gray-600">租约到期</p>
-              <p class="text-lg font-semibold">{{ expiringUsers.length }} 个</p>
-              <div class="text-sm text-gray-500">
-                <span>{{ expiringIn5Days }} 剩余5日内</span> /
-                <span>{{ expiringIn10Days }} 剩余10日内</span>
+            <div class="grid grid-cols-2 gap-2 px-4">
+              <div class="text-sm">
+                <span class="text-green-500">{{ stats.servers.running }}</span> 服务器运行
               </div>
-            </div>
-          </div>
-        </CardBox>
-
-        <!-- 收入统计 -->
-        <CardBox>
-          <div class="flex items-center">
-            <div class="flex-shrink-0 p-4">
-              <div class="rounded-full bg-green-500 p-3">
-                <BaseIcon :path="mdiCurrencyUsd" class="text-white" />
+              <div class="text-sm">
+                <span class="text-red-500">{{ stats.servers.error }}</span> 服务器异常
               </div>
-            </div>
-            <div>
-              <p class="text-sm font-medium text-gray-600">收入统计</p>
-              <p class="text-lg font-semibold">¥ {{ totalIncome }}</p>
-              <div class="text-sm text-gray-500">
-                <span>{{ directIncome }} 直营</span> /
-                <span>{{ distributorIncome }} 分销</span> /
-                <span>{{ unpaidIncome }} 未结</span>
+              <div class="text-sm">
+                <span class="text-green-500">{{ stats.containers.running }}</span> 容器运行
               </div>
-            </div>
-          </div>
-        </CardBox>
-
-        <!-- 序列号统计 -->
-        <CardBox>
-          <div class="flex items-center">
-            <div class="flex-shrink-0 p-4">
-              <div class="rounded-full bg-purple-500 p-3">
-                <BaseIcon :path="mdiKey" class="text-white" />
-              </div>
-            </div>
-            <div>
-              <p class="text-sm font-medium text-gray-600">序列号统计</p>
-              <p class="text-lg font-semibold">{{ totalSerials }} 个</p>
-              <div class="text-sm text-gray-500">
-                <span>{{ usedSerials }} 已用</span> /
-                <span>{{ unusedSerials }} 未用</span> /
-                <span>{{ deletedSerials }} 已删</span>
+              <div class="text-sm">
+                <span class="text-red-500">{{ stats.containers.error }}</span> 容器异常
               </div>
             </div>
           </div>
         </CardBox>
       </div>
 
-      <!-- 容器流量 -->
+      <!-- 第二行：流量和告警 -->
+      <div class="grid grid-cols-1 gap-4 lg:grid-cols-2 mb-6">
+        <!-- 流量统计 -->
+        <CardBox @click="switchView('traffic')" 
+                :class="{
+                  'transform -translate-y-1 shadow-lg': selectedView === 'traffic',
+                  'hover:shadow-md hover:-translate-y-0.5': selectedView !== 'traffic'
+                }"
+                class="cursor-pointer transition-all duration-200">
+          <div class="flex flex-col">
+            <div class="flex items-center mb-4">
+              <div class="flex-shrink-0 p-4">
+                <div class="rounded-full bg-blue-500 p-3">
+                  <BaseIcon :path="mdiChartLine" class="text-white" />
+                </div>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-gray-600">流量统计</p>
+                <p class="text-lg font-semibold">{{ stats.traffic.used }}GB / {{ stats.traffic.total }}GB</p>
+              </div>
+            </div>
+            <div class="px-4">
+              <div class="w-full bg-gray-200 rounded h-2 mb-2">
+                <div class="bg-blue-600 h-2 rounded"
+                     :style="{width: `${(stats.traffic.used / stats.traffic.total * 100)}%`}"
+                ></div>
+              </div>
+              <div class="text-sm text-gray-500">
+                使用率: {{ Math.round(stats.traffic.used / stats.traffic.total * 100) }}%
+              </div>
+            </div>
+          </div>
+        </CardBox>
+
+        <!-- 系统日志 -->
+        <CardBox 
+                class="cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+          <div class="flex flex-col">
+            <div class="flex items-center mb-4">
+              <div class="flex-shrink-0 p-4">
+                <div class="rounded-full bg-red-500 p-3">
+                  <BaseIcon :path="mdiBellRing" class="text-white" />
+                </div>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-gray-600">系统日志</p>
+                <p class="text-lg font-semibold">{{ stats.alerts.total }} 条告警</p>
+              </div>
+            </div>
+            <div class="px-4 space-y-2 max-h-32 overflow-y-auto">
+              <div v-for="(alert, index) in detailData.traffic.alerts" 
+                   :key="index"
+                   class="text-sm p-2 rounded"
+                   :class="alert.level === 'critical' ? 'bg-red-50 text-red-700' : 'bg-yellow-50 text-yellow-700'">
+                {{ alert.message }}
+                <div class="text-xs opacity-75">{{ new Date(alert.time).toLocaleString() }}</div>
+              </div>
+            </div>
+          </div>
+        </CardBox>
+      </div>
+
+      <!-- 详细信息展示区域 -->
       <CardBox>
-        <BaseLevel class="mb-4">
-          <h3 class="text-lg font-bold">容器流量</h3>
-        </BaseLevel>
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead>
-            <tr>
-              <th @click="sortData(allContainers, 'name')" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">容器名称</th>
-              <th @click="sortData(allContainers, 'serverIp')" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">所在服务器IP</th>
-              <th @click="sortData(allContainers, 'userEmail')" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">用户邮箱</th>
-              <th @click="sortData(allContainers, 'port')" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">端口</th>
-              <th @click="sortData(allContainers, 'stunPort')" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">STUN端口</th>
-              <th @click="sortData(allContainers, 'maxTraffic')" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">最高流量</th>
-              <th @click="sortData(allContainers, 'createdAt')" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">创建时间</th>
-              <th @click="sortData(allContainers, 'updatedAt')" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">更新时间</th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-for="container in paginatedContainers" :key="container.id">
-              <td class="px-6 py-4 whitespace-nowrap">{{ container.name }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">{{ container.serverIp }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">{{ container.userEmail }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">{{ container.port }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">{{ container.stunPort }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">{{ container.maxTraffic }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">{{ container.createdAt }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">{{ container.updatedAt }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <div class="mt-4 space-x-2">
-          <BaseButton @click="currentPage--" :disabled="currentPage === 1" label="上一页" />
-          <BaseButton @click="currentPage++" :disabled="currentPage * itemsPerPage >= allContainers.length" label="下一页" />
+        <!-- 流量警报概况 -->
+        <div v-if="selectedView === 'traffic'">
+          <BaseLevel class="mb-4">
+            <h3 class="text-lg font-bold">流量警报概况</h3>
+          </BaseLevel>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- 异常流量警报 -->
+            <div class="p-4 bg-red-50 rounded-lg">
+              <h4 class="font-semibold mb-2">异常流量警报</h4>
+              <div v-for="alert in detailData.traffic.alerts" :key="alert.id"
+                   class="mb-2 p-2 bg-white rounded shadow">
+                <p class="text-sm">{{ alert.message }}</p>
+                <p class="text-xs text-gray-500">{{ new Date(alert.time).toLocaleString() }}</p>
+              </div>
+            </div>
+            
+            <!-- 高流量用户 -->
+            <div class="p-4 bg-blue-50 rounded-lg">
+              <h4 class="font-semibold mb-2">高流量用户</h4>
+              <div v-for="user in detailData.traffic.topUsers" :key="user.id"
+                   class="mb-2 p-2 bg-white rounded shadow">
+                <p class="text-sm">{{ user.username }}</p>
+                <div class="w-full bg-gray-200 rounded h-2">
+                  <div class="bg-blue-600 h-2 rounded"
+                       :style="{width: `${(user.used_traffic / user.max_traffic * 100)}%`}"
+                  ></div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 月度统计 -->
+            <div class="p-4 bg-green-50 rounded-lg">
+              <h4 class="font-semibold mb-2">月度流量统计</h4>
+              <div class="space-y-2">
+                <p class="text-sm">总流量: {{ detailData.traffic.monthlyStats.total }}GB</p>
+                <p class="text-sm">平均每用户: {{ detailData.traffic.monthlyStats.avgPerUser }}GB</p>
+                <p class="text-sm">超限用户数: {{ detailData.traffic.monthlyStats.overlimitUsers }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 用户概况 -->
+        <div v-if="selectedView === 'users'">
+          <BaseLevel class="mb-4">
+            <h3 class="text-lg font-bold">用户概况</h3>
+          </BaseLevel>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- 新增用户 -->
+            <div class="p-4 bg-green-50 rounded-lg">
+              <h4 class="font-semibold mb-2">新增用户</h4>
+              <div v-for="user in detailData.users.newUsers" :key="user.id"
+                   class="mb-2 p-2 bg-white rounded shadow">
+                <p class="text-sm">{{ user.username }}</p>
+                <p class="text-xs text-gray-500">注册时间: {{ new Date(user.created_at).toLocaleString() }}</p>
+              </div>
+            </div>
+            
+            <!-- 即将到期 -->
+            <div class="p-4 bg-yellow-50 rounded-lg">
+              <h4 class="font-semibold mb-2">即将到期用户</h4>
+              <div v-for="user in detailData.users.expiringUsers" :key="user.id"
+                   class="mb-2 p-2 bg-white rounded shadow">
+                <p class="text-sm">{{ user.username }}</p>
+                <p class="text-xs text-gray-500">到期时间: {{ new Date(user.expiry_date).toLocaleString() }}</p>
+              </div>
+            </div>
+            
+            <!-- 活跃度统计 -->
+            <div class="p-4 bg-blue-50 rounded-lg">
+              <h4 class="font-semibold mb-2">用户活跃度</h4>
+              <div class="space-y-2">
+                <p class="text-sm">日活跃: {{ detailData.users.activeStats.daily }}</p>
+                <p class="text-sm">周活跃: {{ detailData.users.activeStats.weekly }}</p>
+                <p class="text-sm">月活跃: {{ detailData.users.activeStats.monthly }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 财务概况 -->
+        <div v-if="selectedView === 'finance'">
+          <BaseLevel class="mb-4">
+            <h3 class="text-lg font-bold">财务概况</h3>
+          </BaseLevel>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- 最近交易 -->
+            <div class="p-4 bg-green-50 rounded-lg">
+              <h4 class="font-semibold mb-2">最近交易</h4>
+              <div v-for="transaction in detailData.finance.recentTransactions" :key="transaction.id"
+                   class="mb-2 p-2 bg-white rounded shadow">
+                <p class="text-sm">¥{{ transaction.amount }}</p>
+                <p class="text-xs text-gray-500">{{ new Date(transaction.time).toLocaleString() }}</p>
+              </div>
+            </div>
+            
+            <!-- 月度收入 -->
+            <div class="p-4 bg-blue-50 rounded-lg">
+              <h4 class="font-semibold mb-2">月度收入</h4>
+              <div class="space-y-2">
+                <p class="text-sm">本月收入: ¥{{ detailData.finance.monthlyRevenue.current }}</p>
+                <p class="text-sm">环比: {{ detailData.finance.monthlyRevenue.growth }}%</p>
+              </div>
+            </div>
+            
+            <!-- 分销商统计 -->
+            <div class="p-4 bg-purple-50 rounded-lg">
+              <h4 class="font-semibold mb-2">分销商统计</h4>
+              <div class="space-y-2">
+                <p class="text-sm">分销商数量: {{ detailData.finance.distributorStats.total }}</p>
+                <p class="text-sm">本月佣金: ¥{{ detailData.finance.distributorStats.commission }}</p>
+              </div>
+            </div>
+          </div>
         </div>
       </CardBox>
-
-      <!-- 分隔线 -->
-      <div class="my-6"></div>
-
-      <!-- 用户列表 -->
-      <CardBox>
-        <BaseLevel class="mb-4">
-          <h3 class="text-lg font-bold">用户列表</h3>
-        </BaseLevel>
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead class="bg-gray-50 dark:bg-gray-800">
-              <tr>
-                <th @click="sortData(users, 'username')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">用户名</th>
-                <th @click="sortData(users, 'email')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">Email</th>
-                <th @click="sortData(users, 'role')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">角色</th>
-                <th @click="sortData(users, 'rental_expiry')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">租约到期</th>
-                <th @click="sortData(users, 'last_login')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">登陆时间</th>
-                <th @click="sortData(users, 'isVerified')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">验证</th>
-                <th @click="sortData(users, 'verificationCode')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">序列号</th>
-                <th class="px-4 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">操作</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-              <tr v-for="user in paginatedUsers" :key="user.id">
-                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.username }}</td>
-                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.email }}</td>
-                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.role }}</td>
-                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.rental_expiry }}</td>
-                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.last_login }}</td>
-                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.isVerified ? '是' : '否' }}</td>
-                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.verificationCode }}</td>
-                <td class="px-4 py-2 whitespace-nowrap text-sm text-center">
-                  <div class="flex justify-center space-x-2">
-                    <button 
-                      @click="viewRentalInfo(user.id)" 
-                      class="text-blue-600 hover:text-blue-800 dark:text-blue-400"
-                      title="租赁详情"
-                    >
-                      <BaseIcon 
-                        :path="mdiInformation"
-                        size="18"
-                      />
-                    </button>
-                    <button 
-                      @click="viewRentalHistory(user.id)" 
-                      class="text-green-600 hover:text-green-800 dark:text-green-400"
-                      title="租赁历史"
-                    >
-                      <BaseIcon 
-                        :path="mdiHistory"
-                        size="18"
-                      />
-                    </button>
-                    <button 
-                      @click="downloadAcl(user.id)" 
-                      class="text-purple-600 hover:text-purple-800 dark:text-purple-400"
-                      title="下载ACL"
-                    >
-                      <BaseIcon 
-                        :path="mdiDownload"
-                        size="18"
-                      />
-                    </button>
-                    <button 
-                      @click="sendReminder(user.id)" 
-                      class="text-orange-600 hover:text-orange-800 dark:text-orange-400"
-                      title="续费通知"
-                    >
-                      <BaseIcon 
-                        :path="mdiBellRing"
-                        size="18"
-                      />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="mt-4 space-x-2">
-          <BaseButton @click="currentPage--" :disabled="currentPage === 1" label="上一页" />
-          <BaseButton @click="currentPage++" :disabled="currentPage * itemsPerPage >= users.length" label="下一页" />
-        </div>
-      </CardBox>
-
     </SectionMain>
   </LayoutAuthenticated>
 </template>
