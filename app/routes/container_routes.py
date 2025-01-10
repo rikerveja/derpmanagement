@@ -62,6 +62,7 @@ def create_new_container():
     创建一个新的 Docker 容器
     """
     data = request.json
+    container_id = data.get('container_id')  # 从请求中获取 container_id
     container_name = data.get('container_name')
     server_id = data.get('server_id')
     image = data.get('image')
@@ -72,14 +73,14 @@ def create_new_container():
     max_download_traffic = data.get('max_download_traffic', 5)  # 默认值为 5 GB
 
     # 检查必填字段
-    if not container_name or not server_id or not image or not port:
+    if not container_id or not container_name or not server_id or not image or not port:
         return jsonify({"success": False, "message": "Missing required parameters"}), 400
 
     try:
         # 创建容器实例并保存到数据库
         new_container = DockerContainer(
-            container_id=f"container_{container_name}",  # 根据容器名称生成容器ID
-            container_name=container_name,
+            container_id=container_id,  # 根据传递的 container_id 存入数据库
+            container_name=container_name,  # 根据传递的 container_name 存入数据库
             server_id=server_id,
             image=image,
             port=port,
