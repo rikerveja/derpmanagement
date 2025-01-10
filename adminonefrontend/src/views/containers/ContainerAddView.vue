@@ -25,6 +25,7 @@ const containerForms = ref([{
   container_id: '',
   container_name: '',
   server_id: '',
+  custom_id: '',
   image: 'zhangjiayuan1983/ip_derper:latest',
   port: null,
   stun_port: null,
@@ -74,6 +75,7 @@ const addContainerForm = () => {
       container_id: '',
       container_name: '',
       server_id: '',
+      custom_id: '',
       image: 'zhangjiayuan1983/ip_derper:latest',
       port: null,
       stun_port: null,
@@ -102,6 +104,21 @@ const updateContainerName = (form, index) => {
 // 监听服务器选择变化
 const handleServerChange = (form, index) => {
   updateContainerName(form, index)
+  updateContainerId(form)
+}
+
+// 更新容器ID
+const updateContainerId = (form) => {
+  const server = servers.value.find(s => s.id === form.server_id)
+  if (server && server.ip_address) {
+    const ipPart = server.ip_address.replace(/\./g, '_')
+    form.container_id = form.custom_id ? `${ipPart}_${form.custom_id}` : ''
+  }
+}
+
+// 监听自定义ID变化
+const handleCustomIdChange = (form) => {
+  updateContainerId(form)
 }
 
 // 检查容器名称是否重复
@@ -178,14 +195,18 @@ onMounted(async () => {
             <!-- 基本信息 -->
             <div class="space-y-4">
               <div class="form-group">
-                <label class="block text-sm font-medium mb-2">容器ID <span class="text-red-500">*</span></label>
+                <label class="block text-sm font-medium mb-2">容器ID号 <span class="text-red-500">*</span></label>
                 <input
-                  v-model="form.container_id"
+                  v-model="form.custom_id"
                   type="text"
                   required
-                  placeholder="请输入容器ID"
+                  placeholder="请输入容器ID号（如：1、2、3等）"
                   class="w-full px-3 py-2 border rounded-md"
+                  @input="handleCustomIdChange(form)"
                 >
+                <div class="mt-1 text-sm text-gray-500">
+                  最终容器ID: {{ form.container_id || '未生成' }}
+                </div>
               </div>
 
               <div class="form-group">
