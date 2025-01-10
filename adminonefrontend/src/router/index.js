@@ -48,6 +48,15 @@ const routes = [
     }
   },
   {
+    path: '/users',
+    name: 'users.list',
+    component: () => import('@/views/users/UserListView.vue'),
+    meta: { 
+      requiresAuth: true,
+      layout: 'authenticated'
+    }
+  },
+  {
     path: '/containers',
     name: 'containers',
     component: () => import('@/views/containers/ContainerListView.vue'),
@@ -58,6 +67,15 @@ const routes = [
     name: 'containers.add',
     component: () => import('@/views/containers/ContainerAddView.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/acl',
+    name: 'acl.list',
+    component: () => import('@/views/acl/AclListView.vue'),
+    meta: { 
+      requiresAuth: true,
+      layout: 'authenticated'
+    }
   }
 ]
 
