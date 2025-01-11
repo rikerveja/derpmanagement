@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import api from '@/services/api'
+import axios from 'axios'
 
 export const useServerStore = defineStore('servers', () => {
   const servers = ref({})
@@ -11,10 +11,10 @@ export const useServerStore = defineStore('servers', () => {
     }
     
     try {
-      const response = await api.getServer(serverId)
-      if (response.success) {
-        servers.value[serverId] = response.server
-        return response.server
+      const response = await axios.get(`http://100.82.38.13:8000/api/server/status/${serverId}`)
+      if (response.data.success) {
+        servers.value[serverId] = response.data.server_info
+        return response.data.server_info
       }
     } catch (error) {
       console.error('获取服务器详情失败:', error)
