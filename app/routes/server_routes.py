@@ -205,7 +205,7 @@ def delete_server(server_id):
 @server_bp.route('/api/server/status/<int:server_id>', methods=['GET'])
 def server_status(server_id):
     """
-    获取指定服务器的状态
+    获取指定服务器的状态以及相关信息
     """
     server = Server.query.get(server_id)
     if not server:
@@ -214,9 +214,33 @@ def server_status(server_id):
 
     try:
         # 获取服务器状态
-        status = get_server_status(server.ip_address)  # 使用 ip_address
+        status = get_server_status(server.ip_address)  # 使用 ip_address 获取服务器状态
+        
+        # 获取服务器的其他相关信息
+        server_info = {
+            "id": server.id,
+            "server_name": server.server_name,
+            "ip_address": server.ip_address,
+            "category_id": server.category_id,
+            "cpu": server.cpu,
+            "memory": server.memory,
+            "storage": server.storage,
+            "bandwidth": server.bandwidth,
+            "status": server.status,
+            "server_type": server.server_type,
+            "region": server.region,
+            "user_count": server.user_count,
+            "total_traffic": server.total_traffic,
+            "remaining_traffic": server.remaining_traffic,
+            "created_at": server.created_at,
+            "updated_at": server.updated_at
+        }
+        
         logging.info(f"Fetched status for server {server_id}: {status}")
-        return jsonify({"success": True, "status": status, "storage": server.storage}), 200  # 使用 storage
+        
+        # 返回服务器状态和其他信息
+        return jsonify({"success": True, "status": status, "server_info": server_info}), 200
+
     except Exception as e:
         logging.error(f"Error getting server status for server {server_id}: {e}")
         return jsonify({"success": False, "message": f"Error getting server status: {str(e)}"}), 500
