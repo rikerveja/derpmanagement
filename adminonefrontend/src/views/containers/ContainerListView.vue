@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useServerStore } from '@/stores/servers'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionMain from '@/components/SectionMain.vue'
 import CardBox from '@/components/CardBox.vue'
@@ -20,7 +21,7 @@ import BaseDialog from '@/components/BaseDialog.vue'
 import api from '@/services/api'
 
 const containers = ref([])
-const serverDetails = ref({})
+const serverStore = useServerStore()
 const currentPage = ref(1)
 const itemsPerPage = 10
 const searchQuery = ref('')
@@ -98,7 +99,7 @@ const fetchContainers = async () => {
       containers.value = response.containers
       console.log('容器列表:', containers.value)
       await fetchServerDetails()
-      console.log('服务器详情:', serverDetails.value)
+      console.log('服务器详情:', serverStore.servers)
     } else {
       throw new Error(response.message)
     }
@@ -113,23 +114,20 @@ const fetchServerDetails = async () => {
   try {
     // 获取所有不重复的服务器ID
     const serverIds = [...new Set(containers.value.map(c => c.server_id))]
+    console.log('需要获取详情的服务器IDs:', serverIds)
     
     // 并行获取所有服务器的状态信息
     const promises = serverIds.map(async (serverId) => {
       try {
-        // 通过server_id获取服务器信息
-        const response = await api.getServer(serverId)  // 修改为正确的API调用
-        if (response && response.success) {
-          serverDetails.value[serverId] = response.server
-        } else {
-          console.error('获取服务器信息失败:', serverId, response)
-        }
+        const response = await serverStore.fetchServerDetails(serverId)
+        console.log(`服务器 ${serverId} 的响应:`, response)
       } catch (error) {
         console.error(`获取服务器 ${serverId} 状态失败:`, error)
       }
     })
     
     await Promise.all(promises)
+    console.log('所有服务器详情:', serverStore.servers)
   } catch (error) {
     console.error('获取服务器详细信息失败:', error)
   }
@@ -137,12 +135,19 @@ const fetchServerDetails = async () => {
 
 // 获取服务器信息的计算属性
 const getServerInfo = (serverId) => {
-  const server = serverDetails.value[serverId]
-  if (!server) return { name: '未知服务器', ip: '未知IP' }
-  return {
-    name: server.hostname || '未知服务器',  // 使用正确的字段名
-    ip: server.ip_address || '未知IP'      // 使用正确的字段名
+  console.log('开始获取服务器信息:', serverId)
+  console.log(`获取服务器 ${serverId} 的信息, 当前缓存:`, serverStore.servers[serverId])
+  const server = serverStore.servers[serverId]
+  if (!server) {
+    console.warn(`未找到服务器 ${serverId} 的信息`)
+    return { name: '未知服务器', ip: '未知IP' }
   }
+  const result = {
+    name: server.server_name || '未知服务器',
+    ip: server.ip_address || '未知IP'
+  }
+  console.log('返回服务器信息:', result)
+  return result
 }
 
 // 停止容器
