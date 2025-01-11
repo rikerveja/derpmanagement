@@ -3,7 +3,7 @@ import axios from 'axios'
 // 创建axios实例
 const api = axios.create({
   baseURL: '/api',
-  timeout: 5000,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json'
   }
@@ -71,7 +71,7 @@ const batchDeleteSerials = (codes) => {
 
 // 服务器相关 API
 const getServers = () => {
-  return api.get('/get_servers')  // 修改为正确的端点
+  return api.get('/get_servers')
 }
 
 const getServerCategories = () => {
@@ -373,11 +373,6 @@ export default {
   },
   deleteRentalHistory(id) {
     return api.delete(`/rental/history/delete/${id}`)
-  },
-
-  // 服务器相关补充
-  getServerHealthCheck(serverId) {
-    return api.get(`/server/health_check/${serverId}`)
   },
 
   // 通知相关补充
