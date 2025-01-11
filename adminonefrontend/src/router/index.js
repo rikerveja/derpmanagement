@@ -3,6 +3,7 @@ import LoginView from '@/views/auth/LoginView.vue'
 import DashboardView from '@/views/dashboard/DashboardView.vue'
 import ProfileView from '@/views/ProfileView.vue'
 import SerialManageView from '@/views/serial/SerialManageView.vue'
+import ServerHealthView from '@/views/servers/ServerHealthView.vue'
 
 const routes = [
   {
@@ -76,6 +77,14 @@ const routes = [
       requiresAuth: true,
       layout: 'authenticated'
     }
+  },
+  {
+    meta: {
+      title: '服务器健康状态'
+    },
+    path: '/servers/health',
+    name: 'servers-health',
+    component: ServerHealthView
   }
 ]
 
