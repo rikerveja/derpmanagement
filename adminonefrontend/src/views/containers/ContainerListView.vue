@@ -16,6 +16,7 @@ import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.
 import BaseButton from '@/components/BaseButton.vue'
 import BaseButtons from '@/components/BaseButtons.vue'
 import BaseIcon from '@/components/BaseIcon.vue'
+import BaseDialog from '@/components/BaseDialog.vue'
 import api from '@/services/api'
 
 const containers = ref([])
@@ -24,6 +25,69 @@ const currentPage = ref(1)
 const itemsPerPage = 10
 const searchQuery = ref('')
 const selectedStatus = ref('all')
+
+// 编辑对话框状态
+const showEditDialog = ref(false)
+const editContainerForm = ref({
+  container_id: '',
+  container_name: '',
+  image: '',
+  port: null,
+  stun_port: null,
+  node_exporter_port: null,
+  max_upload_traffic: 5,
+  max_download_traffic: 5
+})
+
+// 编辑容器
+const editContainer = async (container) => {
+  try {
+    // 直接使用传入的容器数据
+    editContainerForm.value = {
+      container_id: container.container_id,
+      container_name: container.container_name,
+      image: container.image,
+      port: container.port,
+      stun_port: container.stun_port,
+      node_exporter_port: container.node_exporter_port,
+      max_upload_traffic: container.max_upload_traffic,
+      max_download_traffic: container.max_download_traffic
+    }
+    showEditDialog.value = true
+  } catch (error) {
+    console.error('获取容器详情失败:', error)
+  }
+}
+
+// 更新容器
+const updateContainer = async () => {
+  try {
+    console.log('正在更新容器:', editContainerForm.value)
+    const response = await api.updateContainer(editContainerForm.value.container_name, {
+      new_image: editContainerForm.value.image,
+      ports: {
+        derp_port: editContainerForm.value.port,
+        stun_port: editContainerForm.value.stun_port,
+        node_port: editContainerForm.value.node_exporter_port
+      },
+      environment: {
+        max_upload_traffic: editContainerForm.value.max_upload_traffic,
+        max_download_traffic: editContainerForm.value.max_download_traffic
+      }
+    })
+    
+    if (response.success) {
+      alert('更新成功!')
+      showEditDialog.value = false
+      await fetchContainers() // 刷新容器列表
+    } else {
+      alert('更新失败: ' + response.message)
+    }
+  } catch (error) {
+    console.error('更新容器失败:', error)
+    alert('更新失败: ' + error.message)
+  }
+}
 
 // 获取容器列表
 const fetchContainers = async () => {
@@ -117,11 +181,6 @@ const deleteContainer = async (containerId) => {
       console.error('删除容器失败:', error)
     }
   }
-}
-
-// 编辑容器
-const editContainer = (container) => {
-  router.push(`/containers/${container.id}/edit`)
 }
 
 // 筛选后的容器列表
@@ -370,4 +429,100 @@ onMounted(async () => {
       </CardBox>
     </SectionMain>
   </LayoutAuthenticated>
+
+  <!-- 编辑容器对话框 -->
+  <BaseDialog
+    v-model="showEditDialog"
+    :show="showEditDialog"
+    @close="showEditDialog = false"
+  >
+    <template #title>
+      编辑容器
+    </template>
+    
+    <template #body>
+      <div class="space-y-4">
+        <div class="form-group">
+          <label class="block text-sm font-medium mb-2">容器名称</label>
+          <input
+            v-model="editContainerForm.container_name"
+            type="text"
+            class="w-full px-3 py-2 border rounded-md"
+            disabled
+          />
+        </div>
+        
+        <div class="form-group">
+          <label class="block text-sm font-medium mb-2">镜像</label>
+          <input
+            v-model="editContainerForm.image"
+            type="text"
+            class="w-full px-3 py-2 border rounded-md"
+          />
+        </div>
+        
+        <div class="form-group">
+          <label class="block text-sm font-medium mb-2">DERP端口</label>
+          <input
+            v-model="editContainerForm.port"
+            type="number"
+            class="w-full px-3 py-2 border rounded-md"
+          />
+        </div>
+        
+        <div class="form-group">
+          <label class="block text-sm font-medium mb-2">STUN端口</label>
+          <input
+            v-model="editContainerForm.stun_port"
+            type="number"
+            class="w-full px-3 py-2 border rounded-md"
+          />
+        </div>
+        
+        <div class="form-group">
+          <label class="block text-sm font-medium mb-2">NODE端口</label>
+          <input
+            v-model="editContainerForm.node_exporter_port"
+            type="number"
+            class="w-full px-3 py-2 border rounded-md"
+          />
+        </div>
+        
+        <div class="form-group">
+          <label class="block text-sm font-medium mb-2">上传流量限制(GB)</label>
+          <input
+            v-model="editContainerForm.max_upload_traffic"
+            type="number"
+            step="0.01"
+            class="w-full px-3 py-2 border rounded-md"
+          />
+        </div>
+        
+        <div class="form-group">
+          <label class="block text-sm font-medium mb-2">下载流量限制(GB)</label>
+          <input
+            v-model="editContainerForm.max_download_traffic"
+            type="number"
+            step="0.01"
+            class="w-full px-3 py-2 border rounded-md"
+          />
+        </div>
+      </div>
+    </template>
+    
+    <template #footer>
+      <div class="flex justify-end space-x-2">
+        <BaseButton
+          color="info"
+          label="取消"
+          @click="showEditDialog = false"
+        />
+        <BaseButton
+          color="success"
+          label="保存"
+          @click="updateContainer"
+        />
+      </div>
+    </template>
+  </BaseDialog>
 </template> 
