@@ -11,7 +11,8 @@ import {
   mdiRefresh,
   mdiPencil,
   mdiStop,
-  mdiPlay
+  mdiPlay,
+  mdiOpenInNew
 } from '@mdi/js'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
 import BaseButton from '@/components/BaseButton.vue'
@@ -337,8 +338,27 @@ onMounted(async () => {
                   </div>
                 </td>
                 <td class="px-4 py-3">
-                  <span :class="getStatusClass(container.status)">
-                    {{ container.status }}
+                  <span :class="{
+                    'text-red-600': container.status === 'stopped',
+                    'text-yellow-600': container.status === 'paused'
+                  }">
+                    <template v-if="container.status === 'running'">
+                      <a 
+                        :href="`https://${getServerInfo(container.server_id).ip}:${container.port}`"
+                        target="_blank"
+                        class="text-green-600 hover:text-green-800 hover:underline inline-flex items-center"
+                      >
+                        {{ container.status }}
+                        <BaseIcon
+                          :path="mdiOpenInNew"
+                          size="16"
+                          class="ml-1"
+                        />
+                      </a>
+                    </template>
+                    <template v-else>
+                      {{ container.status }}
+                    </template>
                   </span>
                 </td>
                 <td class="px-4 py-3">
