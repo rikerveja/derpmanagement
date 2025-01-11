@@ -250,24 +250,6 @@ def server_status(server_id):
         logging.error(f"Error getting server status for server {server_id}: {e}")
         return jsonify({"success": False, "message": f"Error getting server status: {str(e)}"}), 500
 
-def ping_server(ip_address):
-    """
-    使用 ping 命令检测服务器是否可达
-    """
-    try:
-        # 执行 ping 命令
-        result = subprocess.run(
-            ['ping', '-c', '4', ip_address], 
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-        )
-        
-        if result.returncode == 0:
-            return "reachable", ""
-        else:
-            return "unreachable", result.stderr
-    except Exception as e:
-        return "unreachable", str(e)
-
 
 # 监控服务器健康
 @server_bp.route('/api/server/health_check', methods=['GET'])
