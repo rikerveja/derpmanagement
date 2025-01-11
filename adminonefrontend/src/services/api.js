@@ -121,10 +121,6 @@ const deleteServer = (serverId) => {
   return api.delete(`/delete_server/${serverId}`)
 }
 
-const getServerStatus = (serverId) => {
-  return api.get(`/server/status/${serverId}`)
-}
-
 const getServerHealthCheck = () => {
   return api.get('/server/health_check')
 }
@@ -173,7 +169,6 @@ export default {
   addServer,
   deleteServer,
   updateServer,
-  getServerStatus,
   getServerHealthCheck,
 
   // 日志相关 API
