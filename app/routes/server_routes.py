@@ -3,6 +3,7 @@ from app.models import Server, ServerCategory
 from app.utils.server_utils import get_server_status, monitor_server_health
 from app import db
 import logging
+import subprocess
 
 # 定义蓝图
 server_bp = Blueprint('server', __name__)
@@ -213,8 +214,8 @@ def server_status(server_id):
         return jsonify({"success": False, "message": "Server not found"}), 404
 
     try:
-        # 获取服务器状态
-        status = get_server_status(server.ip_address)  # 使用 ip_address 获取服务器状态
+        # Ping 检测服务器是否在线
+        status, error = ping_server(server.ip_address)
         
         # 获取服务器的其他相关信息
         server_info = {
@@ -226,24 +227,46 @@ def server_status(server_id):
             "memory": server.memory,
             "storage": server.storage,
             "bandwidth": server.bandwidth,
-            "status": server.status,
+            "status": "healthy" if status == "reachable" else "unreachable",
             "server_type": server.server_type,
             "region": server.region,
             "user_count": server.user_count,
             "total_traffic": server.total_traffic,
             "remaining_traffic": server.remaining_traffic,
-            "created_at": server.created_at,
-            "updated_at": server.updated_at
+            "created_at": server.created_at.strftime('%a, %d %b %Y %H:%M:%S GMT'),
+            "updated_at": server.updated_at.strftime('%a, %d %b %Y %H:%M:%S GMT')
         }
         
         logging.info(f"Fetched status for server {server_id}: {status}")
         
         # 返回服务器状态和其他信息
-        return jsonify({"success": True, "status": status, "server_info": server_info}), 200
+        return jsonify({
+            "success": True,
+            "status": {"status": status, "error": error if status == "unreachable" else ""},
+            "server_info": server_info
+        }), 200
 
     except Exception as e:
         logging.error(f"Error getting server status for server {server_id}: {e}")
         return jsonify({"success": False, "message": f"Error getting server status: {str(e)}"}), 500
+
+def ping_server(ip_address):
+    """
+    使用 ping 命令检测服务器是否可达
+    """
+    try:
+        # 执行 ping 命令
+        result = subprocess.run(
+            ['ping', '-c', '4', ip_address], 
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        
+        if result.returncode == 0:
+            return "reachable", ""
+        else:
+            return "unreachable", result.stderr
+    except Exception as e:
+        return "unreachable", str(e)
 
 
 # 监控服务器健康
