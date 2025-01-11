@@ -74,6 +74,16 @@ const editServerForm = ref({
   total_traffic: 20
 })
 
+// 服务器分类映射
+const categoryMap = {
+  '4': '4坑位版',
+  '2': '2坑位版'
+}
+
+// 排序相关
+const sortField = ref('created_at')  // 默认按创建时间排序
+const sortOrder = ref('desc')        // 默认降序
+
 // 获取服务器列表
 const fetchServers = async () => {
   try {
@@ -105,16 +115,39 @@ const fetchCategories = async () => {
   }
 }
 
+// 排序处理函数
+const handleSort = (field) => {
+  if (sortField.value === field) {
+    // 如果点击的是当前排序字段，则切换排序顺序
+    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    // 如果点击的是新字段，则设置为该字段降序
+    sortField.value = field
+    sortOrder.value = 'desc'
+  }
+}
+
 // 筛选后的服务器列表
 const filteredServers = computed(() => {
-  return servers.value.filter(server => {
+  const filtered = servers.value.filter(server => {
     const matchesSearch = searchQuery.value === '' || 
       server.server_name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      server.ip.includes(searchQuery.value)
-    const matchesCategory = selectedCategory.value === 'all' || server.category_id === selectedCategory.value
+      server.ip_address.toLowerCase().includes(searchQuery.value.toLowerCase())
+    const matchesCategory = selectedCategory.value === 'all' || server.category === selectedCategory.value
     const matchesRegion = selectedRegion.value === 'all' || server.region === selectedRegion.value
     const matchesStatus = selectedStatus.value === 'all' || server.status === selectedStatus.value
     return matchesSearch && matchesCategory && matchesRegion && matchesStatus
+  })
+  
+  // 排序
+  return filtered.sort((a, b) => {
+    const aValue = a[sortField.value]
+    const bValue = b[sortField.value]
+    if (sortOrder.value === 'asc') {
+      return aValue > bValue ? 1 : -1
+    } else {
+      return aValue < bValue ? 1 : -1
+    }
   })
 })
 
@@ -362,57 +395,81 @@ onMounted(async () => {
         </div>
 
         <!-- 服务器列表表格 -->
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <div>
+          <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-fixed">
             <thead class="bg-gray-50 dark:bg-gray-800">
               <tr>
-                <th class="px-4 py-3 text-left">服务器名称</th>
-                <th class="px-4 py-3 text-left">IP地址</th>
-                <th class="px-4 py-3 text-left">分类</th>
-                <th class="px-4 py-3 text-left">配置</th>
-                <th class="px-4 py-3 text-left">地区</th>
-                <th class="px-4 py-3 text-left">状态</th>
-                <th class="px-4 py-3 text-left">带宽</th>
-                <th class="px-4 py-3 text-left">用户数</th>
-                <th class="px-4 py-3 text-left">剩余流量</th>
-                <th class="px-4 py-3 text-left">创建时间</th>
-                <th class="px-4 py-3 text-left">操作</th>
+                <th @click="handleSort('server_name')" class="w-[10%] px-2 py-3 text-center font-bold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
+                  服务器名称
+                  <span v-if="sortField === 'server_name'" class="ml-1">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
+                </th>
+                <th class="w-[11%] px-2 py-3 text-center font-bold text-gray-700 dark:text-gray-300">IP地址</th>
+                <th class="w-[7%] px-2 py-3 text-center font-bold text-gray-700 dark:text-gray-300">分类</th>
+                <th class="w-[18%] px-2 py-3 text-center font-bold text-gray-700 dark:text-gray-300">配置</th>
+                <th class="w-[6%] px-2 py-3 text-center font-bold text-gray-700 dark:text-gray-300">地区</th>
+                <th class="w-[6%] px-2 py-3 text-center font-bold text-gray-700 dark:text-gray-300">状态</th>
+                <th class="w-[6%] px-2 py-3 text-center font-bold text-gray-700 dark:text-gray-300">带宽</th>
+                <th @click="handleSort('user_count')" class="w-[5%] px-2 py-3 text-center font-bold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
+                  用户数
+                  <span v-if="sortField === 'user_count'" class="ml-1">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
+                </th>
+                <th class="w-[6%] px-2 py-3 text-center font-bold text-gray-700 dark:text-gray-300">流量</th>
+                <th @click="handleSort('created_at')" class="w-[15%] px-2 py-3 text-center font-bold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
+                  创建时间
+                  <span v-if="sortField === 'created_at'" class="ml-1">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
+                </th>
+                <th class="w-[10%] px-2 py-3 text-center font-bold text-gray-700 dark:text-gray-300">操作</th>
               </tr>
             </thead>
             <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
               <tr v-for="server in paginatedServers" :key="server.id" 
-                  class="hover:bg-gray-50 dark:hover:bg-gray-800">
-                <td class="px-4 py-3">{{ server.server_name }}</td>
-                <td class="px-4 py-3">{{ server.ip_address }}</td>
-                <td class="px-4 py-3">
-                  {{ categories.find(c => c.id === server.category_id)?.category_name }}
+                  class="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200">
+                <td class="px-2 py-2">
+                  <div class="font-medium text-gray-900 dark:text-gray-100">
+                    {{ server.server_name }}
+                  </div>
                 </td>
-                <td class="px-4 py-3">
-                  {{ server.cpu }}核 / {{ server.memory }}GB / {{ server.storage }}GB
-                </td>
-                <td class="px-4 py-3">{{ server.region }}</td>
-                <td class="px-4 py-3">
-                  <span :class="{
-                    'px-2 py-1 rounded text-xs font-medium': true,
-                    'bg-green-100 text-green-800': server.status === 'running',
-                    'bg-red-100 text-red-800': server.status === 'stopped',
-                    'bg-yellow-100 text-yellow-800': server.status === 'restarting'
-                  }">
-                    {{ 
-                      server.status === 'running' ? '运行中' :
-                      server.status === 'stopped' ? '已停止' :
-                      server.status === 'restarting' ? '重启中' : '未知'
-                    }}
+                <td class="px-2 py-2 font-mono text-sm">{{ server.ip_address }}</td>
+                <td class="px-2 py-2">
+                  <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100">
+                    {{ categoryMap[server.category] || '未知分类' }}
                   </span>
                 </td>
-                <td class="px-4 py-3">{{ server.bandwidth }}M</td>
-                <td class="px-4 py-3">{{ server.user_count }}</td>
-                <td class="px-4 py-3">{{ server.remaining_traffic }}GB</td>
-                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                <td class="px-2 py-2 text-sm">
+                  <div class="flex flex-col space-y-1">
+                    <div class="flex items-center justify-center gap-1">
+                      <span class="px-2 py-1 bg-gray-100 rounded-md dark:bg-gray-800">{{ server.cpu }}核</span>
+                      <span class="px-2 py-1 bg-gray-100 rounded-md dark:bg-gray-800">{{ server.memory }}GB</span>
+                    </div>
+                    <div class="flex items-center justify-center">
+                      <span class="px-2 py-1 bg-gray-100 rounded-md dark:bg-gray-800">{{ server.storage }}GB</span>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-2 py-2 text-sm text-gray-600 dark:text-gray-400">{{ server.region }}</td>
+                <td class="px-2 py-2">
+                  <span class="px-2 py-1 rounded text-xs font-medium" :class="{
+                    'bg-green-100 text-green-800': server.status === 'healthy',
+                    'bg-red-100 text-red-800': server.status === 'unhealthy',
+                    'bg-yellow-100 text-yellow-800': server.status === 'unknown'
+                  }">
+                    {{ server.status }}
+                  </span>
+                </td>
+                <td class="px-2 py-2 text-sm">
+                  <span class="font-medium">{{ server.bandwidth }}</span>
+                  <span class="text-gray-500">M</span>
+                </td>
+                <td class="px-2 py-2 text-center font-medium">{{ server.user_count }}</td>
+                <td class="px-2 py-2">
+                  <span class="font-medium">{{ server.remaining_traffic }}</span>
+                  <span class="text-sm text-gray-500">GB</span>
+                </td>
+                <td class="px-2 py-2 text-sm text-gray-600 dark:text-gray-400">
                   {{ new Date(server.created_at).toLocaleString() }}
                 </td>
-                <td class="px-4 py-3">
-                  <div class="flex space-x-2">
+                <td class="px-2 py-2">
+                  <div class="flex items-center space-x-2">
                     <BaseButton
                       :icon="mdiPencil"
                       color="info"
@@ -503,14 +560,13 @@ onMounted(async () => {
               服务器分类 <span class="text-red-500">*</span>
             </label>
             <select
-              v-model="serverForm.category_id"
+              v-model="serverForm.category"
               required
               class="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600"
             >
               <option value="">请选择分类</option>
-              <option v-for="category in categories" :key="category.id" :value="category.id">
-                {{ category.category_name }}
-              </option>
+              <option value="1" selected>4坑位版</option>
+              <option value="2">2坑位版</option>
             </select>
           </div>
 
@@ -770,5 +826,20 @@ input[type="number"] {
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
   @apply appearance-none m-0;
+}
+
+/* 添加一些过渡效果 */
+.cursor-pointer {
+  transition: background-color 0.2s;
+}
+
+/* 确保表格内容居中对齐 */
+td {
+  text-align: center;
+}
+
+/* 让配置信息在单元格内居中 */
+.flex.flex-col {
+  align-items: center;
 }
 </style>
