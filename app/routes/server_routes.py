@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from app.models import Server, ServerCategory
-from app.utils.server_utils import get_server_status, monitor_server_health
+from app.utils.server_utils import ping_server, monitor_server_health  # 更新为新的导入
 from app import db
 import logging
 import subprocess
