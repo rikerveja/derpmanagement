@@ -40,13 +40,14 @@ def monitor_server_health():
             return {"success": False, "message": "No servers found for health check."}
 
         for server in servers:
-            status = get_server_status(server.ip)
+            # 确保访问正确的字段，假设你使用的是 ip_address 字段
+            status = get_server_status(server.ip_address)  # 修改为 ip_address
             results.append({
                 "server_id": server.id,
-                "ip": server.ip,
+                "ip_address": server.ip_address,  # 修改为 ip_address
                 "status": status
             })
-            logger.info(f"Server {server.ip} status: {status}")
+            logger.info(f"Server {server.ip_address} status: {status}")
 
         return {"success": True, "data": results}
 
