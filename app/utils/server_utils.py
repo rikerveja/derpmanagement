@@ -1,34 +1,34 @@
 import logging
-import requests
+import subprocess
 from app.models import Server
 
 # 配置日志记录
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def get_server_status(ip):
+def ping_server(ip_address):
     """
-    获取服务器状态
-    :param ip: 服务器 IP 地址
-    :return: 返回服务器状态信息，包括健康状态和详细信息
+    使用 ping 命令检测服务器是否可达
+    :param ip_address: 服务器 IP 地址
+    :return: 返回服务器是否可达的状态（reachable 或 unreachable）和详细错误信息
     """
     try:
-        # 发送请求获取健康状态
-        response = requests.get(f"http://{ip}/health")
-        if response.status_code == 200:
-            logger.info(f"Server {ip} is healthy.")
-            return {"status": "healthy", "details": response.json()}
+        # 执行 ping 命令
+        result = subprocess.run(
+            ['ping', '-c', '4', ip_address], 
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        
+        if result.returncode == 0:
+            return "reachable", ""
         else:
-            logger.warning(f"Server {ip} is unhealthy. Status code: {response.status_code}")
-            return {"status": "unhealthy", "details": response.text}
-    except requests.exceptions.RequestException as e:
-        # 捕获所有请求异常，如网络问题、超时等
-        logger.error(f"Failed to get server status for {ip}: {str(e)}")
-        return {"status": "unreachable", "error": str(e)}
+            return "unreachable", result.stderr
+    except Exception as e:
+        return "unreachable", str(e)
 
 def monitor_server_health():
     """
-    批量监控所有服务器健康状态
+    批量监控所有服务器健康状态，使用 ping 检测
     :return: 服务器健康状态的列表
     """
     results = []
@@ -40,12 +40,12 @@ def monitor_server_health():
             return {"success": False, "message": "No servers found for health check."}
 
         for server in servers:
-            # 确保访问正确的字段，假设你使用的是 ip_address 字段
-            status = get_server_status(server.ip_address)  # 修改为 ip_address
+            # 使用 ping 检测服务器是否可达
+            status, error = ping_server(server.ip_address)
             results.append({
                 "server_id": server.id,
-                "ip_address": server.ip_address,  # 修改为 ip_address
-                "status": status
+                "ip_address": server.ip_address,
+                "status": {"status": status, "error": error if status == "unreachable" else ""}
             })
             logger.info(f"Server {server.ip_address} status: {status}")
 
