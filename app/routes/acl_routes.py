@@ -69,26 +69,26 @@ def generate_acl():
     for container in containers:
         server = server_info.get(container.server_id)
         if server:
-            # 获取地区和相关信息
+            # 从映射表中获取城市代码和英文名
             region_name = CITY_NAME_MAPPING.get(server.region, server.region.lower())
-            region_code = region_name[:2].upper()  # 城市名的声母，例如：sh -> SH
-            region_name_full = f"{region_name}derper"
+            region_code = region_name[:2].upper()  # 从城市映射表统一获取代码，例如 "深圳" -> "SZ"
+            region_name_full = f"{region_name}derper"  # 使用英文名生成完整的 RegionName
 
-            # 修正容器节点名称：城市名的声母 + linuxserver
+            # 修正容器节点名称：城市代码 + linuxserver
             container_node_name = f"{region_code.lower()}linuxserver"
 
             derp_port = container.port  # 获取容器的端口
             ipv4 = server.ip_address  # 获取服务器的 IP 地址
 
             # 假设 region_id 是从服务器表中得来的
-            region_id = 901  # 例如固定值 901
+            region_id = 901  # 示例固定值 901
 
             # 构建 `derpMap` 和 `Regions` 的结构
             if str(region_id) not in access_control_code["derpMap"]["Regions"]:
                 access_control_code["derpMap"]["Regions"][str(region_id)] = {
                     "RegionID": region_id,
-                    "RegionCode": region_code,
-                    "RegionName": region_name_full,
+                    "RegionCode": region_code,  # 确保使用统一的城市代码
+                    "RegionName": region_name_full,  # 确保使用统一的英文城市名
                     "Nodes": [],
                 }
 
@@ -146,14 +146,15 @@ def generate_acl():
     send_notification_email(
         user.email,
         "Tailscale ACL Generated",
-        f"你的 Tailscale Access Control configuration 已经成功生成，请在第13行开始粘贴插入：\n\n"
-        f"这是你的ACL配置信息:\n\n{nonstandard_json_string}",
+        f"Your Tailscale Access Control configuration has been successfully generated.\n\n"
+        f"Here is your ACL configuration:\n\n{nonstandard_json_string}",
     )
 
     # 打印日志
     logging.info(f"Tailscale ACL generated for user {user.username}")
 
     return jsonify({"success": True, "message": "Tailscale ACL generated successfully", "acl": access_control_code}), 200
+
 
 # 手动更新 ACL 配置
 @acl_bp.route('/api/acl/update', methods=['POST'])
