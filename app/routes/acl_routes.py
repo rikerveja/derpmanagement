@@ -6,13 +6,12 @@ from app.utils.notifications_utils import send_notification_email
 import json
 import logging
 import os
-
 # 定义蓝图
 acl_bp = Blueprint('acl', __name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# 城市名称映射表
-CITY_MAPPING = {
+# 定义城市名称映射
+CITY_NAME_MAPPING = {
     "上海": "shanghai",
     "深圳": "shenzhen",
     "北京": "beijing",
@@ -63,25 +62,25 @@ def generate_acl():
         "derpMap": {
             "OmitDefaultRegions": True,
             "Regions": {}
-        }
+        },
     }
 
     for container in containers:
         server = server_info.get(container.server_id)
         if server:
-            # 获取城市英文名称
-            region_name = CITY_MAPPING.get(server.region, server.region.lower())
-            region_code = region_name[:2].upper()  # 城市名的声母，例如：shanghai -> SH
-            region_name_full = f"{region_name}derper"  # 生成地区全名，例如：shanghaiderper
+            # 获取地区和相关信息
+            region_name = CITY_NAME_MAPPING.get(server.region, server.region.lower())
+            region_code = region_name[:2].upper()  # 城市名的声母，例如：sh -> SH
+            region_name_full = f"{region_name}derper"
 
-            # 生成容器节点名称
+            # 修正容器节点名称：城市名的声母 + linuxserver
             container_node_name = f"{region_code.lower()}linuxserver"
 
             derp_port = container.port  # 获取容器的端口
             ipv4 = server.ip_address  # 获取服务器的 IP 地址
 
-            # 将 RegionID 固定为数字，例如 901
-            region_id = 901  # 根据实际需求设置 RegionID
+            # 假设 region_id 是从服务器表中得来的
+            region_id = 901  # 例如固定值 901
 
             # 构建 `derpMap` 和 `Regions` 的结构
             if str(region_id) not in access_control_code["derpMap"]["Regions"]:
@@ -89,7 +88,7 @@ def generate_acl():
                     "RegionID": region_id,
                     "RegionCode": region_code,
                     "RegionName": region_name_full,
-                    "Nodes": []
+                    "Nodes": [],
                 }
 
             # 添加新的节点
@@ -98,39 +97,42 @@ def generate_acl():
                 "RegionID": region_id,
                 "DERPPort": derp_port,
                 "ipv4": ipv4,
-                "InsecureForTests": True
+                "InsecureForTests": True,
             })
 
-    # 生成带逗号的完整 JSON 字符串，并且格式化为美观的输出
-    json_string = json.dumps(access_control_code, indent=4, ensure_ascii=False)
+    # 手动拼接非标准 JSON 格式的字符串
+    def format_nonstandard_json(data):
+        json_string = json.dumps(data, ensure_ascii=False, indent=4)
+        json_string = json_string.replace("}", "},").replace("]", "],").rstrip(",") + ","
+        return json_string
+
+    nonstandard_json_string = format_nonstandard_json(access_control_code)
 
     # 存储或更新 ACL 配置到数据库
     acl_config = ACLConfig.query.filter_by(user_id=user.id).first()
     if acl_config:
-        # 更新现有的 ACL 配置
-        acl_config.acl_data = json_string  # 更新 ACL 配置数据
-        acl_config.version = "v1.0"  # 更新版本号
-        acl_config.is_active = True  # 确保该配置仍然有效
+        acl_config.acl_data = nonstandard_json_string
+        acl_config.version = "v1.0"
+        acl_config.is_active = True
         db.session.commit()
     else:
-        # 创建新的 ACL 配置
         new_acl_config = ACLConfig(
             user_id=user.id,
             server_ids=json.dumps([server.id for server in servers]),
             container_ids=json.dumps([container.id for container in containers]),
-            acl_data=json_string,
+            acl_data=nonstandard_json_string,
             version="v1.0",
-            is_active=True
+            is_active=True,
         )
         db.session.add(new_acl_config)
         db.session.commit()
 
-    # 记录 ACL 日志，将 acl_version 放到 details 中
+    # 记录 ACL 日志
     acl_log = ACLLog(
         user_id=user.id,
         ip_address=request.remote_addr,
-        location="Unknown",  # 可用外部服务获取用户地理位置
-        details=f"acl_version: v1.0 - ACL generated for user {user.username}"
+        location="Unknown",
+        details=f"acl_version: v1.0 - ACL generated for user {user.username}",
     )
     db.session.add(acl_log)
     db.session.commit()
@@ -138,13 +140,12 @@ def generate_acl():
     # 记录操作日志
     log_operation(user_id=user.id, operation="generate_acl", status="success", details=f"ACL generated for user {user.username}")
 
-    # 发送通知邮件，将 ACL 配置内容通过邮件发送
-    logging.info(f"Sending email to {user.email}")
+    # 发送通知邮件
     send_notification_email(
         user.email,
         "Tailscale ACL Generated",
         f"Your Tailscale Access Control configuration has been successfully generated.\n\n"
-        f"Here is your ACL configuration:\n\n{json_string}"
+        f"Here is your ACL configuration:\n\n{nonstandard_json_string}",
     )
 
     # 打印日志
