@@ -1,9 +1,8 @@
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify
 from app.models import ACLLog, User, Server, DockerContainer, ACLConfig
 from app import db
 from app.utils.logging_utils import log_operation
 from app.utils.notifications_utils import send_notification_email
-import os
 import json
 import logging
 
@@ -121,7 +120,13 @@ def generate_acl():
     log_operation(user_id=user.id, operation="generate_acl", status="success", details=f"ACL generated for user {user.username}")
     
     # 发送通知邮件
-    send_notification_email(user.email, "Tailscale ACL Generated", f"Your Tailscale Access Control configuration has been successfully generated.")
+    logging.info(f"Sending email to {user.email}")
+    send_notification_email(
+        user.email, 
+        "Tailscale ACL Generated", 
+        f"Your Tailscale Access Control configuration has been successfully generated.\n\n"
+        f"Here is your ACL configuration:\n\n{json_string}"  # 将 JSON 字符串作为邮件内容
+    )
     
     # 打印日志
     logging.info(f"Tailscale ACL generated for user {user.username}")
