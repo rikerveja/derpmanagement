@@ -11,13 +11,17 @@ import {
   mdiRefresh,
   mdiPlus,
   mdiServer,
-  mdiDocker
+  mdiDocker,
+  mdiContentCopy,
+  mdiAccount
 } from '@mdi/js'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseIcon from '@/components/BaseIcon.vue'
 import api from '@/services/api'
 import { useRouter } from 'vue-router'
+import AclEditDialog from './AclEditDialog.vue'
+import AclContentDialog from './AclContentDialog.vue'
 
 const router = useRouter()
 const acls = ref([])
@@ -28,38 +32,53 @@ const searchQuery = ref('')
 const currentPage = ref(1)
 const itemsPerPage = 10
 const loading = ref(false)
+const showEditDialog = ref(false)
+const currentAcl = ref(null)
+const showAclDialog = ref(false)
+const currentAclContent = ref(null)
+const copySuccess = ref(false)
 
 // 获取ACL列表及关联数据
 const fetchAcls = async () => {
   try {
     loading.value = true
-    const response = await api.getAclList()
+    const response = await api.getAclConfigs()
+    console.log('原始API响应:', response)
     if (response.success) {
-      acls.value = await Promise.all(response.acls.map(async acl => {
-        // 获取用户信息
-        if (!users.value[acl.user_id]) {
-          const userResponse = await api.getUser(acl.user_id)
-          users.value[acl.user_id] = userResponse.data
+      console.log('映射前的 acl_configs:', response.acl_configs)
+      
+      const mappedConfigs = []
+      for (const config of response.acl_configs) {
+        console.log('正在处理的配置项:', config)
+        const mappedConfig = {
+          id: config.id,
+          user: config.user,
+          servers: config.servers || [],
+          containers: config.containers || [],
+          version: config.version,
+          is_active: config.is_active,
+          created_at: config.created_at,
+          updated_at: config.updated_at,
+          derpMap: config.derpMap
         }
-        
-        // 获取服务器信息
-        for (const serverId of acl.server_ids) {
-          if (!servers.value[serverId]) {
-            const serverResponse = await api.getServer(serverId)
-            servers.value[serverId] = serverResponse.data
-          }
-        }
-        
-        // 获取容器信息
-        for (const containerId of acl.container_ids) {
-          if (!containers.value[containerId]) {
-            const containerResponse = await api.getContainer(containerId)
-            containers.value[containerId] = containerResponse.data
-          }
-        }
-        
-        return acl
-      }))
+        console.log('映射后的配置项:', mappedConfig)
+        mappedConfigs.push(mappedConfig)
+      }
+
+      // 使用新的方式更新响应式数据
+      acls.value = [...mappedConfigs]
+      console.log('最终的 acls 数据:', acls.value)
+
+      if (acls.value.length > 0) {
+        const firstRecord = acls.value[0]
+        console.log('第一条记录详情:', {
+          id: firstRecord.id,
+          user: firstRecord.user,
+          servers: firstRecord.servers,
+          containers: firstRecord.containers,
+          version: firstRecord.version
+        })
+      }
     }
   } catch (error) {
     console.error('获取ACL数据失败:', error)
@@ -72,10 +91,11 @@ const fetchAcls = async () => {
 // 筛选ACL
 const filteredAcls = computed(() => {
   return acls.value.filter(acl => {
-    const user = users.value[acl.user_id]
     const searchLower = searchQuery.value.toLowerCase()
-    return user?.username?.toLowerCase().includes(searchLower) ||
-           acl.version?.toLowerCase().includes(searchLower)
+    return acl.user?.email?.toLowerCase().includes(searchLower) ||
+           acl.containers?.some(container => 
+             container.name.toLowerCase().includes(searchLower)
+           )
   })
 })
 
@@ -92,16 +112,8 @@ const downloadAcl = async (aclId) => {
     loading.value = true
     const response = await api.downloadAcl(aclId)
     if(response.success) {
-      // 创建下载链接
-      const blob = new Blob([JSON.stringify(response.acl, null, 2)], { type: 'application/json' })
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `acl_${aclId}.json`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
+      currentAclContent.value = JSON.stringify(response.acl, null, 2)
+      showAclDialog.value = true
     } else {
       throw new Error(response.message)
     }
@@ -110,6 +122,20 @@ const downloadAcl = async (aclId) => {
     alert('下载ACL失败: ' + error.message)
   } finally {
     loading.value = false
+  }
+}
+
+// 复制到剪贴板
+const copyToClipboard = async () => {
+  try {
+    await navigator.clipboard.writeText(currentAclContent.value)
+    copySuccess.value = true
+    setTimeout(() => {
+      copySuccess.value = false
+    }, 2000)
+  } catch (error) {
+    console.error('复制失败:', error)
+    alert('复制失败: ' + error.message)
   }
 }
 
@@ -135,8 +161,15 @@ const deleteAcl = async (aclId) => {
 }
 
 // 编辑ACL
-const editAcl = (aclId) => {
-  router.push(`/acl/edit/${aclId}`)
+const editAcl = (acl) => {
+  console.log('编辑ACL:', acl)
+  currentAcl.value = acl
+  showEditDialog.value = true
+}
+
+const handleEditSubmit = async () => {
+  console.log('编辑提交成功')
+  await fetchAcls() // 刷新列表
 }
 
 // 创建新ACL
@@ -153,103 +186,87 @@ onMounted(() => {
   <LayoutAuthenticated>
     <SectionMain>
       <SectionTitleLineWithButton :icon="mdiShieldAccount" title="ACL管理" main>
-        <BaseButton :icon="mdiPlus" label="新建ACL" color="success" @click="createAcl" />
-        <BaseButton :icon="mdiRefresh" label="刷新" @click="fetchAcls" />
+        <BaseButton
+          :icon="mdiPlus"
+          color="success"
+          label="新建ACL"
+          to="/acl/generate"
+          small
+        />
       </SectionTitleLineWithButton>
 
-      <CardBox>
-        <!-- 搜索栏 -->
-        <div class="mb-4">
+      <CardBox class="mb-2">
+        <!-- 搜索框 -->
+        <div class="mb-1">
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="搜索用户名或版本..."
-            class="w-full px-4 py-2 border rounded-lg"
-          >
+            placeholder="搜索邮箱或容器名称..."
+            class="w-full px-2 py-1 border rounded-lg text-sm"
+          />
         </div>
 
-        <!-- ACL列表 -->
+        <!-- 表格 -->
         <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
+          <table class="w-full text-left table-auto text-sm">
             <thead>
-              <tr>
-                <th class="px-4 py-3 text-left">用户</th>
-                <th class="px-4 py-3 text-left">服务器</th>
-                <th class="px-4 py-3 text-left">容器</th>
-                <th class="px-4 py-3 text-left">版本</th>
-                <th class="px-4 py-3 text-left">状态</th>
-                <th class="px-4 py-3 text-left">更新时间</th>
-                <th class="px-4 py-3 text-left">操作</th>
+              <tr class="border-b">
+                <th class="px-2 py-1 w-[20%]">用户</th>
+                <th class="px-2 py-1 w-[15%]">服务器</th>
+                <th class="px-2 py-1 w-[20%]">容器</th>
+                <th class="px-2 py-1 w-[10%]">版本</th>
+                <th class="px-2 py-1 whitespace-nowrap w-[10%]">状态</th>
+                <th class="px-2 py-1 w-[15%]">更新时间</th>
+                <th class="px-2 py-1 text-center w-[10%]">操作</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-100">
-              <tr v-if="loading">
-                <td colspan="7" class="px-4 py-8 text-center text-gray-500">
-                  <div class="flex items-center justify-center">
-                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-2"></div>
-                    <span class="ml-2">加载中...</span>
-                  </div>
-                </td>
-              </tr>
-              <tr v-else-if="acls.length === 0">
-                <td colspan="7" class="px-4 py-8 text-center text-gray-500">
-                  暂无ACL数据
-                </td>
-              </tr>
-              <tr v-for="acl in paginatedAcls" :key="acl.id" class="hover:bg-gray-50">
-                <!-- 用户信息 -->
-                <td class="px-4 py-3">
+            <tbody>
+              <tr v-for="acl in paginatedAcls" :key="acl.id" class="border-b">
+                <td class="px-2 py-1">
                   <div class="flex items-center">
-                    <span class="font-medium">{{ users[acl.user_id]?.username }}</span>
+                    <BaseIcon :path="mdiAccount" class="w-4 h-4 mr-1" />
+                    {{ acl.user.email }}
                   </div>
                 </td>
-
-                <!-- 服务器信息 -->
-                <td class="px-4 py-3">
-                  <div class="flex flex-col gap-1">
-                    <div v-for="serverId in acl.server_ids" :key="serverId"
-                         class="flex items-center gap-1 text-sm">
-                      <BaseIcon :path="mdiServer" size="16" />
-                      <span>{{ servers[serverId]?.ip_address }}</span>
+                <td class="px-2 py-1">
+                  <div class="flex items-center">
+                    <BaseIcon :path="mdiServer" class="w-3.5 h-3.5 mr-1" />
+                    {{ acl.servers[0]?.ip_address }}
+                  </div>
+                </td>
+                <td class="px-2 py-1">
+                  <div class="flex items-center">
+                    <BaseIcon :path="mdiDocker" class="w-3.5 h-3.5 mr-1 flex-shrink-0" />
+                    <div class="truncate" :title="acl.containers[0]?.name">
+                      <!-- 调试信息 -->
+                      <template v-if="!acl.containers[0]?.name">
+                        <small class="text-gray-500">
+                          {{ JSON.stringify(acl.containers[0]) }}
+                        </small>
+                      </template>
+                      <template v-else>
+                        {{ acl.containers[0]?.name }}
+                      </template>
                     </div>
                   </div>
                 </td>
-
-                <!-- 容器信息 -->
-                <td class="px-4 py-3">
-                  <div class="flex flex-col gap-1">
-                    <div v-for="containerId in acl.container_ids" :key="containerId"
-                         class="flex items-center gap-1 text-sm">
-                      <BaseIcon :path="mdiDocker" size="16" />
-                      <span>{{ containers[containerId]?.container_name }}</span>
-                    </div>
-                  </div>
-                </td>
-
-                <!-- 版本信息 -->
-                <td class="px-4 py-3">
-                  <span class="text-sm">v{{ acl.version }}</span>
-                </td>
-
-                <!-- 状态 -->
-                <td class="px-4 py-3">
-                  <span :class="`px-2 py-1 rounded-full text-xs ${
-                    acl.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`">
+                <td class="px-2 py-1">{{ acl.version }}</td>
+                <td class="px-2 py-1">
+                  <span 
+                    class="inline-flex items-center px-1 py-0.5 rounded-full text-xs"
+                    :class="acl.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
+                  >
+                    <span class="w-1 h-1 mr-0.5 rounded-full" 
+                          :class="acl.is_active ? 'bg-green-400' : 'bg-red-400'">
+                    </span>
                     {{ acl.is_active ? '活跃' : '禁用' }}
                   </span>
                 </td>
-
-                <!-- 更新时间 -->
-                <td class="px-4 py-3">
-                  <span class="text-sm">
-                    {{ new Date(acl.updated_at).toLocaleString() }}
-                  </span>
+                <td class="px-2 py-1 whitespace-nowrap">
+                  {{ new Date(acl.updated_at).toLocaleString() }}
                 </td>
-
-                <!-- 操作按钮 -->
-                <td class="px-4 py-3">
-                  <div class="flex space-x-2">
+                <td class="px-2 py-1">
+                  <div class="flex justify-center space-x-1">
                     <BaseButton
                       :icon="mdiDownload"
                       color="info"
@@ -263,7 +280,7 @@ onMounted(() => {
                       color="warning"
                       small
                       :disabled="loading"
-                      @click="editAcl(acl.id)"
+                      @click="editAcl(acl)"
                       title="编辑"
                     />
                     <BaseButton
@@ -282,18 +299,22 @@ onMounted(() => {
         </div>
 
         <!-- 分页控件 -->
-        <div class="mt-4 flex justify-between items-center">
-          <span class="text-sm text-gray-600">
+        <div class="mt-1 flex justify-between items-center text-sm">
+          <span class="text-gray-600">
             共 {{ acls.length }} 条记录
           </span>
-          <div class="flex gap-2">
+          <div class="flex gap-1">
             <BaseButton
               label="上一页"
+              small
+              class="px-2 py-1 text-xs"
               :disabled="currentPage === 1"
               @click="currentPage--"
             />
             <BaseButton
               label="下一页"
+              small
+              class="px-2 py-1 text-xs"
               :disabled="currentPage >= Math.ceil(filteredAcls.length / itemsPerPage)"
               @click="currentPage++"
             />
@@ -302,4 +323,61 @@ onMounted(() => {
       </CardBox>
     </SectionMain>
   </LayoutAuthenticated>
-</template> 
+
+  <AclEditDialog
+    :show="showEditDialog"
+    :acl-data="currentAcl"
+    @close="showEditDialog = false"
+    @submit="handleEditSubmit"
+  />
+
+  <AclContentDialog
+    :show="showAclDialog"
+    :content="currentAclContent"
+    @close="showAclDialog = false"
+  />
+</template>
+
+<style scoped>
+/* 调整表格行高 */
+tr {
+  @apply h-7;
+}
+
+/* 调整图标大小 */
+.w-5 {
+  @apply w-3.5;
+}
+.h-5 {
+  @apply h-3.5;
+}
+
+/* 调整状态标签的内边距 */
+.rounded-full {
+  @apply px-1 py-0.5 text-xs;
+}
+
+/* 调整表格文字大小 */
+table {
+  @apply text-sm leading-none;
+}
+
+/* 调整按钮大小 */
+.space-x-2 > * {
+  @apply scale-90;
+}
+
+/* 其他样式保持不变 */
+pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.copy-button {
+  transition: all 0.2s;
+}
+
+.copy-success {
+  @apply bg-green-500 text-white;
+}
+</style> 
