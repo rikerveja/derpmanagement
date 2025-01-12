@@ -369,22 +369,44 @@ def get_acl_logs(user_id):
         return jsonify({"success": False, "message": f"Error retrieving ACL logs: {str(e)}"}), 500
 
 
-# 提供 ACL 文件下载
+# 提供 ACL 配置数据接口
 @acl_bp.route('/api/acl/download/<username>', methods=['GET'])
 def download_acl(username):
     """
-    提供用户的 Tailscale ACL 文件下载
+    从数据库获取用户的 Tailscale ACL 配置并返回
     """
     try:
-        acl_config = ACLConfig.query.filter_by(user_id=username).first()  # 查询该用户的 ACL 配置
+        # 从数据库中获取 ACL 配置数据
+        acl_config = ACLConfig.query.filter_by(user_id=username).first()  # 根据用户名查询 ACL 配置
         if not acl_config:
             return jsonify({"success": False, "message": "Tailscale ACL not found for this user"}), 404
 
-        acl_data = json.loads(acl_config.acl_data)  # 解析存储的 ACL 数据
+        # 解析存储的 acl_data 数据
+        acl_data = json.loads(acl_config.acl_data)  # 将字符串格式的 JSON 数据转化为 Python 字典
 
-        # 构造返回的 JSON 格式的 ACL 配置
-        return jsonify({"success": True, "acl": acl_data}), 200
+        # 格式化数据并准备返回
+        formatted_acl_data = format_acl_data(acl_data)
+
+        # 返回格式化后的数据
+        return jsonify({"success": True, "acl": formatted_acl_data}), 200
 
     except Exception as e:
         logging.error(f"Error downloading Tailscale ACL for user {username}: {str(e)}")
         return jsonify({"success": False, "message": f"Error downloading Tailscale ACL: {str(e)}"}), 500
+
+def format_acl_data(acl_data):
+    """
+    格式化 ACL 数据，将其转换为符合要求的结构
+    """
+    # 这里您可以根据需要进一步处理和格式化 ACL 数据
+    formatted_data = {
+        "version": acl_data.get("version", ""),
+        "acl": {
+            "allow": acl_data.get("allow", []),
+            "deny": acl_data.get("deny", [])
+        },
+        "tags": acl_data.get("tags", {}),
+        "groups": acl_data.get("groups", {}),
+    }
+    return formatted_data
+
