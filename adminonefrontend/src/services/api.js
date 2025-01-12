@@ -131,13 +131,11 @@ const generateAcl = (data) => {
   const requestData = {
     user_id: data.user_id,
     container_ids: data.container_ids,
-    server_ids: [data.server_id] // 将单个server_id转换为数组格式
+    server_id: data.server_id,  // 单个服务器ID
+    is_active: data.is_active
   }
+  console.log('发送生成ACL请求:', requestData)
   return api.post('/acl/generate', requestData)
-}
-
-const updateAcl = (data) => {
-  return api.post('/acl/update', data)
 }
 
 const getAclLogs = (userId) => {
@@ -162,6 +160,20 @@ const getServer = (serverId) => {
 
 const getContainer = (containerId) => {
   return api.get(`/container/${containerId}`)
+}
+
+// ACL配置相关
+const getAclConfigs = () => {
+  return api.get('/acl/configs')
+}
+
+// 获取服务器的容器列表
+const getServerContainers = (serverId) => {
+  return api.get('/containers', {
+    params: {
+      server_id: serverId
+    }
+  })
 }
 
 export default {
@@ -250,13 +262,14 @@ export default {
 
   // ACL 相关 API
   generateAcl,
-  updateAcl,
   getAclLogs,
   downloadAcl,
   getAclList,
   getUser,
   getServer,
   getContainer,
+  getAclConfigs,
+  getServerContainers,
 
   // 流量相关 API
   getRealTimeTraffic() {
