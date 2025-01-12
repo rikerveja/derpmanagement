@@ -1,18 +1,14 @@
 from flask import Blueprint, request, jsonify, send_file
-from app.models import ACLLog, User, Server
+from app.models import ACLLog, User, Server, DockerContainer, ACLConfig
 from app import db
 from app.utils.logging_utils import log_operation
 from app.utils.notifications_utils import send_notification_email
-import os
 import json
 import logging
 
 # 定义蓝图
 acl_bp = Blueprint('acl', __name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
-# 模拟存储 ACL 配置（临时存储，可以替换为数据库存储）
-acl_store = {}
 
 # 动态生成 Tailscale Access Control 配置
 @acl_bp.route('/api/acl/generate', methods=['POST'])
@@ -22,10 +18,10 @@ def generate_acl():
     """
     data = request.json
     user_id = data.get('user_id')
-    server_ids = data.get('server_ids')
+    container_ids = data.get('container_ids')
 
     # 检查必需字段
-    if not user_id or not server_ids:
+    if not user_id or not container_ids:
         log_operation(user_id=None, operation="generate_acl", status="failed", details="Missing required fields")
         return jsonify({"success": False, "message": "Missing required fields"}), 400
 
@@ -34,32 +30,57 @@ def generate_acl():
         log_operation(user_id=user_id, operation="generate_acl", status="failed", details="User not found")
         return jsonify({"success": False, "message": "User not found"}), 404
 
-    servers = Server.query.filter(Server.id.in_(server_ids)).all()
-    if not servers:
-        log_operation(user_id=user_id, operation="generate_acl", status="failed", details="Invalid server IDs")
-        return jsonify({"success": False, "message": "Invalid server IDs"}), 404
+    # 获取容器信息
+    containers = DockerContainer.query.filter(DockerContainer.id.in_(container_ids)).all()
+    if not containers:
+        log_operation(user_id=user_id, operation="generate_acl", status="failed", details="No containers found")
+        return jsonify({"success": False, "message": "No containers found"}), 404
 
-    # 动态生成 Tailscale Access Control 配置代码
+    # 获取服务器信息（包括地区信息）
+    server_ids = set([container.server_id for container in containers])
+    servers = Server.query.filter(Server.id.in_(server_ids)).all()
+    server_info = {server.id: server for server in servers}
+
+    # 动态生成 ACL 配置
     access_control_code = {
         "user_id": user.id,
         "username": user.username,
         "email": user.email,
-        "access_controls": [
-            {
-                "action": "accept",
-                "ip": server.ip,
-                "ports": "80,443"  # 假设只开放 HTTP/HTTPS 端口，可以根据实际需要修改
-            }
-            for server in servers
-        ]
+        "access_controls": []
     }
 
-    # 存储或更新 ACL 配置
-    acl_store[user.id] = access_control_code
-    acl_file_path = f"acl_files/{user.username}_tailscale_acl.json"
-    os.makedirs("acl_files", exist_ok=True)
-    with open(acl_file_path, "w") as acl_file:
-        json.dump(access_control_code, acl_file)
+    for container in containers:
+        server = server_info.get(container.server_id)
+        if server:
+            # 根据容器和服务器的特性生成 ACL 配置
+            access_control = {
+                "action": "accept",
+                "ip": container.ip_address,  # 容器的 IP 地址
+                "ports": f"{container.port},{container.stun_port}",  # 假设开放 HTTP/HTTPS 和 STUN 端口
+                "server_region": server.region  # 服务器地区信息
+            }
+            access_control_code["access_controls"].append(access_control)
+
+    # 存储或更新 ACL 配置到数据库
+    acl_config = ACLConfig.query.filter_by(user_id=user.id).first()
+    if acl_config:
+        # 更新现有的 ACL 配置
+        acl_config.acl_data = json.dumps(access_control_code)  # 更新 ACL 配置数据
+        acl_config.version = "v1.0"  # 可以根据需要增加版本号
+        acl_config.is_active = True  # 确保该配置仍然有效
+        db.session.commit()
+    else:
+        # 创建新的 ACL 配置
+        new_acl_config = ACLConfig(
+            user_id=user.id,
+            server_ids=json.dumps([server.id for server in servers]),
+            container_ids=json.dumps([container.id for container in containers]),
+            acl_data=json.dumps(access_control_code),
+            version="v1.0",
+            is_active=True
+        )
+        db.session.add(new_acl_config)
+        db.session.commit()
 
     # 记录 ACL 日志
     acl_log = ACLLog(
@@ -86,49 +107,68 @@ def update_acl():
     """
     data = request.json
     user_id = data.get('user_id')
-    server_ids = data.get('server_ids')
+    container_ids = data.get('container_ids')
 
     # 检查必需字段
-    if not user_id or not server_ids:
+    if not user_id or not container_ids:
         log_operation(user_id=None, operation="update_acl", status="failed", details="Missing required fields")
         return jsonify({"success": False, "message": "Missing required fields"}), 400
 
-    if user_id not in acl_store:
-        log_operation(user_id=user_id, operation="update_acl", status="failed", details="No existing ACL configuration")
-        return jsonify({"success": False, "message": "No existing ACL configuration for this user"}), 404
+    # 获取容器信息
+    containers = DockerContainer.query.filter(DockerContainer.id.in_(container_ids)).all()
+    if not containers:
+        log_operation(user_id=user_id, operation="update_acl", status="failed", details="No containers found")
+        return jsonify({"success": False, "message": "No containers found"}), 404
 
+    # 获取服务器信息（包括地区信息）
+    server_ids = set([container.server_id for container in containers])
     servers = Server.query.filter(Server.id.in_(server_ids)).all()
-    if not servers:
-        log_operation(user_id=user_id, operation="update_acl", status="failed", details="Invalid server IDs")
-        return jsonify({"success": False, "message": "Invalid server IDs"}), 404
+    server_info = {server.id: server for server in servers}
 
-    # 更新 Tailscale Access Control 配置代码
     user = User.query.get(user_id)
     access_control_code = {
         "user_id": user.id,
         "username": user.username,
         "email": user.email,
-        "access_controls": [
-            {
-                "action": "accept",
-                "ip": server.ip,
-                "ports": "80,443"  # 根据实际需求调整
-            }
-            for server in servers
-        ]
+        "access_controls": []
     }
 
-    acl_store[user.id] = access_control_code
-    acl_file_path = f"acl_files/{user.username}_tailscale_acl.json"
-    with open(acl_file_path, "w") as acl_file:
-        json.dump(access_control_code, acl_file)
+    for container in containers:
+        server = server_info.get(container.server_id)
+        if server:
+            access_control = {
+                "action": "accept",
+                "ip": container.ip_address,
+                "ports": f"{container.port},{container.stun_port}",
+                "server_region": server.region
+            }
+            access_control_code["access_controls"].append(access_control)
+
+    # 更新 ACL 配置到数据库
+    acl_config = ACLConfig.query.filter_by(user_id=user.id).first()
+    if acl_config:
+        acl_config.acl_data = json.dumps(access_control_code)
+        acl_config.version = "v1.1"  # 更新版本号
+        acl_config.is_active = True  # 确保该配置有效
+        db.session.commit()
+    else:
+        new_acl_config = ACLConfig(
+            user_id=user.id,
+            server_ids=json.dumps([server.id for server in servers]),
+            container_ids=json.dumps([container.id for container in containers]),
+            acl_data=json.dumps(access_control_code),
+            version="v1.1",
+            is_active=True
+        )
+        db.session.add(new_acl_config)
+        db.session.commit()
 
     # 记录更新日志
     acl_log = ACLLog(
         user_id=user.id,
         ip_address=request.remote_addr,
         location="Unknown",  # 地理位置可填入实际获取结果
-        acl_version="v1.1"  # 新版本号
+        acl_version="v1.1"
     )
     db.session.add(acl_log)
     db.session.commit()
@@ -148,7 +188,6 @@ def get_acl_logs(user_id):
     """
     logs = ACLLog.query.filter_by(user_id=user_id).all()
     if not logs:
-        log_operation(user_id=user_id, operation="get_acl_logs", status="failed", details="No ACL logs found")
         return jsonify({"success": False, "message": "No ACL logs found"}), 404
 
     log_data = [
@@ -160,7 +199,6 @@ def get_acl_logs(user_id):
         } for log in logs
     ]
 
-    log_operation(user_id=user_id, operation="get_acl_logs", status="success", details="Tailscale ACL logs retrieved")
     return jsonify({"success": True, "logs": log_data}), 200
 
 
@@ -170,17 +208,13 @@ def download_acl(username):
     """
     提供用户的 Tailscale ACL 文件下载
     """
-    acl_file_path = f"acl_files/{username}_tailscale_acl.json"
-    if not os.path.exists(acl_file_path):
-        logging.error(f"Tailscale ACL file for user {username} not found")
-        log_operation(user_id=None, operation="download_acl", status="failed", details=f"Tailscale ACL file for {username} not found")
-        return jsonify({"success": False, "message": "Tailscale ACL file not found"}), 404
+    acl_config = ACLConfig.query.filter_by(user_id=username).first()
+    if not acl_config:
+        return jsonify({"success": False, "message": "Tailscale ACL not found for this user"}), 404
 
     try:
-        log_operation(user_id=None, operation="download_acl", status="success", details=f"Tailscale ACL file downloaded for {username}")
-        logging.info(f"Tailscale ACL file for user {username} downloaded")
-        return send_file(acl_file_path, as_attachment=True)
+        acl_data = json.loads(acl_config.acl_data)  # 解析存储的 ACL 数据
+        # 构造文件内容或直接返回 JSON 格式的响应
+        return jsonify({"success": True, "acl": acl_data}), 200
     except Exception as e:
-        logging.error(f"Error downloading Tailscale ACL file for user {username}: {e}")
-        log_operation(user_id=None, operation="download_acl", status="failed", details=f"Error downloading Tailscale ACL: {str(e)}")
         return jsonify({"success": False, "message": f"Error downloading Tailscale ACL: {str(e)}"}), 500
