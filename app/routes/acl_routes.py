@@ -101,33 +101,34 @@ def generate_acl():
                 "InsecureForTests": True,
             })
 
-    # 手动拼接非标准 JSON 格式的字符串
-    def format_nonstandard_json(data):
-        json_string = json.dumps(data, ensure_ascii=False, indent=4)
-        json_string = json_string[1:-2]  # 去掉最外层的大括号 {} 和最后的逗号
-        json_string = json_string.replace("}", "},").replace("]", "],").rstrip(",") + ","
-        return json_string
-
-    nonstandard_json_string = format_nonstandard_json(access_control_code)
-
     # 存储或更新 ACL 配置到数据库
     acl_config = ACLConfig.query.filter_by(user_id=user.id).first()
     if acl_config:
-        acl_config.acl_data = nonstandard_json_string
+        # 更新现有的 ACL 配置
+        acl_config.server_ids = [server.id for server in servers]  # 存储数组而非 JSON 字符串
+        acl_config.container_ids = [container.id for container in containers]
+        acl_config.acl_data = access_control_code  # 存储标准 JSON 对象
         acl_config.version = "v1.0"
         acl_config.is_active = True
-        db.session.commit()
     else:
-        new_acl_config = ACLConfig(
+        # 创建新的 ACL 配置
+        acl_config = ACLConfig(
             user_id=user.id,
-            server_ids=json.dumps([server.id for server in servers]),
-            container_ids=json.dumps([container.id for container in containers]),
-            acl_data=nonstandard_json_string,
+            server_ids=[server.id for server in servers],  # 存储数组而非 JSON 字符串
+            container_ids=[container.id for container in containers],
+            acl_data=access_control_code,  # 存储标准 JSON 对象
             version="v1.0",
             is_active=True,
         )
-        db.session.add(new_acl_config)
+        db.session.add(acl_config)
+
+    # 提交事务
+    try:
         db.session.commit()
+    except Exception as e:
+        db.session.rollback()  # 事务回滚
+        logging.error(f"Failed to insert ACLConfig: {e}")
+        return jsonify({"success": False, "message": "Database insert failed"}), 500
 
     # 记录 ACL 日志
     acl_log = ACLLog(
@@ -142,18 +143,9 @@ def generate_acl():
     # 记录操作日志
     log_operation(user_id=user.id, operation="generate_acl", status="success", details=f"ACL generated for user {user.username}")
 
-    # 发送通知邮件
-    send_notification_email(
-        user.email,
-        "Tailscale ACL Generated",
-        f"Your Tailscale Access Control configuration has been successfully generated.\n\n"
-        f"Here is your ACL configuration:\n\n{nonstandard_json_string}",
-    )
-
-    # 打印日志
-    logging.info(f"Tailscale ACL generated for user {user.username}")
-
+    # 返回成功响应
     return jsonify({"success": True, "message": "Tailscale ACL generated successfully", "acl": access_control_code}), 200
+
 
 
 # 手动更新 ACL 配置
