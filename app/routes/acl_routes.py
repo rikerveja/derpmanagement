@@ -11,7 +11,6 @@ import logging
 acl_bp = Blueprint('acl', __name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# 动态生成 Tailscale Access Control 配置
 @acl_bp.route('/api/acl/generate', methods=['POST'])
 def generate_acl():
     """
@@ -128,7 +127,6 @@ def generate_acl():
     logging.info(f"Tailscale ACL generated for user {user.username}")
 
     return jsonify({"success": True, "message": "Tailscale ACL generated successfully", "acl": access_control_code}), 200
-
 
 # 手动更新 ACL 配置
 @acl_bp.route('/api/acl/update', methods=['POST'])
