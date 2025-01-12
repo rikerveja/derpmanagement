@@ -28,6 +28,72 @@ CITY_NAME_MAPPING = {
     "南京": {"region_code": "NJ", "region_name_full": "nanjing"},
 }
 
+@acl_bp.route('/api/acl/configs', methods=['GET'])
+def get_acl_configs():
+    """
+    获取 ACL 配置的列表，返回字段：用户、服务器、容器、版本、状态、更新时间、操作、以及格式化的 derpMap 结构。
+    """
+    try:
+        # 查询 ACLConfig 表中的所有记录
+        acl_configs = ACLConfig.query.all()
+        
+        # 格式化查询结果
+        acl_configs_list = []
+        
+        for acl in acl_configs:
+            # 获取关联的用户信息
+            user = User.query.get(acl.user_id)
+            if not user:
+                continue  # 如果用户不存在，跳过当前记录
+            
+            # 获取关联的服务器信息
+            servers = Server.query.filter(Server.id.in_(acl.server_ids)).all()
+            server_info = [{"id": server.id, "ip_address": server.ip_address, "region": server.region} for server in servers]
+
+            # 获取关联的容器信息
+            containers = DockerContainer.query.filter(DockerContainer.id.in_(acl.container_ids)).all()
+            container_info = [{"id": container.id, "name": container.container_name, "port": container.port, "status": container.status} for container in containers]
+
+            # 格式化 derpMap 结构
+            access_control_code = json.loads(acl.acl_data)  # 解析存储的 ACL 数据
+            derp_map = format_derp_map(access_control_code)
+
+            # 构建 ACL 配置的返回信息
+            acl_config_data = {
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email
+                },
+                "servers": server_info,
+                "containers": container_info,
+                "version": acl.version,
+                "is_active": acl.is_active,
+                "created_at": acl.created_at.strftime('%Y-%m-%d %H:%M:%S'),  # 格式化时间
+                "updated_at": acl.updated_at.strftime('%Y-%m-%d %H:%M:%S'),  # 格式化时间
+                "operation": "Updated" if acl.updated_at != acl.created_at else "Created",
+                "derpMap": derp_map  # 返回格式化后的 derpMap 结构
+            }
+            
+            acl_configs_list.append(acl_config_data)
+
+        # 返回成功的响应和 ACL 配置列表
+        return jsonify({"success": True, "acl_configs": acl_configs_list}), 200
+
+    except Exception as e:
+        # 处理可能出现的异常
+        return jsonify({"success": False, "message": f"Error retrieving ACL configs: {str(e)}"}), 500
+
+def format_derp_map(access_control_code):
+    """
+    格式化 derpMap 为前端显示用的格式（例如添加逗号、移除大括号等）
+    """
+    # 格式化 derpMap 字段的输出
+    json_string = json.dumps(access_control_code, ensure_ascii=False, indent=4)
+    json_string = json_string[1:-2]  # 去掉最外层的大括号 {} 和最后的逗号
+    json_string = json_string.replace("}", "},").replace("]", "],").rstrip(",") + ","
+    return json_string
+
 @acl_bp.route('/api/acl/generate', methods=['POST'])
 def generate_acl():
     """
