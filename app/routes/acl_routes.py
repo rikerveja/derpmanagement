@@ -3,6 +3,7 @@ from app.models import ACLLog, User, Server, DockerContainer, ACLConfig
 from app import db
 from app.utils.logging_utils import log_operation
 from app.utils.notifications_utils import send_notification_email
+import os
 import json
 import logging
 
@@ -53,10 +54,11 @@ def generate_acl():
         if server:
             # 获取地区和相关信息
             region_name = server.region
-            region_code = region_name[:2].upper()  # 城市名的声母，例如：深圳 -> SZ
+            region_code = region_name[:2].upper()  # 城市名的声母，例如：上海 -> SH
             region_name_full = region_code.lower() + "derper"  # 如：SZ -> szderper
 
-            container_node_name = region_code.lower() + container.container_name[2:]  # 生成容器节点名称，如：hklinuxserver -> szlinuxserver
+            # 修正容器节点名称：城市名的声母 + linuxserver
+            container_node_name = f"{region_code.lower()}linuxserver"  # 使用城市声母+linuxserver，例如：szlinuxserver
 
             derp_port = container.port  # 获取容器的端口
             ipv4 = server.ip_address  # 获取服务器的 IP 地址
@@ -73,17 +75,17 @@ def generate_acl():
                     "Nodes": []
                 }
 
-            # 添加新的节点（手动加逗号）
+            # 添加新的节点
             access_control_code["derpMap"]["Regions"][str(region_id)]["Nodes"].append({
                 "Name": container_node_name,
                 "RegionID": region_id,
                 "DERPPort": derp_port,
                 "ipv4": ipv4,
-                "InsecureForTests": True
+                "InsecureForTests": True  # 保证格式正确
             })
 
     # 生成带逗号的完整 JSON 字符串（模拟格式）
-    json_string = json.dumps(access_control_code, separators=(',', ': '))
+    json_string = json.dumps(access_control_code, separators=(',', ': '), ensure_ascii=False)
 
     # 存储或更新 ACL 配置到数据库
     acl_config = ACLConfig.query.filter_by(user_id=user.id).first()
@@ -119,7 +121,7 @@ def generate_acl():
     # 记录操作日志
     log_operation(user_id=user.id, operation="generate_acl", status="success", details=f"ACL generated for user {user.username}")
     
-    # 发送通知邮件
+    # 发送通知邮件，将 ACL 配置内容通过邮件发送
     logging.info(f"Sending email to {user.email}")
     send_notification_email(
         user.email, 
@@ -132,6 +134,7 @@ def generate_acl():
     logging.info(f"Tailscale ACL generated for user {user.username}")
 
     return jsonify({"success": True, "message": "Tailscale ACL generated successfully", "acl": access_control_code}), 200
+
 
 # 手动更新 ACL 配置
 @acl_bp.route('/api/acl/update', methods=['POST'])
