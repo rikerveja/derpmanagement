@@ -1,9 +1,8 @@
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify
 from app.models import ACLLog, User, Server, DockerContainer, ACLConfig
 from app import db
 from app.utils.logging_utils import log_operation
 from app.utils.notifications_utils import send_notification_email
-import os
 import json
 import logging
 
@@ -44,9 +43,6 @@ def generate_acl():
 
     # 动态生成 ACL 配置
     access_control_code = {
-        "user_id": user.id,
-        "username": user.username,
-        "email": user.email,
         "derpMap": {
             "OmitDefaultRegions": True,
             "Regions": {}
@@ -56,16 +52,17 @@ def generate_acl():
     for container in containers:
         server = server_info.get(container.server_id)
         if server:
-            # 根据容器和服务器的特性生成 ACL 配置
+            # 获取地区和相关信息
             region_name = server.region
             region_code = region_name[:2].upper()  # 城市名的声母，例如：上海 -> SH
             region_name_full = region_code.lower() + "derper"  # 如：SH -> shderper
 
-            container_node_name = region_code.lower() + container.container_name[2:]
+            container_node_name = region_code.lower() + container.container_name[2:]  # 生成容器节点名称，如：hklinuxserver -> szlinuxserver
 
-            derp_port = container.port
-            ipv4 = server.ip_address
+            derp_port = container.port  # 获取容器的端口
+            ipv4 = server.ip_address  # 获取服务器的 IP 地址
 
+            # 构建 `derpMap` 和 `Regions` 的结构
             if region_code not in access_control_code["derpMap"]["Regions"]:
                 access_control_code["derpMap"]["Regions"][region_code] = {
                     "RegionID": region_code,
@@ -74,6 +71,7 @@ def generate_acl():
                     "Nodes": []
                 }
 
+            # 手动添加逗号来模拟最后一个元素后的逗号
             access_control_code["derpMap"]["Regions"][region_code]["Nodes"].append({
                 "Name": container_node_name,
                 "RegionID": region_code,
@@ -85,11 +83,13 @@ def generate_acl():
     # 存储或更新 ACL 配置到数据库
     acl_config = ACLConfig.query.filter_by(user_id=user.id).first()
     if acl_config:
-        acl_config.acl_data = json.dumps(access_control_code)
-        acl_config.version = "v1.0"
-        acl_config.is_active = True
+        # 更新现有的 ACL 配置
+        acl_config.acl_data = json.dumps(access_control_code)  # 更新 ACL 配置数据
+        acl_config.version = "v1.0"  # 更新版本号
+        acl_config.is_active = True  # 确保该配置仍然有效
         db.session.commit()
     else:
+        # 创建新的 ACL 配置
         new_acl_config = ACLConfig(
             user_id=user.id,
             server_ids=json.dumps([server.id for server in servers]),
@@ -105,14 +105,19 @@ def generate_acl():
     acl_log = ACLLog(
         user_id=user.id,
         ip_address=request.remote_addr,
-        location="Unknown",
-        acl_version="v1.0"
+        location="Unknown",  # 可用外部服务获取用户地理位置
+        acl_version="v1.0"  # 动态生成 ACL 版本号
     )
     db.session.add(acl_log)
     db.session.commit()
 
+    # 记录操作日志
     log_operation(user_id=user.id, operation="generate_acl", status="success", details=f"ACL generated for user {user.username}")
+    
+    # 发送通知邮件
     send_notification_email(user.email, "Tailscale ACL Generated", f"Your Tailscale Access Control configuration has been successfully generated.")
+    
+    # 打印日志
     logging.info(f"Tailscale ACL generated for user {user.username}")
 
     return jsonify({"success": True, "message": "Tailscale ACL generated successfully", "acl": access_control_code}), 200
