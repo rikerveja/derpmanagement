@@ -125,6 +125,45 @@ const getServerHealthCheck = () => {
   return api.get('/server/health_check')
 }
 
+// ACL相关API
+const generateAcl = (data) => {
+  // 转换数据格式以匹配后端API要求
+  const requestData = {
+    user_id: data.user_id,
+    container_ids: data.container_ids,
+    server_ids: [data.server_id] // 将单个server_id转换为数组格式
+  }
+  return api.post('/acl/generate', requestData)
+}
+
+const updateAcl = (data) => {
+  return api.post('/acl/update', data)
+}
+
+const getAclLogs = (userId) => {
+  return api.get(`/acl/logs/${userId}`)
+}
+
+const downloadAcl = (username) => {
+  return api.get(`/acl/download/${username}`)
+}
+
+const getAclList = () => {
+  return api.get('/acl/list')
+}
+
+const getUser = (userId) => {
+  return api.get(`/user/${userId}`)
+}
+
+const getServer = (serverId) => {
+  return api.get(`/server/${serverId}`)
+}
+
+const getContainer = (containerId) => {
+  return api.get(`/container/${containerId}`)
+}
+
 export default {
   // 用户相关 API
   login(email, password) {
@@ -210,21 +249,14 @@ export default {
   },
 
   // ACL 相关 API
-  generateAcl(userId, permissions) {
-    return api.post('/acl/generate', { user_id: userId, permissions })
-  },
-  
-  updateAcl(userId, permissions) {
-    return api.post('/acl/update', { user_id: userId, permissions })
-  },
-  
-  getAclLogs(userId) {
-    return api.get(`/acl/logs/${userId}`)
-  },
-  
-  downloadUserAcl(username) {
-    return api.get(`/acl/download/${username}`)
-  },
+  generateAcl,
+  updateAcl,
+  getAclLogs,
+  downloadAcl,
+  getAclList,
+  getUser,
+  getServer,
+  getContainer,
 
   // 流量相关 API
   getRealTimeTraffic() {
