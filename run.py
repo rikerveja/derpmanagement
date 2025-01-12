@@ -3,6 +3,8 @@ from app import create_app, db
 # 创建应用实例
 app = create_app()
 
+app.config['SQLALCHEMY_ECHO'] = True  # 启用 SQL 语句的日志输出
+
 # 启动应用程序
 if __name__ == "__main__":
     # 建议添加日志记录功能
