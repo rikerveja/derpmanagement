@@ -3,13 +3,30 @@ from app.models import ACLLog, User, Server, DockerContainer, ACLConfig
 from app import db
 from app.utils.logging_utils import log_operation
 from app.utils.notifications_utils import send_notification_email
-import os
 import json
 import logging
+import os
 
 # 定义蓝图
 acl_bp = Blueprint('acl', __name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+# 城市名称映射表
+CITY_MAPPING = {
+    "上海": "shanghai",
+    "深圳": "shenzhen",
+    "北京": "beijing",
+    "广州": "guangzhou",
+    "杭州": "hangzhou",
+    "成都": "chengdu",
+    "武汉": "wuhan",
+    "南京": "nanjing",
+    "天津": "tianjin",
+    "重庆": "chongqing",
+    "西安": "xian",
+    "青岛": "qingdao",
+    "长沙": "changsha"
+}
 
 @acl_bp.route('/api/acl/generate', methods=['POST'])
 def generate_acl():
@@ -52,25 +69,24 @@ def generate_acl():
     for container in containers:
         server = server_info.get(container.server_id)
         if server:
-            # 获取地区和相关信息
-            region_name = server.region
-            region_code = region_name[:2].upper()  # 城市名的声母，例如：上海 -> SH
-            # 将城市名转换为英文，并格式化
-            region_name_full = region_name.lower().replace('上海', 'shanghai') + "derper"  # 转换为英文
+            # 获取城市英文名称
+            region_name = CITY_MAPPING.get(server.region, server.region.lower())
+            region_code = region_name[:2].upper()  # 城市名的声母，例如：shanghai -> SH
+            region_name_full = f"{region_name}derper"  # 生成地区全名，例如：shanghaiderper
 
-            # 修正容器节点名称：城市名的声母 + linuxserver
-            container_node_name = f"{region_code.lower()}linuxserver"  # 使用城市声母+linuxserver，例如：szlinuxserver
+            # 生成容器节点名称
+            container_node_name = f"{region_code.lower()}linuxserver"
 
             derp_port = container.port  # 获取容器的端口
             ipv4 = server.ip_address  # 获取服务器的 IP 地址
 
-            # 将 RegionID 改为数字，例如 901
-            region_id = 901  # 假设 901 对应于深圳
+            # 将 RegionID 固定为数字，例如 901
+            region_id = 901  # 根据实际需求设置 RegionID
 
             # 构建 `derpMap` 和 `Regions` 的结构
-            if region_id not in access_control_code["derpMap"]["Regions"]:
+            if str(region_id) not in access_control_code["derpMap"]["Regions"]:
                 access_control_code["derpMap"]["Regions"][str(region_id)] = {
-                    "RegionID": region_id,  # 使用数字作为 RegionID
+                    "RegionID": region_id,
                     "RegionCode": region_code,
                     "RegionName": region_name_full,
                     "Nodes": []
@@ -82,11 +98,11 @@ def generate_acl():
                 "RegionID": region_id,
                 "DERPPort": derp_port,
                 "ipv4": ipv4,
-                "InsecureForTests": True  # 保证格式正确
+                "InsecureForTests": True
             })
 
     # 生成带逗号的完整 JSON 字符串，并且格式化为美观的输出
-    json_string = json.dumps(access_control_code, separators=(',', ': '), ensure_ascii=False, indent=4)
+    json_string = json.dumps(access_control_code, indent=4, ensure_ascii=False)
 
     # 存储或更新 ACL 配置到数据库
     acl_config = ACLConfig.query.filter_by(user_id=user.id).first()
@@ -114,23 +130,23 @@ def generate_acl():
         user_id=user.id,
         ip_address=request.remote_addr,
         location="Unknown",  # 可用外部服务获取用户地理位置
-        details=f"acl_version: v1.0 - ACL generated for user {user.username}"  # 将 acl_version 放到 details 字段
+        details=f"acl_version: v1.0 - ACL generated for user {user.username}"
     )
     db.session.add(acl_log)
     db.session.commit()
 
     # 记录操作日志
     log_operation(user_id=user.id, operation="generate_acl", status="success", details=f"ACL generated for user {user.username}")
-    
+
     # 发送通知邮件，将 ACL 配置内容通过邮件发送
     logging.info(f"Sending email to {user.email}")
     send_notification_email(
-        user.email, 
-        "Tailscale ACL Generated", 
+        user.email,
+        "Tailscale ACL Generated",
         f"Your Tailscale Access Control configuration has been successfully generated.\n\n"
-        f"Here is your ACL configuration:\n\n{json_string}"  # 将格式化的 JSON 字符串作为邮件内容
+        f"Here is your ACL configuration:\n\n{json_string}"
     )
-    
+
     # 打印日志
     logging.info(f"Tailscale ACL generated for user {user.username}")
 
