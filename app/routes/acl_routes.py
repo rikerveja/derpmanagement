@@ -55,7 +55,8 @@ def generate_acl():
             # 获取地区和相关信息
             region_name = server.region
             region_code = region_name[:2].upper()  # 城市名的声母，例如：上海 -> SH
-            region_name_full = region_code.lower() + "derper"  # 如：SZ -> szderper
+            # 将城市名转换为英文，并格式化
+            region_name_full = region_name.lower().replace('上海', 'shanghai') + "derper"  # 转换为英文
 
             # 修正容器节点名称：城市名的声母 + linuxserver
             container_node_name = f"{region_code.lower()}linuxserver"  # 使用城市声母+linuxserver，例如：szlinuxserver
@@ -84,8 +85,8 @@ def generate_acl():
                 "InsecureForTests": True  # 保证格式正确
             })
 
-    # 生成带逗号的完整 JSON 字符串（模拟格式）
-    json_string = json.dumps(access_control_code, separators=(',', ': '), ensure_ascii=False)
+    # 生成带逗号的完整 JSON 字符串，并且格式化为美观的输出
+    json_string = json.dumps(access_control_code, separators=(',', ': '), ensure_ascii=False, indent=4)
 
     # 存储或更新 ACL 配置到数据库
     acl_config = ACLConfig.query.filter_by(user_id=user.id).first()
@@ -127,7 +128,7 @@ def generate_acl():
         user.email, 
         "Tailscale ACL Generated", 
         f"Your Tailscale Access Control configuration has been successfully generated.\n\n"
-        f"Here is your ACL configuration:\n\n{json_string}"  # 将 JSON 字符串作为邮件内容
+        f"Here is your ACL configuration:\n\n{json_string}"  # 将格式化的 JSON 字符串作为邮件内容
     )
     
     # 打印日志
