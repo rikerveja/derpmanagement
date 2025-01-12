@@ -6,6 +6,7 @@ from app.utils.notifications_utils import send_notification_email
 import json
 import logging
 import os
+
 # 定义蓝图
 acl_bp = Blueprint('acl', __name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -103,6 +104,7 @@ def generate_acl():
     # 手动拼接非标准 JSON 格式的字符串
     def format_nonstandard_json(data):
         json_string = json.dumps(data, ensure_ascii=False, indent=4)
+        json_string = json_string[1:-2]  # 去掉最外层的大括号 {} 和最后的逗号
         json_string = json_string.replace("}", "},").replace("]", "],").rstrip(",") + ","
         return json_string
 
