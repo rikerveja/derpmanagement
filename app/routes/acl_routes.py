@@ -11,21 +11,21 @@ import os
 acl_bp = Blueprint('acl', __name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# 定义城市名称映射
+# 城市映射表，提供城市名到拼音和代码的映射
 CITY_NAME_MAPPING = {
-    "上海": "shanghai",
-    "深圳": "shenzhen",
-    "北京": "beijing",
-    "广州": "guangzhou",
-    "杭州": "hangzhou",
-    "成都": "chengdu",
-    "武汉": "wuhan",
-    "南京": "nanjing",
-    "天津": "tianjin",
-    "重庆": "chongqing",
-    "西安": "xian",
-    "青岛": "qingdao",
-    "长沙": "changsha"
+    "长沙": {"region_code": "CS", "region_name_full": "changsha"},
+    "上海": {"region_code": "SH", "region_name_full": "shanghai"},
+    "深圳": {"region_code": "SZ", "region_name_full": "shenzhen"},
+    "广州": {"region_code": "GZ", "region_name_full": "guangzhou"},
+    "北京": {"region_code": "BJ", "region_name_full": "beijing"},
+    "杭州": {"region_code": "HZ", "region_name_full": "hangzhou"},
+    "成都": {"region_code": "CD", "region_name_full": "chengdu"},
+    "武汉": {"region_code": "WH", "region_name_full": "wuhan"},
+    "天津": {"region_code": "TJ", "region_name_full": "tianjin"},
+    "重庆": {"region_code": "CQ", "region_name_full": "chongqing"},
+    "西安": {"region_code": "XA", "region_name_full": "xian"},
+    "青岛": {"region_code": "QD", "region_name_full": "qingdao"},
+    "南京": {"region_code": "NJ", "region_name_full": "nanjing"},
 }
 
 @acl_bp.route('/api/acl/generate', methods=['POST'])
@@ -69,10 +69,10 @@ def generate_acl():
     for container in containers:
         server = server_info.get(container.server_id)
         if server:
-            # 从映射表中获取城市代码和英文名
-            region_name = CITY_NAME_MAPPING.get(server.region, server.region.lower())
-            region_code = region_name[:2].upper()  # 从城市映射表统一获取代码，例如 "深圳" -> "SZ"
-            region_name_full = f"{region_name}derper"  # 使用英文名生成完整的 RegionName
+            # 从映射表中获取城市代码和拼音
+            city_info = CITY_NAME_MAPPING.get(server.region, {"region_code": "UNKNOWN", "region_name_full": server.region.lower()})
+            region_code = city_info["region_code"]  # 城市代码
+            region_name_full = f"{city_info['region_name_full']}derper"  # 拼音全拼 + derper
 
             # 修正容器节点名称：城市代码 + linuxserver
             container_node_name = f"{region_code.lower()}linuxserver"
@@ -87,8 +87,8 @@ def generate_acl():
             if str(region_id) not in access_control_code["derpMap"]["Regions"]:
                 access_control_code["derpMap"]["Regions"][str(region_id)] = {
                     "RegionID": region_id,
-                    "RegionCode": region_code,  # 确保使用统一的城市代码
-                    "RegionName": region_name_full,  # 确保使用统一的英文城市名
+                    "RegionCode": region_code,  # 使用映射表中的城市代码
+                    "RegionName": region_name_full,  # 使用映射表中的拼音全拼
                     "Nodes": [],
                 }
 
