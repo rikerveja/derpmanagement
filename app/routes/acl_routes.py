@@ -146,8 +146,8 @@ def generate_acl():
     send_notification_email(
         user.email,
         "Tailscale ACL Generated",
-        f"Your Tailscale Access Control configuration has been successfully generated.\n\n"
-        f"Here is your ACL configuration:\n\n{nonstandard_json_string}",
+        f"你的 Tailscale Access Control configuration 已经成功生成，请在第13行开始粘贴插入：\n\n"
+        f"这是你的ACL配置信息:\n\n{nonstandard_json_string}",
     )
 
     # 打印日志
