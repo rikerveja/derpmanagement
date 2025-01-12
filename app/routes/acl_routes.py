@@ -136,7 +136,6 @@ def generate_acl():
 
     return jsonify({"success": True, "message": "Tailscale ACL generated successfully", "acl": access_control_code}), 200
 
-
 # 手动更新 ACL 配置
 @acl_bp.route('/api/acl/update', methods=['POST'])
 def update_acl():
