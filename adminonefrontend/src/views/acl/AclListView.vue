@@ -17,7 +17,9 @@ import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.
 import BaseButton from '@/components/BaseButton.vue'
 import BaseIcon from '@/components/BaseIcon.vue'
 import api from '@/services/api'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
 const acls = ref([])
 const users = ref({})  // 用户信息缓存
 const servers = ref({}) // 服务器信息缓存
@@ -25,10 +27,12 @@ const containers = ref({}) // 容器信息缓存
 const searchQuery = ref('')
 const currentPage = ref(1)
 const itemsPerPage = 10
+const loading = ref(false)
 
 // 获取ACL列表及关联数据
 const fetchAcls = async () => {
   try {
+    loading.value = true
     const response = await api.getAclList()
     if (response.success) {
       acls.value = await Promise.all(response.acls.map(async acl => {
@@ -59,6 +63,9 @@ const fetchAcls = async () => {
     }
   } catch (error) {
     console.error('获取ACL数据失败:', error)
+    alert('获取ACL数据失败: ' + error.message)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -82,9 +89,27 @@ const paginatedAcls = computed(() => {
 // 下载ACL
 const downloadAcl = async (aclId) => {
   try {
-    await api.downloadAcl(aclId)
+    loading.value = true
+    const response = await api.downloadAcl(aclId)
+    if(response.success) {
+      // 创建下载链接
+      const blob = new Blob([JSON.stringify(response.acl, null, 2)], { type: 'application/json' })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `acl_${aclId}.json`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    } else {
+      throw new Error(response.message)
+    }
   } catch (error) {
     console.error('下载ACL失败:', error)
+    alert('下载ACL失败: ' + error.message)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -92,12 +117,31 @@ const downloadAcl = async (aclId) => {
 const deleteAcl = async (aclId) => {
   if (confirm('确定要删除此ACL吗？')) {
     try {
-      await api.deleteAcl(aclId)
-      await fetchAcls()
+      loading.value = true
+      const response = await api.deleteAcl(aclId)
+      if(response.success) {
+        alert('删除成功!')
+        await fetchAcls()
+      } else {
+        throw new Error(response.message)
+      }
     } catch (error) {
       console.error('删除ACL失败:', error)
+      alert('删除ACL失败: ' + error.message)
+    } finally {
+      loading.value = false
     }
   }
+}
+
+// 编辑ACL
+const editAcl = (aclId) => {
+  router.push(`/acl/edit/${aclId}`)
+}
+
+// 创建新ACL
+const createAcl = () => {
+  router.push('/acl/generate')
 }
 
 onMounted(() => {
@@ -139,6 +183,19 @@ onMounted(() => {
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
+              <tr v-if="loading">
+                <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                  <div class="flex items-center justify-center">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-2"></div>
+                    <span class="ml-2">加载中...</span>
+                  </div>
+                </td>
+              </tr>
+              <tr v-else-if="acls.length === 0">
+                <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                  暂无ACL数据
+                </td>
+              </tr>
               <tr v-for="acl in paginatedAcls" :key="acl.id" class="hover:bg-gray-50">
                 <!-- 用户信息 -->
                 <td class="px-4 py-3">
@@ -197,6 +254,7 @@ onMounted(() => {
                       :icon="mdiDownload"
                       color="info"
                       small
+                      :disabled="loading"
                       @click="downloadAcl(acl.id)"
                       title="下载"
                     />
@@ -204,6 +262,7 @@ onMounted(() => {
                       :icon="mdiPencil"
                       color="warning"
                       small
+                      :disabled="loading"
                       @click="editAcl(acl.id)"
                       title="编辑"
                     />
@@ -211,6 +270,7 @@ onMounted(() => {
                       :icon="mdiDelete"
                       color="danger"
                       small
+                      :disabled="loading"
                       @click="deleteAcl(acl.id)"
                       title="删除"
                     />
