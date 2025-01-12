@@ -12,7 +12,17 @@ import {
   mdiMonitor,
   mdiAlertCircle,
   mdiServer,
-  mdiHeartPulse
+  mdiHeartPulse,
+  mdiPlus,
+  mdiKeyVariant,
+  mdiChartBar,
+  mdiClipboardTextClock,
+  mdiHistory,
+  mdiCalendarClock,
+  mdiAlertCircleOutline,
+  mdiCogOutline,
+  mdiTextBoxOutline,
+  mdiServerSecurity
 } from '@mdi/js'
 
 export default [
@@ -96,15 +106,18 @@ export default [
     menu: [
       {
         to: '/acl',
-        label: 'ACL列表'
+        label: 'ACL列表',
+        icon: mdiShieldAccount
       },
       {
         to: '/acl/generate',
-        label: '生成ACL'
+        label: '生成ACL',
+        icon: mdiPlus
       },
       {
         to: '/acl/logs',
-        label: 'ACL日志'
+        label: 'ACL日志',
+        icon: mdiClipboardList
       }
     ]
   },
@@ -114,11 +127,13 @@ export default [
     menu: [
       {
         to: '/serials/manage',
-        label: '序列号管理'
+        label: '序列号管理',
+        icon: mdiKeyVariant
       },
       {
         to: '/serials/stats',
-        label: '序列号统计'
+        label: '序列号统计',
+        icon: mdiChartBar
       }
     ]
   },
@@ -128,15 +143,18 @@ export default [
     menu: [
       {
         to: '/rental',
-        label: '租赁列表'
+        label: '租赁列表',
+        icon: mdiClipboardTextClock
       },
       {
         to: '/rental/history',
-        label: '租赁历史'
+        label: '租赁历史',
+        icon: mdiHistory
       },
       {
         to: '/rental/expiry',
-        label: '到期检查'
+        label: '到期检查',
+        icon: mdiCalendarClock
       }
     ]
   },
@@ -146,11 +164,13 @@ export default [
     menu: [
       {
         to: '/alerts',
-        label: '告警列表'
+        label: '告警列表',
+        icon: mdiAlertCircle
       },
       {
         to: '/alerts/settings',
-        label: '告警设置'
+        label: '告警设置',
+        icon: mdiAlertCircleOutline
       }
     ]
   },
@@ -165,15 +185,18 @@ export default [
     menu: [
       {
         to: '/system/logs',
-        label: '系统日志'
+        label: '系统日志',
+        icon: mdiTextBoxOutline
       },
       {
         to: '/system/ha',
-        label: '高可用配置'
+        label: '高可用配置',
+        icon: mdiServerSecurity
       },
       {
         to: '/system/settings',
-        label: '系统设置'
+        label: '系统设置',
+        icon: mdiCogOutline
       }
     ]
   }
