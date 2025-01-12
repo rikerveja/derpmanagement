@@ -105,12 +105,12 @@ def generate_acl():
         db.session.add(new_acl_config)
         db.session.commit()
 
-    # 记录 ACL 日志
+    # 记录 ACL 日志，将 acl_version 放到 details 中
     acl_log = ACLLog(
         user_id=user.id,
         ip_address=request.remote_addr,
         location="Unknown",  # 可用外部服务获取用户地理位置
-        acl_version="v1.0"  # 动态生成 ACL 版本号
+        details=f"acl_version: v1.0 - ACL generated for user {user.username}"  # 将 acl_version 放到 details 字段
     )
     db.session.add(acl_log)
     db.session.commit()
