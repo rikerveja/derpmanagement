@@ -79,6 +79,24 @@ const routes = [
     }
   },
   {
+    path: '/acl/generate',
+    name: 'acl.generate',
+    component: () => import('@/views/acl/AclGenerateView.vue'),
+    meta: { 
+      requiresAuth: true,
+      layout: 'authenticated'
+    }
+  },
+  {
+    path: '/acl/edit/:id',
+    name: 'acl.edit',
+    component: () => import('@/views/acl/AclGenerateView.vue'),
+    meta: { 
+      requiresAuth: true,
+      layout: 'authenticated'
+    }
+  },
+  {
     meta: {
       title: '服务器健康状态'
     },
