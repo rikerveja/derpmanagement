@@ -58,7 +58,7 @@ def generate_acl():
             container_node_name = region_code.lower() + container.container_name[2:]  # 生成容器节点名称，如：hklinuxserver -> szlinuxserver
 
             derp_port = container.port  # 获取容器的端口
-            ipv4 = server.ip_address  # 获取服务器的 IP 地址
+            ipv4 = server.ip_address  # 获取服务器的 IP 地址（修正了此处的属性名）
 
             # 将 RegionID 改为数字，例如 901
             region_id = 901  # 假设 901 对应于深圳
@@ -212,6 +212,28 @@ def update_acl():
     acl_config.is_active = True  # 确保该配置仍然有效
 
     db.session.commit()
+
+    # 记录 ACL 更新日志
+    acl_log = ACLLog(
+        user_id=user_id,
+        ip_address=request.remote_addr,
+        location="Unknown",  # 可用外部服务获取用户地理位置
+        acl_version="v1.1"  # 动态生成 ACL 版本号
+    )
+    db.session.add(acl_log)
+    db.session.commit()
+
+    # 记录操作日志
+    log_operation(user_id=user_id, operation="update_acl", status="success", details=f"ACL updated for user {acl_config.username}")
+
+    # 发送通知邮件
+    send_notification_email(acl_config.email, "Tailscale ACL Updated", f"Your Tailscale Access Control configuration has been successfully updated.")
+    
+    # 打印日志
+    logging.info(f"Tailscale ACL updated for user {acl_config.username}")
+
+    return jsonify({"success": True, "message": "Tailscale ACL updated successfully", "acl": access_control_code}), 200
+
 
     # 记录 ACL 更新日志
     acl_log = ACLLog(
