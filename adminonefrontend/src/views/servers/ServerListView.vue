@@ -560,13 +560,12 @@ onMounted(async () => {
               服务器分类 <span class="text-red-500">*</span>
             </label>
             <select
-              v-model="serverForm.category"
+              v-model="serverForm.category_id"
               required
               class="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600"
             >
-              <option value="">请选择分类</option>
-              <option value="1" selected>4坑位版</option>
-              <option value="2">2坑位版</option>
+              <option :value="1">4坑位版</option>
+              <option :value="2">2坑位版</option>
             </select>
           </div>
 
