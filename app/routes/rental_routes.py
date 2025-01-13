@@ -85,6 +85,15 @@ def create_rental():
         )
         db.session.add(acl_config)
 
+        # 更新服务器的用户数和流量
+        server = Server.query.get(1)  # 假设为服务器ID 1
+        if server:
+            server.user_count += 1  # 用户数增加
+            server.total_traffic += rental.traffic_limit  # 更新总流量（假设为租赁的流量限制）
+            server.remaining_traffic -= rental.traffic_limit  # 更新剩余流量（假设为租赁的流量限制）
+
+            db.session.commit()
+
         # 提交事务
         db.session.commit()
 
@@ -106,6 +115,7 @@ def create_rental():
             details=f"Error creating rental: {str(e)}"
         )
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
+
 
 
 # 检查租赁到期用户并释放资源
