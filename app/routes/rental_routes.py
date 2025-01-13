@@ -8,6 +8,106 @@ from datetime import datetime, timedelta
 # 定义蓝图
 rental_bp = Blueprint('rental', __name__)
 
+@rental_bp.route('/api/rental/create', methods=['POST'])
+def create_rental():
+    """
+    创建租赁关系，激活序列号并为用户分配服务器、容器、ACL配置等资源
+    """
+    data = request.json
+    serial_code = data.get('serial_code')  # 获取序列号
+    user_id = data.get('user_id')  # 获取用户ID
+
+    if not serial_code or not user_id:
+        log_operation(
+            user_id=None,
+            operation="create_rental",
+            status="failed",
+            details="Missing serial code or user ID"
+        )
+        return jsonify({"success": False, "message": "Missing serial code or user ID"}), 400
+
+    try:
+        # 查找对应的序列号
+        serial_number = SerialNumber.query.filter_by(code=serial_code, status='unused').first()
+        if not serial_number:
+            log_operation(
+                user_id=None,
+                operation="create_rental",
+                status="failed",
+                details=f"Invalid or used serial code: {serial_code}"
+            )
+            return jsonify({"success": False, "message": "Invalid or used serial code"}), 404
+
+        # 激活序列号并更新状态
+        serial_number.status = 'used'
+        serial_number.user_id = user_id
+        serial_number.activated_at = datetime.utcnow()
+        serial_number.expires_at = datetime.utcnow() + timedelta(days=serial_number.valid_days)
+        
+        # 创建租赁记录
+        rental = Rental(
+            user_id=user_id,
+            serial_number_id=serial_number.id,
+            status='active',
+            start_date=datetime.utcnow(),
+            end_date=datetime.utcnow() + timedelta(days=serial_number.valid_days),
+            server_ids=[],
+            container_ids=[],
+            traffic_limit=0,
+            traffic_usage=0,
+            serial_number_expiry=serial_number.expires_at,
+            renewal_count=0
+        )
+        db.session.add(rental)
+
+        # 分配容器并创建 Docker 容器记录
+        docker_container = DockerContainer(
+            container_id=f"container_{user_id}_{rental.id}",
+            container_name=f"container_{rental.id}",
+            user_id=user_id,
+            server_id=1,  # 假设为服务器ID，这里可以进行进一步逻辑处理
+            status="running"
+        )
+        db.session.add(docker_container)
+
+        # 更新租赁关系表
+        rental.container_ids = [docker_container.id]  # 将容器ID关联到租赁记录
+        rental.server_ids = [1]  # 假设将该租赁与服务器ID 1 关联
+
+        # 创建 ACL 配置
+        acl_config = ACLConfig(
+            user_id=user_id,
+            server_ids=rental.server_ids,
+            container_ids=rental.container_ids,
+            acl_data={},
+            version="1.0",
+            is_active=True
+        )
+        db.session.add(acl_config)
+
+        # 提交事务
+        db.session.commit()
+
+        log_operation(
+            user_id=user_id,
+            operation="create_rental",
+            status="success",
+            details=f"Rental created and resources assigned for user {user_id} with serial code {serial_code}"
+        )
+
+        return jsonify({"success": True, "message": "Rental created and resources assigned successfully"}), 200
+
+    except Exception as e:
+        db.session.rollback()  # 回滚事务
+        log_operation(
+            user_id=None,
+            operation="create_rental",
+            status="failed",
+            details=f"Error creating rental: {str(e)}"
+        )
+        return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
+
+
 # 检查租赁到期用户并释放资源
 @rental_bp.route('/api/rental/check_expiry', methods=['GET'])
 def check_expiry():
