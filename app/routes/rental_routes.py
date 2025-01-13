@@ -195,8 +195,92 @@ def renew_rental():
         )
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
 
+# 获取即将到期的租赁
+@rental_bp.route('/api/rental/get_expiring_rentals', methods=['GET'])
+def get_expiring_rentals():
+    """
+    获取即将到期的租赁
+    """
+    try:
+        # 获取查询参数 days_to_expiry，默认为7天
+        days_to_expiry = request.args.get('days_to_expiry', 7, type=int)
+        
+        # 查找所有即将到期的租赁
+        expiring_rentals = Rental.query.filter(
+            Rental.status == 'active',
+            Rental.end_date <= datetime.utcnow() + timedelta(days=days_to_expiry)
+        ).all()
 
-# 检查租赁到期用户并释放资源
+        rental_data = [
+            {
+                "id": rental.id,
+                "user_id": rental.user_id,
+                "serial_code": rental.serial_number.code if rental.serial_number else '',
+                "end_date": rental.end_date,
+                "days_remaining": (rental.end_date - datetime.utcnow()).days,
+                "renewal_count": rental.renewal_count,
+                "status": rental.status
+            } for rental in expiring_rentals
+        ]
+        
+        return jsonify({"success": True, "rentals": rental_data}), 200
+    except Exception as e:
+        log_operation(
+            user_id=None,
+            operation="get_expiring_rentals",
+            status="failed",
+            details=f"Error fetching expiring rentals: {str(e)}"
+        )
+        return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
+
+
+# 发送租赁到期通知
+@rental_bp.route('/api/rental/send_expiry_notifications', methods=['POST'])
+def send_expiry_notifications():
+    """
+    发送即将到期的租赁通知
+    """
+    days_to_expiry = request.json.get('days_to_expiry', 7)
+    try:
+        expiring_rentals = Rental.query.filter(
+            Rental.status == 'active',
+            Rental.end_date <= datetime.utcnow() + timedelta(days=days_to_expiry)
+        ).all()
+
+        if not expiring_rentals:
+            log_operation(user_id=None, operation="send_expiry_notification", status="info", details="No rentals expiring soon.")
+        
+        failed_emails = []
+        for rental in expiring_rentals:
+            user_email = rental.user.email
+            notification_type = 'first' if rental.renewal_count == 0 else 'last'
+            email_sent = send_verification_email(user_email, notification_type)  # 根据通知类型发送邮件
+
+            if not email_sent:
+                failed_emails.append(user_email)
+
+            log_operation(
+                user_id=rental.user_id,
+                operation="send_expiry_notification",
+                status="success",
+                details=f"Expiry notification sent to {user_email}"
+            )
+
+        if failed_emails:
+            return jsonify({"success": False, "message": f"Failed to send reminders to: {', '.join(failed_emails)}"}), 500
+
+        return jsonify({"success": True, "message": "Expiry notifications sent successfully"}), 200
+    except Exception as e:
+        log_operation(
+            user_id=None,
+            operation="send_expiry_notification",
+            status="failed",
+            details=f"Error sending expiry notifications: {str(e)}"
+        )
+        return jsonify({"success": False, "message": f"Error sending notifications: {str(e)}"}), 500
+
+
+# 检查并处理到期租赁
 @rental_bp.route('/api/rental/check_expiry', methods=['GET'])
 def check_expiry():
     """
@@ -250,93 +334,6 @@ def check_expiry():
         )
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
 
-# 发送租赁到期通知
-@rental_bp.route('/api/rental/send_expiry_notifications', methods=['POST'])
-def send_expiry_notifications():
-    """
-    发送即将到期的租赁通知
-    """
-    days_to_expiry = request.json.get('days_to_expiry', 7)
-    try:
-        expiring_rentals = Rental.query.filter(
-            Rental.status == 'active',
-            Rental.end_date < datetime.utcnow() + timedelta(days=days_to_expiry)
-        ).all()
-
-        if not expiring_rentals:
-            log_operation(user_id=None, operation="send_expiry_notification", status="info", details="No rentals expiring soon.")
-        
-        failed_emails = []
-        for rental in expiring_rentals:
-            user_email = rental.user.email
-            notification_type = 'first' if rental.renewal_count == 0 else 'last'
-            email_sent = send_verification_email(user_email, notification_type)  # 根据通知类型发送邮件
-
-            if not email_sent:
-                failed_emails.append(user_email)
-
-            log_operation(
-                user_id=rental.user_id,
-                operation="send_expiry_notification",
-                status="success",
-                details=f"Expiry notification sent to {user_email}"
-            )
-
-        if failed_emails:
-            return jsonify({"success": False, "message": f"Failed to send reminders to: {', '.join(failed_emails)}"}), 500
-
-        return jsonify({"success": True, "message": "Expiry notifications sent successfully"}), 200
-    except Exception as e:
-        log_operation(
-            user_id=None,
-            operation="send_expiry_notification",
-            status="failed",
-            details=f"Error sending expiry notifications: {str(e)}"
-        )
-        return jsonify({"success": False, "message": f"Error sending notifications: {str(e)}"}), 500
-
-
-# 删除租赁信息（删除序列号及其关联的容器和历史记录）
-@rental_bp.route('/api/rental/delete/<int:serial_id>', methods=['DELETE'])
-def delete_rental(serial_id):
-    """
-    删除用户的租赁信息，包括序列号和关联的容器
-    """
-    try:
-        rental = Rental.query.get(serial_id)
-        if not rental:
-            return jsonify({"success": False, "message": "Rental not found"}), 404
-
-        # 删除用户的容器
-        user_containers = DockerContainer.query.filter_by(user_id=rental.user_id).all()
-        for container in user_containers:
-            db.session.delete(container)
-
-        # 删除租赁历史记录
-        user_history = UserHistory.query.filter_by(user_id=rental.user_id).all()
-        for history in user_history:
-            db.session.delete(history)
-
-        # 删除租赁记录
-        db.session.delete(rental)
-        db.session.commit()
-
-        log_operation(
-            user_id=rental.user_id,
-            operation="delete_rental",
-            status="success",
-            details=f"Rental and associated containers deleted for user {rental.user_id}"
-        )
-        return jsonify({"success": True, "message": "Rental deleted successfully"}), 200
-    except Exception as e:
-        db.session.rollback()  # 回滚事务
-        log_operation(
-            user_id=None,
-            operation="delete_rental",
-            status="failed",
-            details=f"Error deleting rental: {str(e)}"
-        )
-        return jsonify({"success": False, "message": f"Error deleting rental: {str(e)}"}), 500
 
 # 查询用户租赁历史记录
 @rental_bp.route('/api/rental/history/<int:user_id>', methods=['GET'])
