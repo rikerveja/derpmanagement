@@ -8,6 +8,16 @@ from datetime import datetime, timedelta
 # 定义蓝图
 rental_bp = Blueprint('rental', __name__)
 
+from flask import Blueprint, request, jsonify  
+from app.models import SerialNumber, UserContainer, UserHistory, Rental, DockerContainer, UserTraffic, RenewalRecord, Server, ACLConfig
+from app.utils.email_utils import send_verification_email
+from app.utils.logging_utils import log_operation
+from app import db
+from datetime import datetime, timedelta
+
+# 定义蓝图
+rental_bp = Blueprint('rental', __name__)
+
 @rental_bp.route('/api/rental/create', methods=['POST'])
 def create_rental():
     """
@@ -92,8 +102,6 @@ def create_rental():
             server.total_traffic += rental.traffic_limit  # 更新总流量（假设为租赁的流量限制）
             server.remaining_traffic -= rental.traffic_limit  # 更新剩余流量（假设为租赁的流量限制）
 
-            db.session.commit()
-
         # 提交事务
         db.session.commit()
 
@@ -117,6 +125,84 @@ def create_rental():
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
 
 
+@rental_bp.route('/api/rental/renew', methods=['POST'])
+def renew_rental():
+    """
+    用户续费接口
+    """
+    data = request.json
+    serial_code = data.get('serial_code')  # 获取序列号
+    renewal_amount = data.get('renewal_amount')  # 获取续费金额
+    renewal_period = data.get('renewal_period')  # 获取续费时长
+
+    if not serial_code or not renewal_amount or not renewal_period:
+        log_operation(
+            user_id=None,
+            operation="renew_rental",
+            status="failed",
+            details="Missing serial code, renewal amount, or renewal period"
+        )
+        return jsonify({"success": False, "message": "Missing required data"}), 400
+
+    try:
+        # 查找对应的序列号
+        serial_number = SerialNumber.query.filter_by(code=serial_code, status='used').first()
+        if not serial_number:
+            log_operation(
+                user_id=None,
+                operation="renew_rental",
+                status="failed",
+                details=f"Invalid serial code: {serial_code}"
+            )
+            return jsonify({"success": False, "message": "Invalid serial code"}), 404
+        
+        # 查找用户的租赁记录
+        rental = Rental.query.filter_by(user_id=serial_number.user_id, serial_number_id=serial_number.id, status='active').first()
+        if not rental:
+            log_operation(
+                user_id=None,
+                operation="renew_rental",
+                status="failed",
+                details=f"No active rental found for serial code: {serial_code}"
+            )
+            return jsonify({"success": False, "message": "No active rental found"}), 404
+
+        # 增加续租天数
+        rental.end_date += timedelta(days=renewal_period)
+        rental.renewal_count += 1
+        
+        # 记录续费信息
+        renewal_record = RenewalRecord(
+            user_id=serial_number.user_id,
+            serial_number_id=serial_number.id,
+            renewal_amount=renewal_amount,
+            renewal_period=renewal_period,
+            renewal_date=datetime.utcnow(),
+            status='success'  # 假设续费成功
+        )
+        db.session.add(renewal_record)
+
+        # 提交租赁和续费记录更新
+        db.session.commit()
+
+        log_operation(
+            user_id=rental.user_id,
+            operation="renew_rental",
+            status="success",
+            details=f"Rental renewed successfully for serial code {serial_code}"
+        )
+
+        return jsonify({"success": True, "message": "Rental renewed successfully"}), 200
+
+    except Exception as e:
+        db.session.rollback()  # 回滚事务
+        log_operation(
+            user_id=None,
+            operation="renew_rental",
+            status="failed",
+            details=f"Error renewing rental: {str(e)}"
+        )
+        return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
 
 # 检查租赁到期用户并释放资源
 @rental_bp.route('/api/rental/check_expiry', methods=['GET'])
@@ -216,85 +302,6 @@ def send_expiry_notifications():
             details=f"Error sending expiry notifications: {str(e)}"
         )
         return jsonify({"success": False, "message": f"Error sending notifications: {str(e)}"}), 500
-
-@rental_bp.route('/api/rental/renew', methods=['POST'])
-def renew_rental():
-    """
-    用户续费接口
-    """
-    data = request.json
-    serial_code = data.get('serial_code')  # 获取序列号
-    renewal_amount = data.get('renewal_amount')  # 获取续费金额
-    renewal_period = data.get('renewal_period')  # 获取续费时长
-
-    if not serial_code or not renewal_amount or not renewal_period:
-        log_operation(
-            user_id=None,
-            operation="renew_rental",
-            status="failed",
-            details="Missing serial code, renewal amount, or renewal period"
-        )
-        return jsonify({"success": False, "message": "Missing required data"}), 400
-
-    try:
-        # 查找对应的序列号
-        serial_number = SerialNumber.query.filter_by(code=serial_code, status='used').first()
-        if not serial_number:
-            log_operation(
-                user_id=None,
-                operation="renew_rental",
-                status="failed",
-                details=f"Invalid serial code: {serial_code}"
-            )
-            return jsonify({"success": False, "message": "Invalid serial code"}), 404
-        
-        # 查找用户的租赁记录
-        rental = Rental.query.filter_by(user_id=serial_number.user_id, serial_number_id=serial_number.id, status='active').first()
-        if not rental:
-            log_operation(
-                user_id=None,
-                operation="renew_rental",
-                status="failed",
-                details=f"No active rental found for serial code: {serial_code}"
-            )
-            return jsonify({"success": False, "message": "No active rental found"}), 404
-
-        # 增加续租天数
-        rental.end_date += timedelta(days=renewal_period)
-        rental.renewal_count += 1
-        
-        # 记录续费信息
-        renewal_record = RenewalRecord(
-            user_id=serial_number.user_id,
-            serial_number_id=serial_number.id,
-            renewal_amount=renewal_amount,
-            renewal_period=renewal_period,
-            renewal_date=datetime.utcnow(),
-            status='success'  # 假设续费成功
-        )
-        db.session.add(renewal_record)
-
-        # 提交租赁和续费记录更新
-        db.session.commit()
-
-        log_operation(
-            user_id=rental.user_id,
-            operation="renew_rental",
-            status="success",
-            details=f"Rental renewed successfully for serial code {serial_code}"
-        )
-
-        return jsonify({"success": True, "message": "Rental renewed successfully"}), 200
-
-    except Exception as e:
-        db.session.rollback()  # 回滚事务
-        log_operation(
-            user_id=None,
-            operation="renew_rental",
-            status="failed",
-            details=f"Error renewing rental: {str(e)}"
-        )
-        return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
 
 
 # 删除租赁信息（删除序列号及其关联的容器和历史记录）
