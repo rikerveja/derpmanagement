@@ -103,6 +103,38 @@ const routes = [
     path: '/servers/health',
     name: 'servers-health',
     component: ServerHealthView
+  },
+  {
+    path: '/rental',
+    children: [
+      {
+        path: '',  // 默认路由，显示租赁列表
+        name: 'rental.list',
+        component: () => import('@/views/rental/RentalListView.vue'),
+        meta: {
+          requiresAuth: true,
+          layout: 'authenticated'
+        }
+      },
+      {
+        path: 'expiry',
+        name: 'rental.expiry',
+        component: () => import('@/views/rental/RentalExpiryView.vue'),
+        meta: {
+          requiresAuth: true,
+          layout: 'authenticated'
+        }
+      },
+      {
+        path: 'history',
+        name: 'rental.history', 
+        component: () => import('@/views/rental/RentalHistoryView.vue'),
+        meta: {
+          requiresAuth: true,
+          layout: 'authenticated'
+        }
+      }
+    ]
   }
 ]
 
