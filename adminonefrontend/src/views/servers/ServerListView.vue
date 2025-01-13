@@ -34,7 +34,7 @@ const itemsPerPage = 10
 
 // 筛选
 const searchQuery = ref('')
-const selectedCategory = ref('all')
+const selectedCategoryId = ref('all')  // 改为 categoryId
 const selectedRegion = ref('all')
 const selectedStatus = ref('all')
 
@@ -76,8 +76,8 @@ const editServerForm = ref({
 
 // 服务器分类映射
 const categoryMap = {
-  '4': '4坑位版',
-  '2': '2坑位版'
+  1: '4坑位版',
+  2: '2坑位版'
 }
 
 // 排序相关
@@ -89,9 +89,26 @@ const fetchServers = async () => {
   try {
     console.log('开始获取服务器列表')
     const response = await api.getServers()
-    console.log('服务器列表响应:', response)
+    console.log('获取服务器列表 - 原始响应:', response)
+
     if (response.success) {
-      servers.value = response.servers || []
+      servers.value = response.servers.map(server => {
+        // 从 category 字段获取分类名称，如果没有则使用 categoryMap 映射
+        const categoryName = server.category || categoryMap[server.category_id] || '未知分类'
+        console.log('处理服务器数据:', {
+          服务器ID: server.id,
+          分类名称: categoryName,
+          原始category: server.category,
+          原始category_id: server.category_id
+        })
+
+        return {
+          ...server,
+          category_id: server.category_id,  // 保持原始的 category_id
+          category_name: categoryName
+        }
+      })
+      console.log('最终处理后的服务器数据:', servers.value)
     } else {
       throw new Error(response.message)
     }
@@ -133,7 +150,7 @@ const filteredServers = computed(() => {
     const matchesSearch = searchQuery.value === '' || 
       server.server_name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       server.ip_address.toLowerCase().includes(searchQuery.value.toLowerCase())
-    const matchesCategory = selectedCategory.value === 'all' || server.category === selectedCategory.value
+    const matchesCategory = selectedCategoryId.value === 'all' || server.category_id === selectedCategoryId.value
     const matchesRegion = selectedRegion.value === 'all' || server.region === selectedRegion.value
     const matchesStatus = selectedStatus.value === 'all' || server.status === selectedStatus.value
     return matchesSearch && matchesCategory && matchesRegion && matchesStatus
@@ -174,16 +191,14 @@ const addServer = async () => {
       return
     }
 
-    // 打印表单数据
-    console.log('表单数据:', serverForm.value) // 确保数据完整
+    console.log('添加服务器 - 原始表单数据:', serverForm.value)
 
-    // 封装请求数据
     const requestData = {
       ip_address: serverForm.value.ip_address,
       region: serverForm.value.region,
       cpu: serverForm.value.cpu,
       memory: serverForm.value.memory,
-      category_id: serverForm.value.category_id,
+      category_id: Number(serverForm.value.category_id),  // 改回使用 category_id
       server_name: serverForm.value.server_name,
       storage: serverForm.value.storage,
       bandwidth: serverForm.value.bandwidth,
@@ -191,11 +206,9 @@ const addServer = async () => {
       total_traffic: serverForm.value.total_traffic
     }
 
-    // 打印请求数据
-    console.log('准备发送的请求数据:', JSON.stringify(requestData, null, 2))
-
+    console.log('添加服务器 - 发送的请求数据:', requestData)
     const response = await api.addServer(requestData)
-    console.log('服务器响应:', response)
+    console.log('添加服务器 - 服务器响应:', response)
 
     if (response.success) {
       alert('添加服务器成功!')
@@ -217,10 +230,7 @@ const addServer = async () => {
       throw new Error(response.message)
     }
   } catch (error) {
-    console.error('添加服务器失败，完整错误信息:', error)
-    console.error('错误响应数据:', error.response?.data)
-    console.error('错误状态码:', error.response?.status)
-    alert('添加服务器失败: ' + (error.response?.data?.message || error.message))
+    console.error('添加服务器失败:', error)
   }
 }
 
@@ -296,7 +306,17 @@ const editServer = (server) => {
 // 更新服务器
 const updateServer = async () => {
   try {
-    const response = await api.updateServer(editServerForm.value.id, editServerForm.value)
+    console.log('更新服务器 - 原始表单数据:', editServerForm.value)
+    
+    const updateData = {
+      ...editServerForm.value,
+      category: Number(editServerForm.value.category_id)
+    }
+    console.log('更新服务器 - 处理后的数据:', updateData)
+
+    const response = await api.updateServer(editServerForm.value.id, updateData)
+    console.log('更新服务器 - 服务器响应:', response)
+
     if (response.success) {
       alert('更新服务器成功!')
       await fetchServers()  // 刷新列表
@@ -366,7 +386,7 @@ onMounted(async () => {
             >
           </div>
           <select
-            v-model="selectedCategory"
+            v-model="selectedCategoryId"
             class="px-3 py-2 border rounded-md"
           >
             <option value="all">全部分类</option>
@@ -432,7 +452,7 @@ onMounted(async () => {
                 <td class="px-2 py-2 font-mono text-sm">{{ server.ip_address }}</td>
                 <td class="px-2 py-2">
                   <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100">
-                    {{ categoryMap[server.category] || '未知分类' }}
+                    {{ server.category_name }}
                   </span>
                 </td>
                 <td class="px-2 py-2 text-sm">
