@@ -187,6 +187,7 @@ class SerialNumber(db.Model):
     payment_status = Column(Enum('paid', 'unpaid', name='payment_status'), default='unpaid')
 
     user = relationship("User", back_populates="serial_numbers")
+    renewal_notifications = relationship("RenewalNotification", back_populates="serial_number")
     distributor = relationship("Distributor", back_populates="serial_numbers")
 
     __table_args__ = (
