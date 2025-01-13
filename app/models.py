@@ -120,30 +120,30 @@ class Rental(db.Model):
     
     user = db.relationship("User", back_populates="rentals")
 
-
-
 class RenewalNotification(db.Model):
     __tablename__ = 'renewal_notifications'
-    
-    # 已有字段
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'))
-    serial_number_id = db.Column(db.Integer, db.ForeignKey('serial_numbers.id', ondelete='CASCADE'))
-    renewal_amount = db.Column(db.DECIMAL(10, 2))
-    renewal_period = db.Column(db.Integer)
-    renewal_date = db.Column(db.Date, nullable=False)
-    renewal_status = db.Column(db.Enum('paid', 'pending', 'failed'), default='pending')  # 续费状态
-    sent_at = db.Column(db.TIMESTAMP)
-    notification_type = db.Column(db.Enum('first', 'last', 'success'), default='first')  # 通知类型
-    notification_channel = db.Column(db.Enum('email', 'sms', 'push'), default='email')  # 通知渠道
-    notification_sent = db.Column(db.Boolean, default=False)  # 是否已发送
-    notification_status = db.Column(db.Enum('sent', 'failed'), default='sent')  # 通知状态
-    notification_content = db.Column(db.String(1024))  # 通知内容
-    created_at = db.Column(db.TIMESTAMP, default=datetime.utcnow)
-    updated_at = db.Column(db.TIMESTAMP, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    user = db.relationship("User", back_populates="renewal_notifications")
 
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
+    serial_number_id = Column(Integer, ForeignKey('serial_numbers.id', ondelete='CASCADE'))
+    renewal_amount = Column(DECIMAL(10, 2))
+    renewal_period = Column(Integer)
+    renewal_date = Column(DateTime, nullable=False)
+    renewal_status = Column(Enum('paid', 'pending', 'failed'), default='pending')
+    sent_at = Column(DateTime)
+    notification_type = Column(Enum('first', 'last', 'success'), default='first')
+    notification_channel = Column(Enum('email', 'sms', 'push'), default='email')
+    notification_sent = Column(Boolean, default=False)
+    notification_status = Column(Enum('sent', 'failed'), default='sent')
+    notification_content = Column(String(1024))
+
+    user = relationship("User", back_populates="notifications")  # 反向关系
+    serial_number = relationship("SerialNumber", back_populates="renewal_notifications")
+
+    __table_args__ = (
+        Index('idx_renewal_notification_user', 'user_id'),
+        Index('idx_renewal_notification_status', 'renewal_status'),
+    )
 
 
 class Distributor(db.Model):
