@@ -5,7 +5,7 @@ import SectionMain from '@/components/SectionMain.vue'
 import CardBox from '@/components/CardBox.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseIcon from '@/components/BaseIcon.vue'
-import BaseDialog from '@/components/BaseDialog.vue'
+import BaseDialog from '@/components/BaseDialogR.vue'
 import { 
   mdiPlus,
   mdiDelete,
