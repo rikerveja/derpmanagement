@@ -8,16 +8,6 @@ from datetime import datetime, timedelta
 # 定义蓝图
 rental_bp = Blueprint('rental', __name__)
 
-from flask import Blueprint, request, jsonify  
-from app.models import SerialNumber, UserContainer, UserHistory, Rental, DockerContainer, UserTraffic, RenewalRecord, Server, ACLConfig
-from app.utils.email_utils import send_verification_email
-from app.utils.logging_utils import log_operation
-from app import db
-from datetime import datetime, timedelta
-
-# 定义蓝图
-rental_bp = Blueprint('rental', __name__)
-
 @rental_bp.route('/api/rental/create', methods=['POST'])
 def create_rental():
     """
@@ -26,6 +16,7 @@ def create_rental():
     data = request.json
     serial_code = data.get('serial_code')  # 获取序列号
     user_id = data.get('user_id')  # 获取用户ID
+    traffic_limit = data.get('traffic_limit', 0)  # 获取流量限制
 
     if not serial_code or not user_id:
         log_operation(
@@ -63,8 +54,8 @@ def create_rental():
             end_date=datetime.utcnow() + timedelta(days=serial_number.valid_days),
             server_ids=[],
             container_ids=[],
-            traffic_limit=0,
-            traffic_usage=0,
+            traffic_limit=traffic_limit,  # 记录流量限制
+            traffic_usage=0,  # 初始流量使用为0
             serial_number_expiry=serial_number.expires_at,
             renewal_count=0
         )
@@ -99,8 +90,8 @@ def create_rental():
         server = Server.query.get(1)  # 假设为服务器ID 1
         if server:
             server.user_count += 1  # 用户数增加
-            server.total_traffic += rental.traffic_limit  # 更新总流量（假设为租赁的流量限制）
-            server.remaining_traffic -= rental.traffic_limit  # 更新剩余流量（假设为租赁的流量限制）
+            server.total_traffic += traffic_limit  # 更新总流量（假设为租赁的流量限制）
+            server.remaining_traffic -= traffic_limit  # 更新剩余流量（假设为租赁的流量限制）
 
         # 提交事务
         db.session.commit()
@@ -203,6 +194,7 @@ def renew_rental():
             details=f"Error renewing rental: {str(e)}"
         )
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
+
 
 # 检查租赁到期用户并释放资源
 @rental_bp.route('/api/rental/check_expiry', methods=['GET'])
