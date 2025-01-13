@@ -22,7 +22,9 @@ import {
   mdiAlertCircleOutline,
   mdiCogOutline,
   mdiTextBoxOutline,
-  mdiServerSecurity
+  mdiServerSecurity,
+  mdiAccountCircle,
+  mdiReceipt
 } from '@mdi/js'
 
 export default [
@@ -138,7 +140,7 @@ export default [
     ]
   },
   {
-    icon: mdiClipboardList,
+    icon: mdiReceipt,
     label: '租赁管理',
     menu: [
       {
@@ -147,14 +149,14 @@ export default [
         icon: mdiClipboardTextClock
       },
       {
-        to: '/rental/history',
-        label: '租赁历史',
-        icon: mdiHistory
-      },
-      {
         to: '/rental/expiry',
         label: '到期检查',
         icon: mdiCalendarClock
+      },
+      {
+        to: '/rental/history',
+        label: '租赁历史',
+        icon: mdiHistory
       }
     ]
   },
