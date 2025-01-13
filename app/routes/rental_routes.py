@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify 
 from app.models import SerialNumber, UserContainer, UserHistory, Rental, DockerContainer, UserTraffic
 from app.utils.email_utils import send_verification_email
 from app.utils.logging_utils import log_operation
@@ -219,8 +219,10 @@ def get_user_history(user_id):
                 "status": rental.status,
                 "payment_status": rental.payment_status,
                 "total_traffic": rental.traffic_usage,
+                "renewal_count": rental.renewal_count
             } for rental in user_rentals
         ]
         return jsonify({"success": True, "history": history_data}), 200
     except Exception as e:
         return jsonify({"success": False, "message": f"Error fetching user history: {str(e)}"}), 500
+
