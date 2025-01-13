@@ -19,7 +19,7 @@ user_server_association = db.Table(
 
 class User(db.Model):
     __tablename__ = 'users'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String(255), unique=True, nullable=False)
     email = Column(String(255), unique=True, nullable=False)
@@ -39,7 +39,7 @@ class User(db.Model):
     commissions = relationship("DistributorCommission", back_populates="distributor")
     rentals = relationship("Rental", back_populates="user")
     serial_numbers = relationship("SerialNumber", back_populates="user")
-    notifications = relationship("RenewalNotification", back_populates="user")
+    notifications = relationship("RenewalNotification", back_populates="user")  # 这里定义了与 RenewalNotification 的关系
     operation_logs = relationship("OperationLog", back_populates="user")
 
     __table_args__ = (
