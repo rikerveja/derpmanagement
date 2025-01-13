@@ -59,7 +59,8 @@ const fetchAcls = async () => {
           is_active: config.is_active,
           created_at: config.created_at,
           updated_at: config.updated_at,
-          derpMap: config.derpMap
+          derpMap: config.derpMap,
+          acl_data: config.acl_data
         }
         console.log('映射后的配置项:', mappedConfig)
         mappedConfigs.push(mappedConfig)
@@ -107,19 +108,51 @@ const paginatedAcls = computed(() => {
 })
 
 // 下载ACL
-const downloadAcl = async (aclId) => {
+const downloadAcl = async (acl) => {
   try {
     loading.value = true
-    const response = await api.downloadAcl(aclId)
-    if(response.success) {
-      currentAclContent.value = JSON.stringify(response.acl, null, 2)
+    const response = await api.downloadAcl(acl.user.id)
+    if (response.success) {
+      // 构建格式化的字符串
+      const lines = []
+      lines.push('    "derpMap": {')
+      lines.push('        "OmitDefaultRegions": ' + response.acl.derpMap.OmitDefaultRegions + ',')
+      lines.push('        "Regions": {')
+      
+      // 处理每个区域
+      Object.entries(response.acl.derpMap.Regions).forEach(([key, region]) => {
+        lines.push(`            "${key}": {`)
+        lines.push(`                "RegionID": ${region.RegionID},`)
+        lines.push(`                "RegionCode": "${region.RegionCode}",`)
+        lines.push(`                "RegionName": "${region.RegionName}",`)
+        lines.push('                "Nodes": [')
+        
+        // 处理节点
+        region.Nodes.forEach((node, index) => {
+          lines.push('                    {')
+          lines.push(`                        "Name": "${node.Name}",`)
+          lines.push(`                        "RegionID": ${node.RegionID},`)
+          lines.push(`                        "DERPPort": ${node.DERPPort},`)
+          lines.push(`                        "ipv4": "${node.ipv4}",`)
+          lines.push(`                        "InsecureForTests": ${node.InsecureForTests}`)
+          lines.push('                    },')
+        })
+        
+        lines.push('                ],')
+        lines.push('            },')
+      })
+      
+      lines.push('        },')
+      lines.push('    },')
+
+      currentAclContent.value = lines.join('\n')
       showAclDialog.value = true
     } else {
-      throw new Error(response.message)
+      throw new Error(response.message || '未找到ACL配置数据')
     }
   } catch (error) {
-    console.error('下载ACL失败:', error)
-    alert('下载ACL失败: ' + error.message)
+    console.error('获取ACL配置失败:', error)
+    alert('获取ACL配置失败: ' + error.message)
   } finally {
     loading.value = false
   }
@@ -272,7 +305,7 @@ onMounted(() => {
                       color="info"
                       small
                       :disabled="loading"
-                      @click="downloadAcl(acl.id)"
+                      @click="downloadAcl(acl)"
                       title="下载"
                     />
                     <BaseButton
