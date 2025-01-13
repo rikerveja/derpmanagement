@@ -370,14 +370,14 @@ def get_acl_logs(user_id):
 
 
 # 提供 ACL 配置数据接口
-@acl_bp.route('/api/acl/download/<username>', methods=['GET'])
-def download_acl(username):
+@acl_bp.route('/api/acl/download/<user_id>', methods=['GET'])
+def download_acl(user_id):
     """
     从数据库获取用户的 Tailscale ACL 配置并返回
     """
     try:
         # 从数据库中获取 ACL 配置数据
-        acl_config = ACLConfig.query.filter_by(user_id=username).first()  # 根据用户名查询 ACL 配置
+        acl_config = ACLConfig.query.filter_by(user_id=user_id).first()  # 根据 user_id 查询 ACL 配置
         if not acl_config:
             return jsonify({"success": False, "message": "Tailscale ACL not found for this user"}), 404
 
@@ -391,7 +391,7 @@ def download_acl(username):
         return jsonify({"success": True, "acl": formatted_acl_data}), 200
 
     except Exception as e:
-        logging.error(f"Error downloading Tailscale ACL for user {username}: {str(e)}")
+        logging.error(f"Error downloading Tailscale ACL for user {user_id}: {str(e)}")
         return jsonify({"success": False, "message": f"Error downloading Tailscale ACL: {str(e)}"}), 500
 
 def format_acl_data(acl_data):
