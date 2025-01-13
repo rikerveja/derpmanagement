@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from app.models import SerialNumber, UserContainer, UserHistory
+from app.models import SerialNumber, UserContainer, UserHistory, Rental, DockerContainer, UserTraffic
 from app.utils.email_utils import send_verification_email
 from app.utils.logging_utils import log_operation
 from app import db
@@ -16,9 +16,9 @@ def check_expiry():
     """
     try:
         # 查找所有已到期的租赁
-        expired_rentals = SerialNumber.query.filter(
-            SerialNumber.status == 'active',
-            SerialNumber.used_at + timedelta(days=SerialNumber.duration_days) < datetime.utcnow()
+        expired_rentals = Rental.query.filter(
+            Rental.status == 'active',
+            Rental.end_date < datetime.utcnow()
         ).all()
 
         if not expired_rentals:
@@ -29,9 +29,14 @@ def check_expiry():
             rental.status = 'expired'
 
             # 删除用户的容器
-            user_containers = UserContainer.query.filter_by(user_id=rental.user_id).all()
+            user_containers = DockerContainer.query.filter_by(user_id=rental.user_id).all()
             for container in user_containers:
                 db.session.delete(container)
+
+            # 删除用户的流量记录
+            user_traffic = UserTraffic.query.filter_by(user_id=rental.user_id).all()
+            for traffic in user_traffic:
+                db.session.delete(traffic)
 
             # 删除租赁历史记录
             user_history = UserHistory.query.filter_by(user_id=rental.user_id).all()
@@ -57,7 +62,6 @@ def check_expiry():
         )
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
 
-
 # 发送租赁到期通知
 @rental_bp.route('/api/rental/send_expiry_notifications', methods=['POST'])
 def send_expiry_notifications():
@@ -66,9 +70,9 @@ def send_expiry_notifications():
     """
     days_to_expiry = request.json.get('days_to_expiry', 7)
     try:
-        expiring_rentals = SerialNumber.query.filter(
-            SerialNumber.status == 'active',
-            SerialNumber.used_at + timedelta(days=SerialNumber.duration_days - days_to_expiry) < datetime.utcnow()
+        expiring_rentals = Rental.query.filter(
+            Rental.status == 'active',
+            Rental.end_date < datetime.utcnow() + timedelta(days=days_to_expiry)
         ).all()
 
         if not expiring_rentals:
@@ -77,7 +81,8 @@ def send_expiry_notifications():
         failed_emails = []
         for rental in expiring_rentals:
             user_email = rental.user.email
-            email_sent = send_verification_email(user_email)  # 复用邮件发送逻辑，提醒用户续费
+            notification_type = 'first' if rental.renewal_count == 0 else 'last'
+            email_sent = send_verification_email(user_email, notification_type)  # 根据通知类型发送邮件
 
             if not email_sent:
                 failed_emails.append(user_email)
@@ -90,7 +95,6 @@ def send_expiry_notifications():
             )
 
         if failed_emails:
-            logging.error(f"Failed to send reminder to: {', '.join(failed_emails)}")
             return jsonify({"success": False, "message": f"Failed to send reminders to: {', '.join(failed_emails)}"}), 500
 
         return jsonify({"success": True, "message": "Expiry notifications sent successfully"}), 200
@@ -102,7 +106,6 @@ def send_expiry_notifications():
             details=f"Error sending expiry notifications: {str(e)}"
         )
         return jsonify({"success": False, "message": f"Error sending notifications: {str(e)}"}), 500
-
 
 # 用户续费接口
 @rental_bp.route('/api/rental/renew', methods=['POST'])
@@ -124,7 +127,7 @@ def renew_rental():
 
     try:
         # 查找对应的租赁
-        rental = SerialNumber.query.filter_by(code=serial_code, status='active').first()
+        rental = Rental.query.filter_by(serial_number_id=serial_code, status='active').first()
         if not rental:
             log_operation(
                 user_id=None,
@@ -135,7 +138,8 @@ def renew_rental():
             return jsonify({"success": False, "message": "Invalid or expired serial code"}), 404
 
         # 增加续租天数（默认为30天）
-        rental.duration_days += data.get('additional_days', 30)
+        rental.end_date += timedelta(days=data.get('additional_days', 30))
+        rental.renewal_count += 1
         db.session.commit()
 
         log_operation(
@@ -155,7 +159,6 @@ def renew_rental():
         )
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
 
-
 # 删除租赁信息（删除序列号及其关联的容器和历史记录）
 @rental_bp.route('/api/rental/delete/<int:serial_id>', methods=['DELETE'])
 def delete_rental(serial_id):
@@ -163,12 +166,12 @@ def delete_rental(serial_id):
     删除用户的租赁信息，包括序列号和关联的容器
     """
     try:
-        rental = SerialNumber.query.get(serial_id)
+        rental = Rental.query.get(serial_id)
         if not rental:
             return jsonify({"success": False, "message": "Rental not found"}), 404
 
         # 删除用户的容器
-        user_containers = UserContainer.query.filter_by(user_id=rental.user_id).all()
+        user_containers = DockerContainer.query.filter_by(user_id=rental.user_id).all()
         for container in user_containers:
             db.session.delete(container)
 
@@ -177,7 +180,7 @@ def delete_rental(serial_id):
         for history in user_history:
             db.session.delete(history)
 
-        # 删除序列号
+        # 删除租赁记录
         db.session.delete(rental)
         db.session.commit()
 
@@ -198,7 +201,6 @@ def delete_rental(serial_id):
         )
         return jsonify({"success": False, "message": f"Error deleting rental: {str(e)}"}), 500
 
-
 # 查询用户租赁历史记录
 @rental_bp.route('/api/rental/history/<int:user_id>', methods=['GET'])
 def get_user_history(user_id):
@@ -206,16 +208,18 @@ def get_user_history(user_id):
     查询用户租赁历史记录
     """
     try:
-        user_history = UserHistory.query.filter_by(user_id=user_id).all()
-        if not user_history:
-            return jsonify({"success": False, "message": "No history found"}), 404
+        user_rentals = Rental.query.filter_by(user_id=user_id).all()
+        if not user_rentals:
+            return jsonify({"success": False, "message": "No rental history found"}), 404
 
         history_data = [
             {
-                "rental_start": record.rental_start,
-                "rental_end": record.rental_end,
-                "total_traffic": record.total_traffic,
-            } for record in user_history
+                "start_date": rental.start_date,
+                "end_date": rental.end_date,
+                "status": rental.status,
+                "payment_status": rental.payment_status,
+                "total_traffic": rental.traffic_usage,
+            } for rental in user_rentals
         ]
         return jsonify({"success": True, "history": history_data}), 200
     except Exception as e:
