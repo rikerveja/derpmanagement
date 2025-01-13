@@ -142,8 +142,8 @@ const getAclLogs = (userId) => {
   return api.get(`/acl/logs/${userId}`)
 }
 
-const downloadAcl = (username) => {
-  return api.get(`/acl/download/${username}`)
+const downloadAcl = (userId) => {
+  return api.get(`/acl/download/${userId}`)
 }
 
 const getAclList = () => {
