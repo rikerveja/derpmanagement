@@ -235,39 +235,39 @@ onMounted(() => {
             v-model="searchQuery"
             type="text"
             placeholder="搜索邮箱或容器名称..."
-            class="w-full px-2 py-1 border rounded-lg text-sm"
+            class="w-full px-2 py-1 border rounded-lg text-sm focus:outline-none focus:border-blue-500"
           />
         </div>
 
-        <!-- 表格 -->
+        <!-- 表格容器 -->
         <div class="overflow-x-auto">
           <table class="w-full text-left table-auto text-sm">
             <thead>
               <tr class="border-b">
-                <th class="px-2 py-1 w-[20%]">用户</th>
-                <th class="px-2 py-1 w-[15%]">服务器</th>
-                <th class="px-2 py-1 w-[20%]">容器</th>
-                <th class="px-2 py-1 w-[10%]">版本</th>
-                <th class="px-2 py-1 whitespace-nowrap w-[10%]">状态</th>
-                <th class="px-2 py-1 w-[15%]">更新时间</th>
-                <th class="px-2 py-1 text-center w-[10%]">操作</th>
+                <th class="px-1 py-1 w-[25%] sm:w-[20%]">用户</th>
+                <th class="hidden sm:table-cell px-1 py-1 w-[15%]">服务器</th>
+                <th class="px-1 py-1 w-[30%] sm:w-[20%]">容器</th>
+                <th class="hidden sm:table-cell px-1 py-1 w-[10%]">版本</th>
+                <th class="px-1 py-1 w-[15%] sm:w-[10%]">状态</th>
+                <th class="hidden sm:table-cell px-1 py-1 w-[15%]">更新时间</th>
+                <th class="px-1 py-1 w-[30%] sm:w-[10%] text-center">操作</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="acl in paginatedAcls" :key="acl.id" class="border-b">
-                <td class="px-2 py-1">
+                <td class="px-1 py-1">
                   <div class="flex items-center">
-                    <BaseIcon :path="mdiAccount" class="w-4 h-4 mr-1" />
-                    {{ acl.user.email }}
+                    <BaseIcon :path="mdiAccount" class="w-4 h-4 mr-1 flex-shrink-0" />
+                    <span class="truncate">{{ acl.user.email }}</span>
                   </div>
                 </td>
-                <td class="px-2 py-1">
+                <td class="hidden sm:table-cell px-1 py-1">
                   <div class="flex items-center">
-                    <BaseIcon :path="mdiServer" class="w-3.5 h-3.5 mr-1" />
-                    {{ acl.servers[0]?.ip_address }}
+                    <BaseIcon :path="mdiServer" class="w-3.5 h-3.5 mr-1 flex-shrink-0" />
+                    <span class="truncate">{{ acl.servers[0]?.ip_address }}</span>
                   </div>
                 </td>
-                <td class="px-2 py-1">
+                <td class="px-1 py-1">
                   <div class="flex items-center">
                     <BaseIcon :path="mdiDocker" class="w-3.5 h-3.5 mr-1 flex-shrink-0" />
                     <div class="truncate" :title="acl.containers[0]?.name">
@@ -283,8 +283,8 @@ onMounted(() => {
                     </div>
                   </div>
                 </td>
-                <td class="px-2 py-1">{{ acl.version }}</td>
-                <td class="px-2 py-1">
+                <td class="hidden sm:table-cell px-1 py-1">{{ acl.version }}</td>
+                <td class="px-1 py-1">
                   <span 
                     class="inline-flex items-center px-1 py-0.5 rounded-full text-xs"
                     :class="acl.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
@@ -295,10 +295,10 @@ onMounted(() => {
                     {{ acl.is_active ? '活跃' : '禁用' }}
                   </span>
                 </td>
-                <td class="px-2 py-1 whitespace-nowrap">
+                <td class="hidden sm:table-cell px-1 py-1 whitespace-nowrap">
                   {{ new Date(acl.updated_at).toLocaleString() }}
                 </td>
-                <td class="px-2 py-1">
+                <td class="px-1 py-1">
                   <div class="flex justify-center space-x-1">
                     <BaseButton
                       :icon="mdiDownload"
@@ -332,22 +332,22 @@ onMounted(() => {
         </div>
 
         <!-- 分页控件 -->
-        <div class="mt-1 flex justify-between items-center text-sm">
+        <div class="mt-1 flex flex-col sm:flex-row justify-between items-center gap-2 text-sm">
           <span class="text-gray-600">
             共 {{ acls.length }} 条记录
           </span>
-          <div class="flex gap-1">
+          <div class="flex gap-2">
             <BaseButton
               label="上一页"
               small
-              class="px-2 py-1 text-xs"
+              class="px-3 py-1 text-xs whitespace-nowrap"
               :disabled="currentPage === 1"
               @click="currentPage--"
             />
             <BaseButton
               label="下一页"
               small
-              class="px-2 py-1 text-xs"
+              class="px-3 py-1 text-xs whitespace-nowrap"
               :disabled="currentPage >= Math.ceil(filteredAcls.length / itemsPerPage)"
               @click="currentPage++"
             />
@@ -374,7 +374,7 @@ onMounted(() => {
 <style scoped>
 /* 调整表格行高 */
 tr {
-  @apply h-7;
+  @apply h-8 sm:h-7;
 }
 
 /* 调整图标大小 */
@@ -392,12 +392,29 @@ tr {
 
 /* 调整表格文字大小 */
 table {
-  @apply text-sm leading-none;
+  @apply text-xs sm:text-sm leading-none w-full;
 }
 
 /* 调整按钮大小 */
 .space-x-2 > * {
   @apply scale-90;
+}
+
+/* 移动端优化 */
+@media (max-width: 640px) {
+  .overflow-x-auto {
+    @apply -mx-2;
+  }
+  
+  td, th {
+    @apply whitespace-nowrap;
+    @apply px-1;
+  }
+  
+  /* 调整操作按钮在移动端的大小 */
+  .space-x-1 > * {
+    @apply scale-75;
+  }
 }
 
 /* 其他样式保持不变 */
