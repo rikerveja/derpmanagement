@@ -94,39 +94,56 @@ class DistributorCommission(db.Model):
 class Rental(db.Model):
     __tablename__ = 'rentals'
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
-    status = Column(Enum('active', 'expired', 'paused', name='rental_status'), default='active', nullable=False)
-    start_date = Column(DateTime, nullable=False)
-    end_date = Column(DateTime, nullable=False)
-    server_ids = Column(JSON, default=dict)
-    container_ids = Column(JSON, default=dict)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    tenant_id = Column(Integer)
+    # 已有字段
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'))
+    status = db.Column(db.Enum('active', 'pending', 'expired', 'suspended', 'terminated', 'canceled'), default='active', nullable=False)
+    start_date = db.Column(db.DateTime, nullable=False)
+    end_date = db.Column(db.DateTime, nullable=False)
+    expired_at = db.Column(db.DateTime)  # 到期时间
+    server_ids = db.Column(db.JSON, default=dict)  # 服务器ID列表
+    container_ids = db.Column(db.JSON, default=dict)  # 容器ID列表
+    traffic_limit = db.Column(db.Integer, default=0)  # 流量限制
+    traffic_usage = db.Column(db.Integer, default=0)  # 已使用流量
+    traffic_reset_date = db.Column(db.Date)  # 流量重置日期
+    serial_number_id = db.Column(db.Integer, db.ForeignKey('serial_numbers.id'))
+    serial_number_expiry = db.Column(db.Date)  # 序列号有效期
+    renewed_at = db.Column(db.Date)  # 续费日期
+    renewal_count = db.Column(db.Integer, default=0)  # 续费次数
+    container_status = db.Column(db.Enum('active', 'inactive', 'terminated'), default='active')  # 容器状态
+    server_status = db.Column(db.Enum('active', 'inactive', 'failed'), default='active')  # 服务器状态
+    payment_status = db.Column(db.Enum('pending', 'paid', 'failed', 'refunded'), default='pending')  # 支付状态
+    payment_date = db.Column(db.DateTime)  # 支付日期
+    tenant_id = db.Column(db.Integer)  # 租户ID
+    created_at = db.Column(db.TIMESTAMP, default=datetime.utcnow)
+    updated_at = db.Column(db.TIMESTAMP, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    user = db.relationship("User", back_populates="rentals")
 
-    user = relationship("User", back_populates="rentals")
-
-    __table_args__ = (
-        Index('idx_rental_status', 'status'),
-        Index('idx_rental_user', 'user_id'),
-        Index('idx_rental_dates', 'start_date', 'end_date'),
-    )
 
 
 class RenewalNotification(db.Model):
     __tablename__ = 'renewal_notifications'
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'))
-    notification_type = Column(Enum('7_days', '3_days', '1_day', name='notification_type'), nullable=False)
-    sent_at = Column(DateTime, default=datetime.utcnow)
-    notification_channel = Column(Enum('email', 'sms', 'push', name='notification_channel'), nullable=False)
-    notification_sent = Column(Boolean, default=False)
-    notification_status = Column(Enum('pending', 'sent', 'failed', name='notification_status'), default='pending')
-    notification_content = Column(String(1024))
+    # 已有字段
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'))
+    serial_number_id = db.Column(db.Integer, db.ForeignKey('serial_numbers.id', ondelete='CASCADE'))
+    renewal_amount = db.Column(db.DECIMAL(10, 2))
+    renewal_period = db.Column(db.Integer)
+    renewal_date = db.Column(db.Date, nullable=False)
+    renewal_status = db.Column(db.Enum('paid', 'pending', 'failed'), default='pending')  # 续费状态
+    sent_at = db.Column(db.TIMESTAMP)
+    notification_type = db.Column(db.Enum('first', 'last', 'success'), default='first')  # 通知类型
+    notification_channel = db.Column(db.Enum('email', 'sms', 'push'), default='email')  # 通知渠道
+    notification_sent = db.Column(db.Boolean, default=False)  # 是否已发送
+    notification_status = db.Column(db.Enum('sent', 'failed'), default='sent')  # 通知状态
+    notification_content = db.Column(db.String(1024))  # 通知内容
+    created_at = db.Column(db.TIMESTAMP, default=datetime.utcnow)
+    updated_at = db.Column(db.TIMESTAMP, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    user = db.relationship("User", back_populates="renewal_notifications")
 
-    user = relationship("User", back_populates="notifications")
 
 
 class Distributor(db.Model):
@@ -361,19 +378,19 @@ class DockerContainerResources(db.Model):
 class DockerContainerTraffic(db.Model):
     __tablename__ = 'docker_container_traffic'
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    container_id = Column(Integer, ForeignKey('docker_containers.id', ondelete='CASCADE'))
-    upload_traffic = Column(DECIMAL(10, 2))
-    download_traffic = Column(DECIMAL(10, 2))
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    # 已有字段
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    container_id = db.Column(db.Integer, db.ForeignKey('docker_containers.id'))
+    upload_traffic = db.Column(db.DECIMAL(10, 2))  # 上传流量
+    download_traffic = db.Column(db.DECIMAL(10, 2))  # 下载流量
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)  # 流量记录时间
+    traffic_limit = db.Column(db.DECIMAL(10, 2))  # 流量限制
+    remaining_traffic = db.Column(db.DECIMAL(10, 2))  # 剩余流量
+    created_at = db.Column(db.TIMESTAMP, default=datetime.utcnow)
+    updated_at = db.Column(db.TIMESTAMP, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    container = relationship("DockerContainer")
-
-    __table_args__ = (
-        Index('idx_container_traffic_container', 'container_id'),
-        Index('idx_container_traffic_timestamp', 'timestamp'),
-    )
-
+    container = db.relationship("DockerContainer")
+    
 
 class DockerContainerEvents(db.Model):
     __tablename__ = 'docker_container_events'
@@ -689,14 +706,18 @@ class ContainerTraffic(db.Model):
 class ServerTraffic(db.Model):
     __tablename__ = 'server_traffic'
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    server_id = Column(Integer, ForeignKey('servers.id'))
-    total_traffic = Column(DECIMAL(10, 2))
-    remaining_traffic = Column(DECIMAL(10, 2))
-    traffic_limit = Column(DECIMAL(10, 2))
-    updated_at = Column(DateTime, default=datetime.utcnow)
+    # 已有字段
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    server_id = db.Column(db.Integer, db.ForeignKey('servers.id'))
+    total_traffic = db.Column(db.DECIMAL(10, 2))  # 总流量
+    remaining_traffic = db.Column(db.DECIMAL(10, 2))  # 剩余流量
+    traffic_limit = db.Column(db.DECIMAL(10, 2))  # 流量限制
+    traffic_used = db.Column(db.DECIMAL(10, 2))  # 已使用流量
+    traffic_reset_date = db.Column(db.Date)  # 流量重置日期（如每月1日重置）
+    updated_at = db.Column(db.TIMESTAMP, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.TIMESTAMP, default=datetime.utcnow)
 
-    server = relationship("Server")
+    server = db.relationship("Server")
 
 
 class TrafficAlert(db.Model):
