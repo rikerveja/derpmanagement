@@ -9,22 +9,13 @@
         <!-- 标题栏 -->
         <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div class="text-lg font-semibold text-gray-900 dark:text-white">
-            <slot name="header">对话框标题</slot>
+            <slot name="header"></slot>
           </div>
         </div>
         
         <!-- 内容区域 -->
         <div class="px-6 py-4 overflow-y-auto">
-          <slot name="default">对话框内容</slot>
-        </div>
-        
-        <!-- 底部按钮区域 -->
-        <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
-          <slot name="footer">
-            <div class="flex justify-end space-x-2">
-              <slot name="actions"></slot>
-            </div>
-          </slot>
+          <slot name="default"></slot>
         </div>
       </div>
     </div>
@@ -46,14 +37,7 @@ const handleClose = () => {
 }
 </script>
 
-<script>
-export default {
-  name: 'BaseDialog'
-}
-</script>
-
 <style scoped>
-/* 添加淡入淡出动画 */
 .fixed {
   animation: fadeIn 0.2s ease-out;
 }
