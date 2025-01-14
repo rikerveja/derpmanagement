@@ -53,7 +53,7 @@ def create_rental():
         rental = Rental(
             id=None,  # 数据库会自动生成主键
             user_id=user_id,
-            tenant_id=None,  # 如果有租户信息，可从`user_id`关联或手动指定
+            tenant_id=None,  # 如果有租户信息，可从user_id关联或手动指定
             serial_number_id=serial_number.id,
             serial_number_expiry=serial_number.end_date,
             status='active',
@@ -86,21 +86,6 @@ def create_rental():
         server = Server.query.get(server_id)
         if server:
             server.user_count += 1
-            server.total_traffic += traffic_limit
-            server.remaining_traffic -= traffic_limit
-
-        # 创建 ACL 配置
-        acl_config = ACLConfig(
-            user_id=user_id,
-            server_ids=[server_id],
-            container_ids=[container_id],
-            acl_data={
-                "bandwidth_limit": container_config.get("bandwidth_limit", 0)  # 带宽限制
-            },
-            version="1.0",
-            is_active=True
-        )
-        db.session.add(acl_config)
 
         # 提交事务
         db.session.commit()
@@ -124,6 +109,15 @@ def create_rental():
         )
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
 
+    except Exception as e:
+        db.session.rollback()  # 回滚事务
+        log_operation(
+            user_id=None,
+            operation="create_rental",
+            status="failed",
+            details=f"Error creating rental: {str(e)}"
+        )
+        return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
 
 @rental_bp.route('/api/rental/renew', methods=['POST'])
 def renew_rental():
