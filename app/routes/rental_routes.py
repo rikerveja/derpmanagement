@@ -16,16 +16,19 @@ def create_rental():
     data = request.json
     serial_code = data.get('serial_code')  # 获取序列号
     user_id = data.get('user_id')  # 获取用户ID
+    server_id = data.get('server_id')  # 获取服务器ID
+    container_id = data.get('container_id')  # 获取容器ID
     traffic_limit = data.get('traffic_limit', 0)  # 获取流量限制
+    container_config = data.get('container_config', {})  # 获取容器配置（如带宽限制）
 
-    if not serial_code or not user_id:
+    if not serial_code or not user_id or not server_id or not container_id:
         log_operation(
             user_id=None,
             operation="create_rental",
             status="failed",
-            details="Missing serial code or user ID"
+            details="Missing required fields: serial_code, user_id, server_id, or container_id"
         )
-        return jsonify({"success": False, "message": "Missing serial code or user ID"}), 400
+        return jsonify({"success": False, "message": "Missing required fields"}), 400
 
     try:
         # 查找对应的序列号
@@ -42,56 +45,62 @@ def create_rental():
         # 激活序列号并更新状态
         serial_number.status = 'used'
         serial_number.user_id = user_id
-        serial_number.activated_at = datetime.utcnow()
-        serial_number.expires_at = datetime.utcnow() + timedelta(days=serial_number.valid_days)
+        serial_number.start_date = datetime.utcnow()
+        serial_number.end_date = datetime.utcnow() + timedelta(days=serial_number.valid_days)
+        serial_number.used_at = datetime.utcnow()  # 更新使用时间
         
         # 创建租赁记录
         rental = Rental(
+            id=None,  # 数据库会自动生成主键
             user_id=user_id,
+            tenant_id=None,  # 如果有租户信息，可从`user_id`关联或手动指定
             serial_number_id=serial_number.id,
+            serial_number_expiry=serial_number.end_date,
             status='active',
-            start_date=datetime.utcnow(),
-            end_date=datetime.utcnow() + timedelta(days=serial_number.valid_days),
-            server_ids=[],
-            container_ids=[],
-            traffic_limit=traffic_limit,  # 记录流量限制
-            traffic_usage=0,  # 初始流量使用为0
-            serial_number_expiry=serial_number.expires_at,
-            renewal_count=0
+            payment_status='pending',  # 默认设置支付状态为待支付
+            payment_date=None,  # 支付日期初始为空
+            start_date=serial_number.start_date,
+            end_date=serial_number.end_date,
+            expired_at=None,  # 到期时间初始为空，系统逻辑可以计算填充
+            traffic_limit=traffic_limit,
+            traffic_usage=0,
+            traffic_reset_date=None,  # 如果有定期流量重置逻辑，可以添加
+            renewal_count=0,
+            renewed_at=None,  # 初始为空，续费时更新
+            container_status='pending',  # 默认容器状态
+            server_status='active',  # 默认服务器状态
+            server_ids=[server_id],
+            container_ids=[container_id],
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
         )
         db.session.add(rental)
 
-        # 分配容器并创建 Docker 容器记录
-        docker_container = DockerContainer(
-            container_id=f"container_{user_id}_{rental.id}",
-            container_name=f"container_{rental.id}",
-            user_id=user_id,
-            server_id=1,  # 假设为服务器ID，这里可以进行进一步逻辑处理
-            status="running"
-        )
-        db.session.add(docker_container)
+        # 更新容器信息
+        docker_container = DockerContainer.query.get(container_id)
+        if docker_container:
+            docker_container.status = "running"
+            docker_container.server_id = server_id
 
-        # 更新租赁关系表
-        rental.container_ids = [docker_container.id]  # 将容器ID关联到租赁记录
-        rental.server_ids = [1]  # 假设将该租赁与服务器ID 1 关联
+        # 更新服务器的用户数和流量
+        server = Server.query.get(server_id)
+        if server:
+            server.user_count += 1
+            server.total_traffic += traffic_limit
+            server.remaining_traffic -= traffic_limit
 
         # 创建 ACL 配置
         acl_config = ACLConfig(
             user_id=user_id,
-            server_ids=rental.server_ids,
-            container_ids=rental.container_ids,
-            acl_data={},
+            server_ids=[server_id],
+            container_ids=[container_id],
+            acl_data={
+                "bandwidth_limit": container_config.get("bandwidth_limit", 0)  # 带宽限制
+            },
             version="1.0",
             is_active=True
         )
         db.session.add(acl_config)
-
-        # 更新服务器的用户数和流量
-        server = Server.query.get(1)  # 假设为服务器ID 1
-        if server:
-            server.user_count += 1  # 用户数增加
-            server.total_traffic += traffic_limit  # 更新总流量（假设为租赁的流量限制）
-            server.remaining_traffic -= traffic_limit  # 更新剩余流量（假设为租赁的流量限制）
 
         # 提交事务
         db.session.commit()
@@ -100,10 +109,10 @@ def create_rental():
             user_id=user_id,
             operation="create_rental",
             status="success",
-            details=f"Rental created and resources assigned for user {user_id} with serial code {serial_code}"
+            details=f"Rental created for user {user_id} with serial code {serial_code}"
         )
 
-        return jsonify({"success": True, "message": "Rental created and resources assigned successfully"}), 200
+        return jsonify({"success": True, "message": "Rental created successfully"}), 200
 
     except Exception as e:
         db.session.rollback()  # 回滚事务
