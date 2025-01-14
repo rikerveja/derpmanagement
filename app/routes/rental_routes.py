@@ -80,9 +80,9 @@ def create_rental():
         docker_container = DockerContainer.query.get(container_id)
         if docker_container:
             docker_container.status = "running"
-            docker_container.server_id = server_id
+            docker_container.user_id = user_id
 
-        # 更新服务器的用户数和流量
+        # 更新服务器的用户数
         server = Server.query.get(server_id)  # 查询 `servers` 表
         if server:
             server.user_count += 1
@@ -353,4 +353,3 @@ def get_user_history(user_id):
         return jsonify({"success": True, "history": history_data}), 200
     except Exception as e:
         return jsonify({"success": False, "message": f"Error fetching user history: {str(e)}"}), 500
-
