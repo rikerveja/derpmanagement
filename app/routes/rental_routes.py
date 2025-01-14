@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify 
-from app.models import SerialNumber, UserContainer, UserHistory, Rental, DockerContainer, UserTraffic
+from app.models import SerialNumber, UserContainer, UserHistory, Rental, DockerContainer, UserTraffic, Server
 from app.utils.email_utils import send_verification_email
 from app.utils.logging_utils import log_operation
 from app import db
