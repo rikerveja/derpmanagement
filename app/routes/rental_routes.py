@@ -48,7 +48,7 @@ def create_rental():
         serial_number.start_date = datetime.utcnow()
         serial_number.end_date = datetime.utcnow() + timedelta(days=serial_number.valid_days)
         serial_number.used_at = datetime.utcnow()  # 更新使用时间
-
+        
         # 创建租赁记录
         rental = Rental(
             id=None,  # 数据库会自动生成主键
@@ -67,7 +67,7 @@ def create_rental():
             traffic_reset_date=None,  # 如果有定期流量重置逻辑，可以添加
             renewal_count=0,
             renewed_at=None,  # 初始为空，续费时更新
-            container_status='active',  # 设置默认容器状态为枚举值之一
+            container_status='active',  # 设置为 ENUM 中的合法值
             server_status='active',  # 默认服务器状态
             server_ids=[server_id],
             container_ids=[container_id],
@@ -79,11 +79,11 @@ def create_rental():
         # 更新容器信息
         docker_container = DockerContainer.query.get(container_id)
         if docker_container:
-            docker_container.status = "running"
+            docker_container.status = "running"  # 确保状态值合法
             docker_container.server_id = server_id
 
         # 更新服务器的用户数和流量
-        server = Server.query.get(server_id)
+        server = db.session.query(servers).get(server_id)  # 修正为查询 `servers` 表
         if server:
             server.user_count += 1
 
@@ -108,7 +108,6 @@ def create_rental():
             details=f"Error creating rental: {str(e)}"
         )
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
-
 
 @rental_bp.route('/api/rental/renew', methods=['POST'])
 def renew_rental():
