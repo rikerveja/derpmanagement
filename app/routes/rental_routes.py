@@ -48,7 +48,7 @@ def create_rental():
         serial_number.start_date = datetime.utcnow()
         serial_number.end_date = datetime.utcnow() + timedelta(days=serial_number.valid_days)
         serial_number.used_at = datetime.utcnow()  # 更新使用时间
-        
+
         # 创建租赁记录
         rental = Rental(
             id=None,  # 数据库会自动生成主键
@@ -67,7 +67,7 @@ def create_rental():
             traffic_reset_date=None,  # 如果有定期流量重置逻辑，可以添加
             renewal_count=0,
             renewed_at=None,  # 初始为空，续费时更新
-            container_status='pending',  # 默认容器状态
+            container_status='active',  # 设置默认容器状态为枚举值之一
             server_status='active',  # 默认服务器状态
             server_ids=[server_id],
             container_ids=[container_id],
@@ -109,15 +109,6 @@ def create_rental():
         )
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
 
-    except Exception as e:
-        db.session.rollback()  # 回滚事务
-        log_operation(
-            user_id=None,
-            operation="create_rental",
-            status="failed",
-            details=f"Error creating rental: {str(e)}"
-        )
-        return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
 
 @rental_bp.route('/api/rental/renew', methods=['POST'])
 def renew_rental():
