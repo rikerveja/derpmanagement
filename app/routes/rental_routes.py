@@ -51,24 +51,24 @@ def create_rental():
         
         # 创建租赁记录
         rental = Rental(
-            id=None,  # 数据库会自动生成主键
+            id=None,
             user_id=user_id,
-            tenant_id=None,  # 如果有租户信息，可从user_id关联或手动指定
+            tenant_id=None,
             serial_number_id=serial_number.id,
             serial_number_expiry=serial_number.end_date,
             status='active',
-            payment_status='pending',  # 默认设置支付状态为待支付
-            payment_date=None,  # 支付日期初始为空
+            payment_status='pending',
+            payment_date=None,
             start_date=serial_number.start_date,
             end_date=serial_number.end_date,
-            expired_at=None,  # 到期时间初始为空，系统逻辑可以计算填充
+            expired_at=None,
             traffic_limit=traffic_limit,
             traffic_usage=0,
-            traffic_reset_date=None,  # 如果有定期流量重置逻辑，可以添加
+            traffic_reset_date=None,
             renewal_count=0,
-            renewed_at=None,  # 初始为空，续费时更新
-            container_status='active',  # 设置为 ENUM 中的合法值
-            server_status='active',  # 默认服务器状态
+            renewed_at=None,
+            container_status='active',
+            server_status='active',
             server_ids=[server_id],
             container_ids=[container_id],
             created_at=datetime.utcnow(),
@@ -79,11 +79,11 @@ def create_rental():
         # 更新容器信息
         docker_container = DockerContainer.query.get(container_id)
         if docker_container:
-            docker_container.status = "running"  # 确保状态值合法
+            docker_container.status = "running"
             docker_container.server_id = server_id
 
         # 更新服务器的用户数和流量
-        server = db.session.query(servers).get(server_id)  # 修正为查询 `servers` 表
+        server = Server.query.get(server_id)  # 查询 `servers` 表
         if server:
             server.user_count += 1
 
@@ -100,7 +100,7 @@ def create_rental():
         return jsonify({"success": True, "message": "Rental created successfully"}), 200
 
     except Exception as e:
-        db.session.rollback()  # 回滚事务
+        db.session.rollback()
         log_operation(
             user_id=None,
             operation="create_rental",
@@ -108,6 +108,7 @@ def create_rental():
             details=f"Error creating rental: {str(e)}"
         )
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
+
 
 @rental_bp.route('/api/rental/renew', methods=['POST'])
 def renew_rental():
