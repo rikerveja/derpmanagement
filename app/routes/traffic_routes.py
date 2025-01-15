@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from app.models import UserContainer, DockerContainerTraffic, ServerTraffic, UserTraffic, Rentals
+from app.models import UserContainer, DockerContainerTraffic, ServerTraffic, UserTraffic, Rental
 from datetime import datetime
 import requests
 import logging
