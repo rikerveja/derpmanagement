@@ -8,6 +8,56 @@ from datetime import datetime, timedelta
 # 定义蓝图
 rental_bp = Blueprint('rental', __name__)
 
+@rental_bp.route('/api/rentals/all', methods=['GET'])
+def get_all_rentals():
+    """
+    获取全部租赁关系的数据表，包含指定字段的信息
+    """
+    try:
+        # 查询所有租赁关系
+        rentals = Rental.query.all()
+
+        # 序列化数据
+        rental_data = [
+            {
+                "id": rental.id,
+                "user_id": rental.user_id,
+                "status": rental.status,
+                "start_date": rental.start_date,
+                "end_date": rental.end_date,
+                "expired_at": rental.expired_at,
+                "server_ids": rental.server_ids,
+                "container_ids": rental.container_ids,
+                "traffic_limit": rental.traffic_limit,
+                "traffic_usage": rental.traffic_usage,
+                "traffic_reset_date": rental.traffic_reset_date,
+                "serial_number_id": rental.serial_number_id,
+                "serial_number_expiry": rental.serial_number_expiry,
+                "renewed_at": rental.renewed_at,
+                "renewal_count": rental.renewal_count,
+                "container_status": rental.container_status,
+                "server_status": rental.server_status,
+                "payment_status": rental.payment_status,
+                "payment_date": rental.payment_date,
+                "tenant_id": rental.tenant_id,
+                "created_at": rental.created_at,
+                "updated_at": rental.updated_at
+            }
+            for rental in rentals
+        ]
+
+        return jsonify({"success": True, "data": rental_data}), 200
+
+    except Exception as e:
+        log_operation(
+            user_id=None,
+            operation="get_all_rentals",
+            status="failed",
+            details=f"Error retrieving rentals: {str(e)}"
+        )
+        return jsonify({"success": False, "message": f"Error retrieving rentals: {str(e)}"}), 500
+
+
 @rental_bp.route('/api/rental/create', methods=['POST'])
 def create_rental():
     """
