@@ -5,17 +5,24 @@
     
     <!-- 对话框 -->
     <div class="fixed inset-0 flex items-center justify-center p-4">
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
         <!-- 标题栏 -->
-        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
           <div class="text-lg font-semibold text-gray-900 dark:text-white">
             <slot name="header"></slot>
           </div>
         </div>
         
-        <!-- 内容区域 -->
-        <div class="px-6 py-4 overflow-y-auto">
-          <slot name="default"></slot>
+        <!-- 内容区域 - 添加滚动 -->
+        <div class="px-6 py-4 overflow-y-auto flex-grow">
+          <div>
+            <slot name="default"></slot>
+          </div>
+        </div>
+        
+        <!-- 底部按钮区域 -->
+        <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+          <slot name="footer"></slot>
         </div>
       </div>
     </div>
