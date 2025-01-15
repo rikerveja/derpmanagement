@@ -8,7 +8,7 @@ import subprocess
 # 定义蓝图
 server_bp = Blueprint('server', __name__)
 
-# 添加服务器
+# 添加服务器记得分类这里要先填上4坑位版和2坑位版，id分别是1和2，否则添加服务器完成不了
 @server_bp.route('/api/add_server', methods=['POST'])
 def add_server():
     """
