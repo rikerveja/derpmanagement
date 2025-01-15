@@ -3,507 +3,491 @@ import { ref, computed, onMounted } from 'vue'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionMain from '@/components/SectionMain.vue'
 import CardBox from '@/components/CardBox.vue'
+import BaseButton from '@/components/BaseButton.vue'
+import BaseIcon from '@/components/BaseIcon.vue'
+import BaseDialog from '@/components/BaseDialog.vue'
+import BaseDialogR from '@/components/BaseDialogR.vue'
 import { 
-  mdiServer,
   mdiPlus,
   mdiDelete,
   mdiRefresh,
   mdiPencil,
-  mdiMagnify,
-  mdiFilter,
-  mdiHeartPulse
+  mdiHistory,
+  mdiBellRing,
+  mdiCurrencyUsd,
+  mdiInformation
 } from '@mdi/js'
-import BaseButton from '@/components/BaseButton.vue'
-import BaseButtons from '@/components/BaseButtons.vue'
-import BaseIcon from '@/components/BaseIcon.vue'
-import BaseDialog from '@/components/BaseDialog.vue'
 import api from '@/services/api'
+import RentalRenewDialog from './RentalRenewDialog.vue'
+import RentalCreateDialog from './RentalCreateDialog.vue'
 
-// 服务器列表数据
-const servers = ref([])
-const categories = ref([]) // 服务器分类
-const regions = ref([
-  '上海', '深圳', '北京', '广州', '杭州', 
-  '成都', '武汉', '南京', '天津', '重庆',
-  '西安', '青岛', '长沙'
-])
+// 添加 loading 状态
+const loading = ref(false)
 
-// 分页
+// 租赁数据
+const rentals = ref([])
 const currentPage = ref(1)
 const itemsPerPage = 10
 
-// 筛选
-const searchQuery = ref('')
-const selectedCategoryId = ref('all')  // 改为 categoryId
-const selectedRegion = ref('all')
-const selectedStatus = ref('all')
-
-// 服务器表单
-const serverForm = ref({
-  server_name: '',
-  ip_address: '',
-  region: '上海',
-  cpu: 2,
-  memory: 2,
-  storage: 40,
-  category_id: '',
-  bandwidth: 100,
-  user_count: 0,
-  total_traffic: 20
+// 搜索条件
+const searchQuery = ref({
+  keyword: '',  // 统一的搜索关键字，用于序列号、用户名和邮箱
+  status: ''    // 状态筛选
 })
 
-// 服务器分类默认值
-const defaultCategories = [
-  { id: 1, category_name: '4坑位版' },
-  { id: 2, category_name: '2坑位版' }
-]
-
-// 添加编辑对话框的状态控制
-const showEditDialog = ref(false)
-const editServerForm = ref({
-  id: null,
-  server_name: '',
-  ip_address: '',
-  region: '上海',
-  cpu: 2,
-  memory: 2,
-  storage: 40,
-  category_id: '',
-  bandwidth: 100,
-  user_count: 0,
-  total_traffic: 20
+// 排序相关状态
+const sortConfig = ref({
+  key: 'id',        // 默认按ID排序
+  order: 'desc'     // 默认降序
 })
 
-// 服务器分类映射
-const categoryMap = {
-  1: '4坑位版',
-  2: '2坑位版'
-}
+// 分页相关计算属性
+const filteredRentals = computed(() => {
+  let result = rentals.value
 
-// 排序相关
-const sortField = ref('created_at')  // 默认按创建时间排序
-const sortOrder = ref('desc')        // 默认降序
-
-// 获取服务器列表
-const fetchServers = async () => {
-  try {
-    console.log('开始获取服务器列表')
-    const response = await api.getServers()
-    console.log('获取服务器列表 - 原始响应:', response)
-
-    if (response.success) {
-      servers.value = response.servers.map(server => {
-        // 从 category 字段获取分类名称，如果没有则使用 categoryMap 映射
-        const categoryName = server.category || categoryMap[server.category_id] || '未知分类'
-        console.log('处理服务器数据:', {
-          服务器ID: server.id,
-          分类名称: categoryName,
-          原始category: server.category,
-          原始category_id: server.category_id
-        })
-
-        return {
-          ...server,
-          category_id: server.category_id,  // 保持原始的 category_id
-          category_name: categoryName
-        }
-      })
-      console.log('最终处理后的服务器数据:', servers.value)
-    } else {
-      throw new Error(response.message)
-    }
-  } catch (error) {
-    console.error('获取服务器列表失败:', error)
-    servers.value = []
+  // 搜索过滤
+  if (searchQuery.value.keyword) {
+    const keyword = searchQuery.value.keyword.toLowerCase()
+    result = result.filter(rental => 
+      rental.serial_code.toLowerCase().includes(keyword) ||
+      rental.user_info.toLowerCase().includes(keyword)
+    )
   }
-}
 
-// 获取服务器分类
-const fetchCategories = async () => {
-  try {
-    console.log('开始获取服务器分类')
-    const response = await api.getServerCategories()
-    console.log('服务器分类响应:', response)
-    // 如果API返回为空，使用默认分类
-    categories.value = Array.isArray(response) ? response : response.categories || defaultCategories
-  } catch (error) {
-    console.error('获取服务器分类失败:', error)
-    categories.value = defaultCategories
+  // 状态过滤
+  if (searchQuery.value.status) {
+    result = result.filter(rental => rental.status === searchQuery.value.status)
   }
-}
 
-// 排序处理函数
-const handleSort = (field) => {
-  if (sortField.value === field) {
-    // 如果点击的是当前排序字段，则切换排序顺序
-    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
-  } else {
-    // 如果点击的是新字段，则设置为该字段降序
-    sortField.value = field
-    sortOrder.value = 'desc'
-  }
-}
-
-// 筛选后的服务器列表
-const filteredServers = computed(() => {
-  const filtered = servers.value.filter(server => {
-    const matchesSearch = searchQuery.value === '' || 
-      server.server_name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      server.ip_address.toLowerCase().includes(searchQuery.value.toLowerCase())
-    const matchesCategory = selectedCategoryId.value === 'all' || server.category_id === selectedCategoryId.value
-    const matchesRegion = selectedRegion.value === 'all' || server.region === selectedRegion.value
-    const matchesStatus = selectedStatus.value === 'all' || server.status === selectedStatus.value
-    return matchesSearch && matchesCategory && matchesRegion && matchesStatus
-  })
-  
   // 排序
-  return filtered.sort((a, b) => {
-    const aValue = a[sortField.value]
-    const bValue = b[sortField.value]
-    if (sortOrder.value === 'asc') {
-      return aValue > bValue ? 1 : -1
-    } else {
-      return aValue < bValue ? 1 : -1
+  result = [...result].sort((a, b) => {
+    let compareResult = 0
+    switch (sortConfig.value.key) {
+      case 'id':
+        compareResult = b.id - a.id // 默认按 ID 降序
+        break
+      case 'serial_code':
+        compareResult = a.serial_code.localeCompare(b.serial_code)
+        break
+      case 'user_info':
+        compareResult = a.user_info.localeCompare(b.user_info)
+        break
+      case 'start_date':
+        compareResult = new Date(a.start_date) - new Date(b.start_date)
+        break
+      case 'end_date':
+        compareResult = new Date(a.end_date) - new Date(b.end_date)
+        break
+      default:
+        compareResult = 0
     }
+    return sortConfig.value.order === 'desc' ? -compareResult : compareResult
   })
+
+  return result
 })
 
-// 分页后的服务器列表
-const paginatedServers = computed(() => {
+// 分页数据
+const paginatedRentals = computed(() => {
   const start = (currentPage.value - 1) * itemsPerPage
   const end = start + itemsPerPage
-  return filteredServers.value.slice(start, end)
+  return filteredRentals.value.slice(start, end)
 })
 
 // 总页数
-const totalPages = computed(() => {
-  return Math.ceil(filteredServers.value.length / itemsPerPage)
-})
+const totalPages = computed(() => 
+  Math.ceil(filteredRentals.value.length / itemsPerPage)
+)
 
-// 添加服务器
-const addServer = async () => {
-  try {
-    // 检查所有必填字段
-    if (!serverForm.value.server_name || !serverForm.value.ip_address || !serverForm.value.category_id ||
-        !serverForm.value.region || !serverForm.value.cpu || !serverForm.value.memory || 
-        !serverForm.value.storage) {
-      alert('请填写所有必要信息（服务器名称、IP地址、分类、地区、CPU、内存、存储）')
-      return
-    }
-
-    console.log('添加服务器 - 原始表单数据:', serverForm.value)
-
-    const requestData = {
-      ip_address: serverForm.value.ip_address,
-      region: serverForm.value.region,
-      cpu: serverForm.value.cpu,
-      memory: serverForm.value.memory,
-      category_id: Number(serverForm.value.category_id),  // 改回使用 category_id
-      server_name: serverForm.value.server_name,
-      storage: serverForm.value.storage,
-      bandwidth: serverForm.value.bandwidth,
-      user_count: serverForm.value.user_count,
-      total_traffic: serverForm.value.total_traffic
-    }
-
-    console.log('添加服务器 - 发送的请求数据:', requestData)
-    const response = await api.addServer(requestData)
-    console.log('添加服务器 - 服务器响应:', response)
-
-    if (response.success) {
-      alert('添加服务器成功!')
-      await fetchServers()
-      // 重置表单
-      serverForm.value = {
-        server_name: '',
-        ip_address: '',
-        region: '上海',
-        cpu: 2,
-        memory: 2,
-        storage: 40,
-        category_id: '',
-        bandwidth: 100,
-        user_count: 0,
-        total_traffic: 20
-      }
-    } else {
-      throw new Error(response.message)
-    }
-  } catch (error) {
-    console.error('添加服务器失败:', error)
+// 处理排序
+const handleSort = (key) => {
+  if (sortConfig.value.key === key) {
+    sortConfig.value.order = sortConfig.value.order === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortConfig.value.key = key
+    sortConfig.value.order = 'asc'
   }
 }
 
-// 删除服务器
-const deleteServer = async (serverId) => {
-  if (confirm('确定要删除这台服务器吗？此操作将同时删除相关的容器数据!')) {
+// 续费对话框控制
+const showRenewDialog = ref(false)
+const currentRental = ref(null)
+
+// 历史记录数据
+const rentalHistory = ref([])
+const showHistoryDialog = ref(false)
+
+// 创建租赁对话框控制
+const showCreateDialog = ref(false)
+
+// 获取租赁列表
+const fetchRentals = async () => {
+  try {
+    loading.value = true;
+    const response = await api.getRentals();
+    if (response.success) {
+      rentals.value = response.data.map(rental => ({
+        id: rental.id,
+        user_id: rental.user_id,
+        user_info: `${rental.username || '未知用户'}(${rental.email || '无邮箱'})`,
+        serial_code: rental.serial_code,
+        status: rental.status,
+        start_date: rental.start_date,
+        end_date: rental.end_date,
+        expired_at: rental.expired_at,
+        traffic_usage: rental.traffic_usage,
+        traffic_limit: rental.traffic_limit,
+        traffic_reset_date: rental.traffic_reset_date,
+        renewal_count: rental.renewal_count,
+        container_status: rental.container_status,
+        server_status: rental.server_status,
+        payment_status: rental.payment_status,
+        payment_date: rental.payment_date
+      }));
+    }
+  } catch (error) {
+    console.error('获取租赁列表失败:', error);
+  } finally {
+    loading.value = false;
+  }
+};
+
+// 删除租赁
+const deleteRental = async (serialId) => {
+  if (confirm('确定要删除该租赁记录吗？此操作将同时删除相关的容器和历史记录!')) {
     try {
-      const response = await api.deleteServer(serverId)
+      const response = await api.deleteRental(serialId);
       if (response.success) {
-        await fetchServers()
-      } else {
-        throw new Error(response.message)
+        alert('删除成功!');
+        await fetchRentals();
       }
     } catch (error) {
-      console.error('删除服务器失败:', error)
-      alert('删除服务器失败: ' + error.message)
+      console.error('删除租赁失败:', error);
+      alert('删除失败: ' + error.message);
     }
   }
-}
+};
 
-// 检查服务器状态
-const checkServerStatus = async (serverId) => {
+// 发送到期通知
+const sendExpiryNotifications = async () => {
   try {
-    const response = await api.getServerStatus(serverId)
-    return response.success ? response.status : 'unknown'
-  } catch (error) {
-    console.error('获取服务器状态失败:', error)
-    return 'unknown'
-  }
-}
-
-// 健康检查
-const checkServerHealth = async () => {
-  try {
-    const response = await api.getServerHealthCheck()
+    const response = await api.sendExpiryNotifications({ days_to_expiry: 7 });
     if (response.success) {
-      console.log('服务器健康状态:', response.health_check_results)
-      alert('健康检查完成，请查看控制台日志')
-    } else {
-      throw new Error(response.message)
+      alert('到期通知发送成功!');
     }
   } catch (error) {
-    console.error('健康检查失败:', error)
-    alert('服务器健康检查失败: ' + error.message)
+    console.error('发送到期通知失败:', error);
+    alert('发送通知失败: ' + error.message);
   }
-}
+};
 
-// 编辑服务器
-const editServer = (server) => {
-  console.log('编辑服务器被点击:', server)
-  if (!server) {
-    console.error('未获取到服务器数据')
-    return
-  }
-  editServerForm.value = { 
-    id: server.id,
-    server_name: server.server_name,
-    ip_address: server.ip_address,
-    region: server.region,
-    cpu: server.cpu,
-    memory: server.memory,
-    storage: server.storage,
-    category_id: server.category_id,
-    bandwidth: server.bandwidth,
-    user_count: server.user_count,
-    total_traffic: server.total_traffic
-  }
-  console.log('设置表单数据:', editServerForm.value)
-  showEditDialog.value = true
-  console.log('对话框显示状态:', showEditDialog.value)
-}
-
-// 更新服务器
-const updateServer = async () => {
+// 检查租赁到期
+const checkExpiry = async () => {
   try {
-    console.log('更新服务器 - 原始表单数据:', editServerForm.value)
-    
-    const updateData = {
-      ...editServerForm.value,
-      category: Number(editServerForm.value.category_id)
-    }
-    console.log('更新服务器 - 处理后的数据:', updateData)
-
-    const response = await api.updateServer(editServerForm.value.id, updateData)
-    console.log('更新服务器 - 服务器响应:', response)
-
+    const response = await api.checkRentalExpiry();
     if (response.success) {
-      alert('更新服务器成功!')
-      await fetchServers()  // 刷新列表
-      showEditDialog.value = false  // 关闭对话框
-    } else {
-      throw new Error(response.message)
+      alert('已处理过期租赁!');
+      await fetchRentals();
     }
   } catch (error) {
-    console.error('更新服务器失败:', error)
-    alert('更新服务器失败: ' + error.message)
+    console.error('检查租赁到期失败:', error);
+    alert('检查到期失败: ' + error.message);
+  }
+};
+
+// 打开续费对话框
+const openRenewDialog = (rental) => {
+  currentRental.value = rental
+  showRenewDialog.value = true
+}
+
+// 查看历史记录
+const viewHistory = async (userId) => {
+  try {
+    const response = await api.getRentalHistory(userId)
+    if (response.success) {
+      rentalHistory.value = response.history
+      showHistoryDialog.value = true
+    }
+  } catch (error) {
+    console.error('获取历史记录失败:', error)
+    alert('获取历史记录失败: ' + error.message)
   }
 }
 
-// 初始化加载
+// 处理续费
+const handleRenew = async (renewalData) => {
+  try {
+    const response = await api.renewRental(renewalData)
+    if (response.success) {
+      alert('续费成功!')
+      showRenewDialog.value = false
+      await fetchRentals()
+    }
+  } catch (error) {
+    console.error('续费失败:', error)
+    alert('续费失败: ' + error.message)
+  }
+}
+
+// 初始化
 onMounted(async () => {
-  console.log('ServerListView mounted')
-  console.log('Layout component:', LayoutAuthenticated)
-  try {
-    await Promise.all([
-      fetchServers(),
-      fetchCategories()
-    ])
-  } catch (error) {
-    console.error('初始化加载失败:', error)
-  }
+  await fetchRentals()
 })
+
+const formatStatus = (status) => {
+  const statusMap = {
+    'active': '活跃',
+    'expired': '已过期',
+    'pending': '处理中'
+  }
+  return statusMap[status] || status
+}
+
+const formatPaymentStatus = (status) => {
+  const statusMap = {
+    'paid': '已支付',
+    'unpaid': '未支付',
+    'pending': '处理中',
+    'failed': '支付失败'
+  }
+  return statusMap[status] || status
+}
+
+const formatContainerStatus = (status) => {
+  const statusMap = {
+    'running': '运行中',
+    'stopped': '已停止',
+    'pending': '启动中',
+    'error': '错误'
+  }
+  return statusMap[status] || status
+}
+
+const formatServerStatus = (status) => {
+  const statusMap = {
+    'running': '运行中',
+    'stopped': '已停止',
+    'pending': '启动中',
+    'error': '错误'
+  }
+  return statusMap[status] || status
+}
+
+// 添加日期格式化函数
+const formatDate = (dateString) => {
+  return new Date(dateString).toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  })
+}
+
+// 添加时间格式化函数
+const formatTime = (dateString) => {
+  return new Date(dateString).toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  })
+}
 </script>
 
 <template>
   <LayoutAuthenticated>
     <SectionMain>
-      <!-- 添加调试信息 -->
-      <div v-if="servers.length === 0" class="text-center py-4">
-        <p>{{ '暂无服务器数据' }}</p>
-      </div>
-      
-      <CardBox class="mb-6">
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="text-lg font-bold flex items-center">
-            <BaseIcon :path="mdiServer" class="mr-2" />
-            服务器列表
-          </h3>
-          <div class="flex space-x-2">
+      <CardBox class="mb-6 dark:bg-gray-900">
+        <!-- 标题和操作按钮 -->
+        <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+          <h1 class="text-2xl font-bold dark:text-white">租赁管理</h1>
+          <div class="flex flex-wrap gap-2">
+            <BaseButton
+              :icon="mdiPlus"
+              color="success"
+              @click="showCreateDialog = true"
+              label="创建租赁"
+              class="whitespace-nowrap"
+            />
             <BaseButton
               :icon="mdiRefresh"
               color="info"
-              @click="fetchServers"
-              title="刷新列表"
+              @click="fetchRentals"
+              title="刷新"
+              class="whitespace-nowrap"
             />
             <BaseButton
-              :icon="mdiHeartPulse"
-              color="success"
-              @click="checkServerHealth"
-              title="健康检查"
+              :icon="mdiBellRing"
+              color="warning"
+              @click="sendExpiryNotifications"
+              title="发送到期通知"
+              class="whitespace-nowrap"
             />
           </div>
         </div>
 
-        <!-- 筛选工具栏 -->
-        <div class="flex flex-wrap gap-4 mb-4">
-          <div class="flex-1 min-w-[200px]">
+        <!-- 搜索区域 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div class="form-group">
+            <label class="block text-sm font-medium mb-2 dark:text-gray-300">搜索</label>
             <input
-              v-model="searchQuery"
+              v-model="searchQuery.keyword"
               type="text"
-              placeholder="搜索服务器名称或IP..."
-              class="w-full px-3 py-2 border rounded-md"
-            >
+              class="form-input dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700"
+              placeholder="搜索序列号/用户名/邮箱"
+            />
           </div>
-          <select
-            v-model="selectedCategoryId"
-            class="px-3 py-2 border rounded-md"
-          >
-            <option value="all">全部分类</option>
-            <option v-for="category in categories" :key="category.id" :value="category.id">
-              {{ category.category_name }}
-            </option>
-          </select>
-          <select
-            v-model="selectedRegion"
-            class="px-3 py-2 border rounded-md"
-          >
-            <option value="all">全部地区</option>
-            <option v-for="region in regions" :key="region" :value="region">
-              {{ region }}
-            </option>
-          </select>
-          <select
-            v-model="selectedStatus"
-            class="px-3 py-2 border rounded-md"
-          >
-            <option value="all">全部状态</option>
-            <option value="running">运行中</option>
-            <option value="stopped">已停止</option>
-            <option value="restarting">重启中</option>
-          </select>
+          <div class="form-group">
+            <label class="block text-sm font-medium mb-2 dark:text-gray-300">状态</label>
+            <select 
+              v-model="searchQuery.status" 
+              class="form-input dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700"
+            >
+              <option value="">全部</option>
+              <option value="active">活跃</option>
+              <option value="expired">已过期</option>
+              <option value="pending">处理中</option>
+            </select>
+          </div>
         </div>
 
-        <!-- 服务器列表表格 -->
-        <div>
-          <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-fixed">
+        <!-- 租赁列表表格 -->
+        <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+          <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead class="bg-gray-50 dark:bg-gray-800">
               <tr>
-                <th @click="handleSort('server_name')" class="w-[10%] px-2 py-3 text-center font-bold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                  服务器名称
-                  <span v-if="sortField === 'server_name'" class="ml-1">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
+                <th @click="handleSort('user_info')" 
+                    class="group px-4 py-3 text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 w-1/5"
+                >
+                  <div class="flex items-center space-x-1">
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">用户信息/序列号</span>
+                    <span v-if="sortConfig.key === 'user_info'" class="text-gray-500 dark:text-gray-400">
+                      {{ sortConfig.order === 'asc' ? '↑' : '↓' }}
+                    </span>
+                  </div>
                 </th>
-                <th class="w-[11%] px-2 py-3 text-center font-bold text-gray-700 dark:text-gray-300">IP地址</th>
-                <th class="w-[7%] px-2 py-3 text-center font-bold text-gray-700 dark:text-gray-300">分类</th>
-                <th class="w-[18%] px-2 py-3 text-center font-bold text-gray-700 dark:text-gray-300">配置</th>
-                <th class="w-[6%] px-2 py-3 text-center font-bold text-gray-700 dark:text-gray-300">地区</th>
-                <th class="w-[6%] px-2 py-3 text-center font-bold text-gray-700 dark:text-gray-300">状态</th>
-                <th class="w-[6%] px-2 py-3 text-center font-bold text-gray-700 dark:text-gray-300">带宽</th>
-                <th @click="handleSort('user_count')" class="w-[5%] px-2 py-3 text-center font-bold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                  用户数
-                  <span v-if="sortField === 'user_count'" class="ml-1">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
+                <th @click="handleSort('status')" 
+                    class="group px-4 py-3 text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 w-24"
+                >
+                  <div class="flex items-center space-x-1">
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">状态</span>
+                    <span v-if="sortConfig.key === 'status'" class="text-gray-500 dark:text-gray-400">
+                      {{ sortConfig.order === 'asc' ? '↑' : '↓' }}
+                    </span>
+                  </div>
                 </th>
-                <th class="w-[6%] px-2 py-3 text-center font-bold text-gray-700 dark:text-gray-300">流量</th>
-                <th @click="handleSort('created_at')" class="w-[15%] px-2 py-3 text-center font-bold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                  创建时间
-                  <span v-if="sortField === 'created_at'" class="ml-1">{{ sortOrder === 'asc' ? '↑' : '↓' }}</span>
+                <th class="px-4 py-3 text-left w-32">
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">开始时间</span>
                 </th>
-                <th class="w-[10%] px-2 py-3 text-center font-bold text-gray-700 dark:text-gray-300">操作</th>
+                <th class="px-4 py-3 text-left w-32">
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">到期时间</span>
+                </th>
+                <th class="px-4 py-3 text-left w-24">
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">流量使用</span>
+                </th>
+                <th class="px-4 py-3 text-left w-28">
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">运行状态</span>
+                </th>
+                <th class="px-4 py-3 text-left w-24">
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">支付状态</span>
+                </th>
+                <th class="px-4 py-3 text-left w-28">
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">操作</span>
+                </th>
               </tr>
             </thead>
-            <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-              <tr v-for="server in paginatedServers" :key="server.id" 
-                  class="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200">
-                <td class="px-2 py-2">
-                  <div class="font-medium text-gray-900 dark:text-gray-100">
-                    {{ server.server_name }}
+            <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-900 dark:divide-gray-700">
+              <tr v-for="rental in paginatedRentals" 
+                  :key="rental.id"
+                  class="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                <td class="px-4 py-3">
+                  <div class="flex flex-col">
+                    <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {{ rental.user_info }}
+                    </span>
+                    <span class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                      序列号: {{ rental.serial_code }}
+                    </span>
                   </div>
                 </td>
-                <td class="px-2 py-2 font-mono text-sm">{{ server.ip_address }}</td>
-                <td class="px-2 py-2">
-                  <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100">
-                    {{ server.category_name }}
-                  </span>
-                </td>
-                <td class="px-2 py-2 text-sm">
-                  <div class="flex flex-col space-y-1">
-                    <div class="flex items-center justify-center gap-1">
-                      <span class="px-2 py-1 bg-gray-100 rounded-md dark:bg-gray-800">{{ server.cpu }}核</span>
-                      <span class="px-2 py-1 bg-gray-100 rounded-md dark:bg-gray-800">{{ server.memory }}GB</span>
-                    </div>
-                    <div class="flex items-center justify-center">
-                      <span class="px-2 py-1 bg-gray-100 rounded-md dark:bg-gray-800">{{ server.storage }}GB</span>
-                    </div>
-                  </div>
-                </td>
-                <td class="px-2 py-2 text-sm text-gray-600 dark:text-gray-400">{{ server.region }}</td>
-                <td class="px-2 py-2">
-                  <span class="px-2 py-1 rounded text-xs font-medium" :class="{
-                    'bg-green-100 text-green-800': server.status === 'healthy',
-                    'bg-red-100 text-red-800': server.status === 'unhealthy',
-                    'bg-yellow-100 text-yellow-800': server.status === 'unknown'
+                <td class="px-4 py-3">
+                  <span class="text-xs font-medium px-2 py-1 rounded-full" :class="{
+                    'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200': rental.status === 'active',
+                    'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200': rental.status === 'expired',
+                    'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200': rental.status === 'pending'
                   }">
-                    {{ server.status }}
+                    {{ formatStatus(rental.status) }}
                   </span>
                 </td>
-                <td class="px-2 py-2 text-sm">
-                  <span class="font-medium">{{ server.bandwidth }}</span>
-                  <span class="text-gray-500">M</span>
+                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                  <div class="flex flex-col">
+                    <span>{{ formatDate(rental.start_date) }}</span>
+                    <span class="text-gray-500">{{ formatTime(rental.start_date) }}</span>
+                  </div>
                 </td>
-                <td class="px-2 py-2 text-center font-medium">{{ server.user_count }}</td>
-                <td class="px-2 py-2">
-                  <span class="font-medium">{{ server.remaining_traffic }}</span>
-                  <span class="text-sm text-gray-500">GB</span>
+                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                  <div class="flex flex-col">
+                    <span>{{ formatDate(rental.end_date) }}</span>
+                    <span class="text-gray-500">{{ formatTime(rental.end_date) }}</span>
+                  </div>
                 </td>
-                <td class="px-2 py-2 text-sm text-gray-600 dark:text-gray-400">
-                  {{ new Date(server.created_at).toLocaleString() }}
+                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
+                  {{ rental.traffic_usage }}/{{ rental.traffic_limit }}GB
                 </td>
-                <td class="px-2 py-2">
-                  <div class="flex items-center space-x-2">
+                <td class="px-4 py-3">
+                  <div class="flex flex-col space-y-0.5">
+                    <div class="flex items-center space-x-0.5">
+                      <span class="text-xs text-gray-500 dark:text-gray-400 min-w-[42px]">容器:</span>
+                      <span class="text-xs font-medium px-1.5 py-0.5 rounded" :class="{
+                        'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200': rental.container_status === 'running',
+                        'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200': rental.container_status === 'stopped',
+                        'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200': rental.container_status === 'pending'
+                      }">
+                        {{ formatContainerStatus(rental.container_status) }}
+                      </span>
+                    </div>
+                    <div class="flex items-center space-x-0.5">
+                      <span class="text-xs text-gray-500 dark:text-gray-400 min-w-[42px]">服务器:</span>
+                      <span class="text-xs font-medium px-1.5 py-0.5 rounded" :class="{
+                        'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200': rental.server_status === 'running',
+                        'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200': rental.server_status === 'stopped',
+                        'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200': rental.server_status === 'pending'
+                      }">
+                        {{ formatServerStatus(rental.server_status) }}
+                      </span>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-4 py-3">
+                  <span class="text-xs font-medium px-2 py-1 rounded-full" :class="{
+                    'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200': rental.payment_status === 'paid',
+                    'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200': rental.payment_status === 'unpaid',
+                    'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200': rental.payment_status === 'pending'
+                  }">
+                    {{ formatPaymentStatus(rental.payment_status) }}
+                  </span>
+                </td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center space-x-1">
                     <BaseButton
                       :icon="mdiPencil"
                       color="info"
                       small
-                      type="button"
-                      @click="editServer(server)"
-                      title="编辑"
+                      @click="showRenewDialog = true; currentRental = rental"
+                      title="续费"
+                    />
+                    <BaseButton
+                      :icon="mdiHistory"
+                      color="success" 
+                      small
+                      @click="viewHistory(rental.id)"
+                      title="历史记录"
                     />
                     <BaseButton
                       :icon="mdiDelete"
                       color="danger"
                       small
-                      type="button"
-                      @click="deleteServer(server.id)"
+                      @click="deleteRental(rental.id)"
                       title="删除"
                     />
                   </div>
@@ -514,351 +498,144 @@ onMounted(async () => {
         </div>
 
         <!-- 分页控件 -->
-        <div class="mt-4 flex items-center justify-between">
+        <div class="mt-4 flex flex-col md:flex-row justify-between items-center gap-4">
           <div class="text-sm text-gray-700 dark:text-gray-300">
-            显示 {{ (currentPage - 1) * itemsPerPage + 1 }} 到 
-            {{ Math.min(currentPage * itemsPerPage, filteredServers.length) }} 条，
-            共 {{ filteredServers.length }} 条
+            共 {{ filteredRentals.length }} 条记录
           </div>
-          <div class="flex space-x-2">
+          <div class="flex items-center space-x-2">
             <BaseButton
-              @click="currentPage--"
               :disabled="currentPage === 1"
+              @click="currentPage--"
               label="上一页"
+              class="whitespace-nowrap"
+              :class="{ 'opacity-50 cursor-not-allowed': currentPage === 1 }"
             />
-            <span class="px-4 py-2">
+            <span class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
               {{ currentPage }} / {{ totalPages }}
             </span>
             <BaseButton
-              @click="currentPage++"
               :disabled="currentPage >= totalPages"
+              @click="currentPage++"
               label="下一页"
+              class="whitespace-nowrap"
+              :class="{ 'opacity-50 cursor-not-allowed': currentPage >= totalPages }"
             />
           </div>
         </div>
       </CardBox>
-
-      <!-- 添加服务器表单 -->
-      <CardBox class="mb-6">
-        <div class="flex items-center mb-6">
-          <BaseIcon :path="mdiPlus" class="mr-2" />
-          <h3 class="text-lg font-bold">添加服务器</h3>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <!-- 服务器名称 -->
-          <div class="form-group">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              服务器名称 <span class="text-red-500">*</span>
-            </label>
-            <input
-              v-model="serverForm.server_name"
-              type="text"
-              required
-              placeholder="请输入服务器名称"
-              class="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600"
-            >
-          </div>
-
-          <!-- IP地址 -->
-          <div class="form-group">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              IP地址 <span class="text-red-500">*</span>
-            </label>
-            <input
-              v-model="serverForm.ip_address"
-              type="text"
-              required
-              placeholder="请输入服务器IP地址"
-              class="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600"
-            >
-          </div>
-
-          <!-- 服务器分类 -->
-          <div class="form-group">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              服务器分类 <span class="text-red-500">*</span>
-            </label>
-            <select
-              v-model="serverForm.category_id"
-              required
-              class="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600"
-            >
-              <option :value="1">4坑位版</option>
-              <option :value="2">2坑位版</option>
-            </select>
-          </div>
-
-          <!-- 地区选择 -->
-          <div class="form-group">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              地区
-            </label>
-            <select
-              v-model="serverForm.region"
-              class="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600"
-            >
-              <option v-for="region in regions" :key="region" :value="region">
-                {{ region }}
-              </option>
-            </select>
-          </div>
-
-          <!-- CPU配置 -->
-          <div class="form-group">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              CPU核心数
-            </label>
-            <input
-              v-model="serverForm.cpu"
-              type="number"
-              min="1"
-              required
-              class="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600"
-            >
-          </div>
-
-          <!-- 内存配置 -->
-          <div class="form-group">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              内存容量(GB)
-            </label>
-            <input
-              v-model="serverForm.memory"
-              type="number"
-              min="1"
-              required
-              class="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600"
-            >
-          </div>
-
-          <!-- 硬盘配置 -->
-          <div class="form-group">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              硬盘容量(GB)
-            </label>
-            <input
-              v-model="serverForm.storage"
-              type="number"
-              min="1"
-              required
-              class="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600"
-            >
-          </div>
-
-          <!-- 带宽配置 -->
-          <div class="form-group">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              带宽(M)
-            </label>
-            <input
-              v-model="serverForm.bandwidth"
-              type="number"
-              min="1"
-              required
-              class="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-            >
-          </div>
-
-          <!-- 总流量配置 -->
-          <div class="form-group">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              总流量(GB)
-            </label>
-            <input
-              v-model="serverForm.total_traffic"
-              type="number"
-              min="1"
-              required
-              class="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-            >
-          </div>
-        </div>
-
-        <div class="mt-6 flex justify-end">
-          <BaseButton
-            :icon="mdiPlus"
-            color="success"
-            label="添加服务器"
-            @click="addServer"
-            class="w-full md:w-auto"
-          />
-        </div>
-      </CardBox>
-
-      <!-- 添加编辑对话框 -->
-      <BaseDialog
-        :show="showEditDialog"
-        @close="showEditDialog = false"
-        @confirm="updateServer"
-      >
-        <template #title>
-          <div class="flex items-center">
-            <BaseIcon :path="mdiPencil" class="mr-2" />
-            编辑服务器
-          </div>
-        </template>
-        
-        <template #body>
-          <div class="grid grid-cols-2 gap-4">
-            <div class="form-group">
-              <label class="block text-sm font-medium mb-2">服务器名称</label>
-              <input
-                v-model="editServerForm.server_name"
-                type="text"
-                class="w-full px-3 py-2 border rounded-md"
-              />
-            </div>
-            
-            <div class="form-group">
-              <label class="block text-sm font-medium mb-2">IP地址</label>
-              <input
-                v-model="editServerForm.ip_address"
-                type="text"
-                class="w-full px-3 py-2 border rounded-md"
-              />
-            </div>
-
-            <!-- 服务器分类 -->
-            <div class="form-group">
-              <label class="block text-sm font-medium mb-2">服务器分类</label>
-              <select
-                v-model="editServerForm.category_id"
-                class="w-full px-3 py-2 border rounded-md"
-              >
-                <option value="">请选择分类</option>
-                <option v-for="category in categories" 
-                        :key="category.id" 
-                        :value="category.id"
-                >
-                  {{ category.category_name }}
-                </option>
-              </select>
-            </div>
-            
-            <!-- 地区选择 -->
-            <div class="form-group">
-              <label class="block text-sm font-medium mb-2">地区</label>
-              <select
-                v-model="editServerForm.region"
-                class="w-full px-3 py-2 border rounded-md"
-              >
-                <option v-for="region in regions" 
-                        :key="region" 
-                        :value="region"
-                >
-                  {{ region }}
-                </option>
-              </select>
-            </div>
-            
-            <div class="form-group">
-              <label class="block text-sm font-medium mb-2">CPU核心数</label>
-              <input
-                v-model="editServerForm.cpu"
-                type="number"
-                class="w-full px-3 py-2 border rounded-md"
-              />
-            </div>
-            
-            <div class="form-group">
-              <label class="block text-sm font-medium mb-2">内存(GB)</label>
-              <input
-                v-model="editServerForm.memory"
-                type="number"
-                class="w-full px-3 py-2 border rounded-md"
-              />
-            </div>
-            
-            <div class="form-group">
-              <label class="block text-sm font-medium mb-2">硬盘(GB)</label>
-              <input
-                v-model="editServerForm.storage"
-                type="number"
-                class="w-full px-3 py-2 border rounded-md"
-              />
-            </div>
-
-            <!-- 带宽配置 -->
-            <div class="form-group">
-              <label class="block text-sm font-medium mb-2">带宽(M)</label>
-              <input
-                v-model="editServerForm.bandwidth"
-                type="number"
-                min="1"
-                class="w-full px-3 py-2 border rounded-md"
-              />
-            </div>
-            
-            <!-- 用户数量 -->
-            <div class="form-group">
-              <label class="block text-sm font-medium mb-2">用户数量</label>
-              <input
-                v-model="editServerForm.user_count"
-                type="number"
-                min="0"
-                class="w-full px-3 py-2 border rounded-md"
-              />
-            </div>
-            
-            <!-- 总流量配置 -->
-            <div class="form-group">
-              <label class="block text-sm font-medium mb-2">总流量(GB)</label>
-              <input
-                v-model="editServerForm.total_traffic"
-                type="number"
-                min="1"
-                class="w-full px-3 py-2 border rounded-md"
-              />
-            </div>
-          </div>
-        </template>
-        
-        <template #footer>
-          <div class="flex justify-end space-x-2">
-            <BaseButton
-              color="info"
-              label="取消"
-              @click="showEditDialog = false"
-            />
-            <BaseButton
-              color="success"
-              label="保存"
-              @click="updateServer"
-            />
-          </div>
-        </template>
-      </BaseDialog>
     </SectionMain>
   </LayoutAuthenticated>
+
+  <!-- 对话框组件 -->
+  <RentalCreateDialog
+    :show="showCreateDialog"
+    @close="showCreateDialog = false"
+    @create="handleCreate"
+  />
+
+  <RentalRenewDialog
+    :show="showRenewDialog"
+    :rental="currentRental"
+    @close="showRenewDialog = false"
+    @renew="handleRenew"
+  />
+
+  <BaseDialogR
+    :show="showHistoryDialog"
+    @close="showHistoryDialog = false"
+  >
+    <template #header>
+      <div class="text-lg font-bold">租赁历史记录</div>
+    </template>
+    <template #default>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead>
+            <tr>
+              <th class="px-4 py-2">开始日期</th>
+              <th class="px-4 py-2">结束日期</th>
+              <th class="px-4 py-2">状态</th>
+              <th class="px-4 py-2">支付状态</th>
+              <th class="px-4 py-2">流量使用</th>
+              <th class="px-4 py-2">续费次数</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="history in rentalHistory" :key="history.start_date">
+              <td class="px-4 py-2">{{ new Date(history.start_date).toLocaleString() }}</td>
+              <td class="px-4 py-2">{{ new Date(history.end_date).toLocaleString() }}</td>
+              <td class="px-4 py-2">{{ history.status }}</td>
+              <td class="px-4 py-2">{{ history.payment_status }}</td>
+              <td class="px-4 py-2">{{ history.total_traffic }}GB</td>
+              <td class="px-4 py-2">{{ history.renewal_count }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
+  </BaseDialogR>
 </template>
 
 <style scoped>
 .form-group {
-  @apply mb-4;
+  @apply relative;
 }
 
-input[type="number"] {
-  @apply [appearance:textfield];
+.form-input {
+  @apply w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm 
+         focus:ring-2 focus:ring-blue-500 focus:border-blue-500 
+         transition-colors duration-200
+         dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300;
 }
 
-input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button {
-  @apply appearance-none m-0;
+.form-input:disabled {
+  @apply bg-gray-100 cursor-not-allowed
+         dark:bg-gray-700 dark:text-gray-500;
 }
 
-/* 添加一些过渡效果 */
-.cursor-pointer {
-  transition: background-color 0.2s;
+/* 状态标签样式 */
+.status-badge {
+  @apply px-2 py-1 rounded-full text-xs font-medium;
 }
 
-/* 确保表格内容居中对齐 */
-td {
-  text-align: center;
+.status-badge-success {
+  @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200;
 }
 
-/* 让配置信息在单元格内居中 */
-.flex.flex-col {
-  align-items: center;
+.status-badge-error {
+  @apply bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200;
 }
-</style>
+
+.status-badge-warning {
+  @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200;
+}
+
+/* 表格悬停效果 */
+.hover-row {
+  @apply transition-colors duration-150 ease-in-out;
+}
+
+/* 按钮组样式 */
+.button-group {
+  @apply inline-flex rounded-md shadow-sm;
+}
+
+.button-group > :not([hidden]) ~ :not([hidden]) {
+  @apply -ml-px;
+}
+
+/* 响应式优化 */
+@media (max-width: 640px) {
+  .overflow-x-auto {
+    @apply -mx-4;
+  }
+  
+  td, th {
+    @apply whitespace-nowrap px-2;
+  }
+  
+  .button-group {
+    @apply flex-wrap gap-1;
+  }
+}
+</style> 
