@@ -150,6 +150,18 @@ def create_rental():
         if server:
             server.user_count += 1
 
+        # **新增：将容器数据写入 `user_containers` 表**
+        user_container = UserContainer(
+            id=None,
+            user_id=user_id,
+            container_id=container_id,
+            status='active',
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+            expiry_date=serial_number.end_date
+        )
+        db.session.add(user_container)
+
         # 提交事务
         db.session.commit()
 
