@@ -11,37 +11,50 @@ rental_bp = Blueprint('rental', __name__)
 @rental_bp.route('/api/rentals/all', methods=['GET'])
 def get_all_rentals():
     """
-    获取全部租赁关系的数据表，包含指定字段的信息
+    获取全部租赁关系的数据表，包含指定字段的信息，以及序列号字符串和用户名/邮箱
     """
     try:
-        # 查询所有租赁关系
-        rentals = Rental.query.all()
+        # 查询所有租赁关系，并通过 JOIN 查询序列号和用户数据
+        rentals = (
+            db.session.query(
+                Rental,
+                SerialNumber.code.label("serial_code"),
+                User.username.label("username"),
+                User.email.label("email")
+            )
+            .join(SerialNumber, Rental.serial_number_id == SerialNumber.id, isouter=True)
+            .join(User, Rental.user_id == User.id, isouter=True)
+            .all()
+        )
 
         # 序列化数据
         rental_data = [
             {
-                "id": rental.id,
-                "user_id": rental.user_id,
-                "status": rental.status,
-                "start_date": rental.start_date,
-                "end_date": rental.end_date,
-                "expired_at": rental.expired_at,
-                "server_ids": rental.server_ids,
-                "container_ids": rental.container_ids,
-                "traffic_limit": rental.traffic_limit,
-                "traffic_usage": rental.traffic_usage,
-                "traffic_reset_date": rental.traffic_reset_date,
-                "serial_number_id": rental.serial_number_id,
-                "serial_number_expiry": rental.serial_number_expiry,
-                "renewed_at": rental.renewed_at,
-                "renewal_count": rental.renewal_count,
-                "container_status": rental.container_status,
-                "server_status": rental.server_status,
-                "payment_status": rental.payment_status,
-                "payment_date": rental.payment_date,
-                "tenant_id": rental.tenant_id,
-                "created_at": rental.created_at,
-                "updated_at": rental.updated_at
+                "id": rental.Rental.id,
+                "user_id": rental.Rental.user_id,
+                "username": rental.username,
+                "email": rental.email,
+                "status": rental.Rental.status,
+                "start_date": rental.Rental.start_date,
+                "end_date": rental.Rental.end_date,
+                "expired_at": rental.Rental.expired_at,
+                "server_ids": rental.Rental.server_ids,
+                "container_ids": rental.Rental.container_ids,
+                "traffic_limit": rental.Rental.traffic_limit,
+                "traffic_usage": rental.Rental.traffic_usage,
+                "traffic_reset_date": rental.Rental.traffic_reset_date,
+                "serial_number_id": rental.Rental.serial_number_id,
+                "serial_code": rental.serial_code,
+                "serial_number_expiry": rental.Rental.serial_number_expiry,
+                "renewed_at": rental.Rental.renewed_at,
+                "renewal_count": rental.Rental.renewal_count,
+                "container_status": rental.Rental.container_status,
+                "server_status": rental.Rental.server_status,
+                "payment_status": rental.Rental.payment_status,
+                "payment_date": rental.Rental.payment_date,
+                "tenant_id": rental.Rental.tenant_id,
+                "created_at": rental.Rental.created_at,
+                "updated_at": rental.Rental.updated_at
             }
             for rental in rentals
         ]
