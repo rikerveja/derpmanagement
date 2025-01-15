@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch } from 'vue'
-import BaseDialog from '@/components/BaseDialog.vue'
+import BaseDialogR from '@/components/BaseDialogR.vue'
 import BaseButton from '@/components/BaseButton.vue'
 
 const props = defineProps({
@@ -39,10 +39,9 @@ watch(() => props.rental, (newRental) => {
 </script>
 
 <template>
-  <BaseDialog
+  <BaseDialogR
     :show="show"
-    @close="$emit('close')"
-    :max-width="400"
+    @close="handleClose"
   >
     <template #header>
       <div class="text-lg font-bold">续费租赁</div>
@@ -103,7 +102,7 @@ watch(() => props.rental, (newRental) => {
         />
       </div>
     </template>
-  </BaseDialog>
+  </BaseDialogR>
 </template>
 
 <style scoped>
