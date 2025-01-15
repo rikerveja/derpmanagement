@@ -9,12 +9,20 @@ const api = axios.create({
   }
 })
 
-// 请求拦截器 - 添加token
+// 请求拦截器 - 添加token和日志
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  console.log('Request Config:', {
+    url: config.url,
+    method: config.method,
+    headers: config.headers,
+    data: config.data,
+    timestamp: new Date().toISOString(),
+    isOptions: config.method.toLowerCase() === 'options'
+  });
   return config
 })
 
@@ -296,7 +304,10 @@ export default {
   checkRentalExpiry() {
     return api.get('/rental/check_expiry')
   },
-  
+  createRental(data) {
+    return api.post('/rental/create', data);
+  },
+
   sendExpiryNotifications(userId, expiryDate) {
     return api.post('/rental/send_expiry_notifications', { user_id: userId, expiry_date: expiryDate })
   },
@@ -432,5 +443,9 @@ export default {
   getSerials,
   generateSerials,
   deleteSerial,
-  batchDeleteSerials
+  batchDeleteSerials,
+
+  getRentals() {
+    return api.get('/rentals/all');
+  }
 } 
