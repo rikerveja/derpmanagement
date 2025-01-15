@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 from werkzeug.exceptions import BadRequest
 import os
 import subprocess
+from app import db  # 假设 Flask-SQLAlchemy 设置
 
 # 创建 Blueprint
 system_bp = Blueprint('system', __name__)
@@ -72,3 +73,20 @@ def set_server_category():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 # 假设 reset_database 和 backup_database 分别是定义的数据库操作函数
+def reset_database():
+    # 实际的数据库重置逻辑
+    # 示例：删除所有表并重新创建
+    db.session.remove()
+    db.drop_all()
+    db.create_all()
+
+def backup_database():
+    # 使用 mysqldump 进行数据库备份的例子
+    backup_dir = '/backup/directory'
+    filename = f"{backup_dir}/backup_{int(time.time())}.sql"
+    
+    # 使用 subprocess 执行系统命令备份数据库
+    command = f"mysqldump -u root -p your_database_name > {filename}"
+    subprocess.run(command, shell=True, check=True)
+    
+    return filename
