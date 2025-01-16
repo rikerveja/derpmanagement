@@ -325,12 +325,6 @@ def renew_rental():
         if user:
             user.rental_expiry = rental.end_date  # 更新租赁过期时间为最新的结束时间
 
-        # 更新 ACL 配置表中与该用户关联的所有条目
-        user_acls = ACL.query.filter_by(user_id=serial_number.user_id).all()
-        for acl in user_acls:
-            acl.expiry_date = rental.end_date  # 更新 ACL 配置表中的到期时间
-            db.session.add(acl)
-
         # 提交所有更改
         db.session.commit()
 
