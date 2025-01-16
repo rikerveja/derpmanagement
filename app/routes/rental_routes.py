@@ -241,7 +241,7 @@ def renew_rental():
         return jsonify({"success": False, "message": "Missing required data"}), 400
 
     try:
-        # 查找对应的序列号
+        # 查找对应的序列号，序列号必须是已经使用的
         serial_number = SerialNumber.query.filter_by(code=serial_code, status='used').first()
         if not serial_number:
             log_operation(
@@ -251,7 +251,7 @@ def renew_rental():
                 details=f"Invalid serial code: {serial_code}"
             )
             return jsonify({"success": False, "message": "Invalid serial code"}), 404
-        
+
         # 查找用户的租赁记录
         rental = Rental.query.filter_by(user_id=serial_number.user_id, serial_number_id=serial_number.id, status='active').first()
         if not rental:
@@ -263,11 +263,11 @@ def renew_rental():
             )
             return jsonify({"success": False, "message": "No active rental found"}), 404
 
-        # 增加续租天数
+        # 根据续约时长更新租赁结束时间
         rental.end_date += timedelta(days=renewal_period)
         rental.renewal_count += 1
-        
-        # 记录续费信息
+
+        # 创建续约记录并保存
         renewal_record = RenewalRecord(
             user_id=serial_number.user_id,
             serial_number_id=serial_number.id,
@@ -278,9 +278,16 @@ def renew_rental():
         )
         db.session.add(renewal_record)
 
-        # 提交租赁和续费记录更新
+        # 更新租赁记录的到期时间，并同步更新容器的过期时间
+        user_container = UserContainer.query.filter_by(user_id=serial_number.user_id, container_id=rental.container_ids[0]).first()
+        if user_container:
+            user_container.expiry_date = rental.end_date  # 更新容器的过期时间为新的租赁结束时间
+            db.session.commit()
+
+        # 续约成功后提交更新
         db.session.commit()
 
+        # 日志记录
         log_operation(
             user_id=rental.user_id,
             operation="renew_rental",
@@ -299,6 +306,7 @@ def renew_rental():
             details=f"Error renewing rental: {str(e)}"
         )
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
+
 
 # 获取即将到期的租赁
 @rental_bp.route('/api/rental/get_expiring_rentals', methods=['GET'])
