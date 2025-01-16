@@ -227,7 +227,7 @@ def renew_rental():
     用户续费接口
     """
     data = request.json
-    serial_code = data.get('serial_code')  # 获取序列号
+    serial_code = data.get('serial_code')  # 获取续约序列号
     renewal_amount = data.get('renewal_amount')  # 获取续费金额
     renewal_period = data.get('renewal_period')  # 获取续费时长
 
@@ -241,50 +241,96 @@ def renew_rental():
         return jsonify({"success": False, "message": "Missing required data"}), 400
 
     try:
-        # 查找对应的序列号，序列号必须是已经使用的
-        serial_number = SerialNumber.query.filter_by(code=serial_code, status='used').first()
+        # 查找新的序列号，并确保是未使用的
+        serial_number = SerialNumber.query.filter_by(code=serial_code, status='unused').first()
         if not serial_number:
             log_operation(
                 user_id=None,
                 operation="renew_rental",
                 status="failed",
-                details=f"Invalid serial code: {serial_code}"
+                details=f"Invalid or used serial code: {serial_code}"
             )
-            return jsonify({"success": False, "message": "Invalid serial code"}), 404
+            return jsonify({"success": False, "message": "Invalid or used serial code"}), 404
+        
+        # 获取租赁时长，假设序列号前4个字符代表天数（例如：180D -> 180）
+        rental_days = int(serial_code[:3])  # 提取租赁天数（例如 '180D' -> 180）
+        if rental_days <= 0:
+            log_operation(
+                user_id=None,
+                operation="renew_rental",
+                status="failed",
+                details=f"Invalid rental days in serial code: {serial_code}"
+            )
+            return jsonify({"success": False, "message": "Invalid rental days in serial code"}), 400
 
         # 查找用户的租赁记录
-        rental = Rental.query.filter_by(user_id=serial_number.user_id, serial_number_id=serial_number.id, status='active').first()
+        rental = Rental.query.filter_by(user_id=serial_number.user_id, status='active').first()
         if not rental:
             log_operation(
                 user_id=None,
                 operation="renew_rental",
                 status="failed",
-                details=f"No active rental found for serial code: {serial_code}"
+                details=f"No active rental found for user {serial_number.user_id}"
             )
-            return jsonify({"success": False, "message": "No active rental found"}), 404
+            return jsonify({"success": False, "message": "No active rental found for this user"}), 404
 
-        # 根据续约时长更新租赁结束时间
-        rental.end_date += timedelta(days=renewal_period)
+        # 获取原序列号的 `end_date` 作为新的 `start_date`
+        new_start_date = rental.end_date  # 当前租赁的 `end_date` 就是新序列号的 `start_date`
+
+        # 计算新的 `end_date`，即在当前 `end_date` 上加上续约的天数
+        new_end_date = new_start_date + timedelta(days=rental_days)
+
+        # 更新序列号的 `start_date` 和 `end_date`
+        serial_number.status = 'used'
+        serial_number.user_id = rental.user_id
+        serial_number.start_date = new_start_date  # 新的 `start_date` 是当前租赁的结束时间
+        serial_number.end_date = new_end_date  # 新的 `end_date` 是当前租赁结束时间加上续约时长
+        serial_number.used_at = datetime.utcnow()  # 更新使用时间
+
+        # 更新租赁记录的 `end_date`
+        rental.end_date = new_end_date
         rental.renewal_count += 1
 
-        # 创建续约记录并保存
+        # 创建续费记录并保存
         renewal_record = RenewalRecord(
             user_id=serial_number.user_id,
             serial_number_id=serial_number.id,
             renewal_amount=renewal_amount,
-            renewal_period=renewal_period,
+            renewal_period=rental_days,  # 续费时长以序列号为准
             renewal_date=datetime.utcnow(),
             status='success'  # 假设续费成功
         )
         db.session.add(renewal_record)
 
-        # 更新租赁记录的到期时间，并同步更新容器的过期时间
+        # 更新容器的过期时间为新的租赁结束时间
         user_container = UserContainer.query.filter_by(user_id=serial_number.user_id, container_id=rental.container_ids[0]).first()
         if user_container:
             user_container.expiry_date = rental.end_date  # 更新容器的过期时间为新的租赁结束时间
-            db.session.commit()
 
-        # 续约成功后提交更新
+        # 新增：将容器数据写入 `user_containers` 表
+        new_user_container = UserContainer(
+            id=None,
+            user_id=serial_number.user_id,
+            container_id=rental.container_ids[0],  # 假设容器与租赁的关联
+            status='active',
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+            expiry_date=rental.end_date
+        )
+        db.session.add(new_user_container)
+
+        # 新增：更新 User 表的 rental_expiry
+        user = User.query.get(serial_number.user_id)
+        if user:
+            user.rental_expiry = rental.end_date  # 更新租赁过期时间为最新的结束时间
+
+        # 更新 ACL 配置表中与该用户关联的所有条目
+        user_acls = ACL.query.filter_by(user_id=serial_number.user_id).all()
+        for acl in user_acls:
+            acl.expiry_date = rental.end_date  # 更新 ACL 配置表中的到期时间
+            db.session.add(acl)
+
+        # 提交所有更改
         db.session.commit()
 
         # 日志记录
@@ -306,6 +352,7 @@ def renew_rental():
             details=f"Error renewing rental: {str(e)}"
         )
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
+
 
 
 # 获取即将到期的租赁
