@@ -220,7 +220,6 @@ def create_rental():
         )
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
 
-
 @rental_bp.route('/api/rental/renew', methods=['POST'])
 def renew_rental():
     """
@@ -228,15 +227,17 @@ def renew_rental():
     """
     data = request.json
     serial_code = data.get('serial_code')  # 获取续约序列号
+    user_id = data.get('user_id')  # 获取用户ID
     renewal_amount = data.get('renewal_amount')  # 获取续费金额
     renewal_period = data.get('renewal_period')  # 获取续费时长
 
-    if not serial_code or not renewal_amount or not renewal_period:
+    # 检查必填字段
+    if not serial_code or not renewal_amount or not renewal_period or not user_id:
         log_operation(
             user_id=None,
             operation="renew_rental",
             status="failed",
-            details="Missing serial code, renewal amount, or renewal period"
+            details="Missing serial code, user_id, renewal amount, or renewal period"
         )
         return jsonify({"success": False, "message": "Missing required data"}), 400
 
@@ -252,6 +253,16 @@ def renew_rental():
             )
             return jsonify({"success": False, "message": "Invalid or used serial code"}), 404
         
+        # 检查是否传递了正确的 user_id
+        if serial_number.user_id != user_id:
+            log_operation(
+                user_id=None,
+                operation="renew_rental",
+                status="failed",
+                details=f"Serial code {serial_code} does not belong to user {user_id}"
+            )
+            return jsonify({"success": False, "message": "Serial code does not belong to the given user"}), 404
+
         # 获取租赁时长，假设序列号前4个字符代表天数（例如：180D -> 180）
         rental_days = int(serial_code[:3])  # 提取租赁天数（例如 '180D' -> 180）
         if rental_days <= 0:
@@ -264,13 +275,13 @@ def renew_rental():
             return jsonify({"success": False, "message": "Invalid rental days in serial code"}), 400
 
         # 查找用户的租赁记录
-        rental = Rental.query.filter_by(user_id=serial_number.user_id, status='active').first()
+        rental = Rental.query.filter_by(user_id=user_id, status='active').first()
         if not rental:
             log_operation(
                 user_id=None,
                 operation="renew_rental",
                 status="failed",
-                details=f"No active rental found for user {serial_number.user_id}"
+                details=f"No active rental found for user {user_id}"
             )
             return jsonify({"success": False, "message": "No active rental found for this user"}), 404
 
@@ -352,7 +363,6 @@ def renew_rental():
             details=f"Error renewing rental: {str(e)}"
         )
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
-
 
 
 # 获取即将到期的租赁
