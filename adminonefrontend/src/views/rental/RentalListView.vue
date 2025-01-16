@@ -9,17 +9,18 @@ import BaseDialog from '@/components/BaseDialog.vue'
 import BaseDialogR from '@/components/BaseDialogR.vue'
 import { 
   mdiPlus,
-  mdiDelete,
   mdiRefresh,
   mdiPencil,
   mdiHistory,
   mdiBellRing,
   mdiCurrencyUsd,
-  mdiInformation
+  mdiInformation,
+  mdiEye
 } from '@mdi/js'
 import api from '@/services/api'
 import RentalRenewDialog from './RentalRenewDialog.vue'
 import RentalCreateDialog from './RentalCreateDialog.vue'
+import RentalDetailDialog from './RentalDetailDialog.vue'
 
 // 添加 loading 状态
 const loading = ref(false)
@@ -126,6 +127,10 @@ const showHistoryDialog = ref(false)
 
 // 创建租赁对话框控制
 const showCreateDialog = ref(false)
+
+// 添加详情对话框状态
+const showDetail = ref(false)
+const currentRental = ref(null)
 
 // 获取租赁列表
 const fetchRentals = async () => {
@@ -334,6 +339,12 @@ const getUserDisplayName = (rental) => {
   }
   return '未知用户'
 }
+
+// 添加详情对话框
+const showDetailDialog = (rental) => {
+  currentRental.value = rental
+  showDetail.value = true
+}
 </script>
 
 <template>
@@ -512,9 +523,9 @@ const getUserDisplayName = (rental) => {
                 </td>
                 <td class="px-4 py-3">
                   <div class="flex items-center space-x-1">
-              <BaseButton
+                    <BaseButton
                       :icon="mdiPencil"
-                color="info"
+                      color="info"
                       small
                       @click="openRenewDialog(rental)"
                       title="续费"
@@ -522,16 +533,16 @@ const getUserDisplayName = (rental) => {
                     <BaseButton
                       :icon="mdiHistory"
                       color="success" 
-                small
+                      small
                       @click="viewHistory(rental.id)"
                       title="历史记录"
-              />
-              <BaseButton
-                      :icon="mdiDelete"
-                color="danger"
-                small
-                      @click="deleteRental(rental.id)"
-                      title="删除"
+                    />
+                    <BaseButton
+                      :icon="mdiEye"
+                      color="info"
+                      small
+                      @click="showDetailDialog(rental)"
+                      title="查看详情"
                     />
                   </div>
                 </td>
@@ -618,6 +629,13 @@ const getUserDisplayName = (rental) => {
       </div>
     </template>
   </BaseDialogR>
+
+  <!-- 添加详情对话框 -->
+  <RentalDetailDialog
+    :show="showDetail"
+    :rental="currentRental"
+    @close="showDetail = false"
+  />
 </template> 
 
 <style scoped>
