@@ -162,6 +162,12 @@ def create_rental():
         )
         db.session.add(user_container)
 
+        # 新增：更新 User 表的 rental_expiry
+        user = User.query.get(user_id)
+        if user:
+            user.rental_expiry = serial_number.end_date  # 更新租赁过期时间为序列号的结束时间
+            db.session.commit()  # 提交 User 表的更新
+
         # 提交事务
         db.session.commit()
 
@@ -183,6 +189,7 @@ def create_rental():
             details=f"Error creating rental: {str(e)}"
         )
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
+
 
 
 @rental_bp.route('/api/rental/renew', methods=['POST'])
