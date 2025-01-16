@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from app.models import SerialNumber, UserContainer, UserHistory, Rental, DockerContainer, UserTraffic, Server, User, Alert, Traffic
+from app.models import SerialNumber, UserContainer, UserHistory, Rental, DockerContainer, UserTraffic, Server, User, Traffic
 from app import db
 from datetime import datetime, timedelta
 import logging
