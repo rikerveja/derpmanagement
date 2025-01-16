@@ -10,17 +10,18 @@
         <BaseButton
           :icon="mdiContentCopy"
           :color="copySuccess ? 'success' : 'info'"
+          :label="copySuccess ? '已复制' : '复制'"
           small
           @click="copyToClipboard"
-          :label="copySuccess ? '已复制' : '复制'"
-          class="ml-4"
+          :class="{ 'copy-success': copySuccess }"
+          :disabled="copySuccess"
         />
       </div>
     </template>
     
     <template #body>
       <div class="max-h-[60vh] overflow-y-auto">
-        <pre class="bg-gray-50 p-4 rounded-lg text-sm font-mono whitespace-pre-wrap">{{ content }}</pre>
+        <pre ref="contentRef" class="bg-gray-50 p-4 rounded-lg text-sm font-mono whitespace-pre-wrap">{{ content }}</pre>
       </div>
     </template>
     
@@ -28,6 +29,7 @@
       <div class="flex justify-end">
         <BaseButton
           label="关闭"
+          color="info"
           @click="$emit('close')"
         />
       </div>
@@ -43,22 +45,48 @@ import { mdiContentCopy } from '@mdi/js'
 
 const props = defineProps({
   show: Boolean,
-  content: String
+  content: {
+    type: String,
+    required: true
+  }
 })
 
 const emit = defineEmits(['close'])
 const copySuccess = ref(false)
+const contentRef = ref(null)
 
 const copyToClipboard = async () => {
+  if (!props.content) return
+  
   try {
+    // 使用现代 Clipboard API
     await navigator.clipboard.writeText(props.content)
+    
+    // 复制成功处理
     copySuccess.value = true
     setTimeout(() => {
       copySuccess.value = false
     }, 2000)
-  } catch (error) {
-    console.error('复制失败:', error)
-    alert('复制失败: ' + error.message)
+  } catch (err) {
+    // 如果 Clipboard API 失败，尝试备用方案
+    try {
+      // 创建临时文本区域
+      const textArea = document.createElement('textarea')
+      textArea.value = props.content
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      
+      // 复制成功处理
+      copySuccess.value = true
+      setTimeout(() => {
+        copySuccess.value = false
+      }, 2000)
+    } catch (error) {
+      console.error('复制失败:', error)
+      alert('复制失败，请手动复制')
+    }
   }
 }
 </script>
@@ -67,13 +95,33 @@ const copyToClipboard = async () => {
 pre {
   max-width: 100%;
   overflow-x: auto;
-}
-
-.copy-button {
-  transition: all 0.2s;
+  tab-size: 4;
 }
 
 .copy-success {
-  @apply bg-green-500 text-white;
+  @apply bg-green-500 text-white cursor-not-allowed opacity-75;
+}
+
+/* 添加过渡效果 */
+.copy-button {
+  transition: all 0.2s ease-in-out;
+}
+
+/* 美化滚动条 */
+.overflow-y-auto {
+  scrollbar-width: thin;
+  scrollbar-color: theme('colors.gray.400') theme('colors.gray.100');
+}
+
+.overflow-y-auto::-webkit-scrollbar {
+  width: 6px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  @apply bg-gray-100 rounded;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  @apply bg-gray-400 rounded hover:bg-gray-500;
 }
 </style> 
