@@ -89,6 +89,10 @@ def create_app(config_class=Config):
     from app.routes.security_routes import security_bp  # 新增：安全与设备绑定模块
     from app.utils.user_history import user_history_bp  # 从 utils 导入 user_history 蓝图
 
+    # 新增：注册 system_bp 蓝图
+    from app.routes.system import system_bp  # 导入 system_bp 蓝图
+    app.register_blueprint(system_bp, url_prefix='')  # 注册 system_bp 蓝图
+
     # 蓝图注册到 Flask 应用
     app.register_blueprint(user_bp, url_prefix='')
     app.register_blueprint(server_bp, url_prefix='')
@@ -126,4 +130,3 @@ def get_api_urls():
                 'methods': methods           # 路由支持的 HTTP 方法
             })
     return jsonify(api_urls)
-
