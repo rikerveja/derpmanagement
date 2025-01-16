@@ -278,8 +278,14 @@ const createAclConfig = async () => {
   }
 }
 
-// 重置表单和状态
+// 添加重置函数
 const resetForm = () => {
+  // 重置选中的数据
+  selectedSerial.value = null
+  selectedUser.value = null
+  selectedServer.value = null
+  selectedContainer.value = null
+  
   // 重置表单数据
   rentalForm.value = {
     serial_code: '',
@@ -287,46 +293,98 @@ const resetForm = () => {
     traffic_limit: 0,
     server_id: null,
     container_id: null,
-    acl_id: null,
+    acl_id: null,  // 确保清除 ACL ID
     container_config: {
       bandwidth_limit: 100
     }
   }
   
-  // 重置选中状态
-  selectedSerial.value = null
-  selectedServer.value = null
-  selectedContainer.value = null
-  
-  // 清空列表数据
+  // 重置列表数据
   containerList.value = []
+  serialList.value = []  // 清空序列号列表
+  userList.value = []    // 清空用户列表
+  serverList.value = []  // 清空服务器列表
+  aclList.value = []     // 清空 ACL 列表
   
-  // 重置错误状态
-  errors.value = {}
-  serialSearchQuery.value = ''  // 重置搜索框
-  showSerialDropdown.value = false  // 关闭下拉列表
+  // 重置 ACL 相关数据
+  aclContent.value = null  // 清空 ACL 内容
+  
+  // 重置错误信息
+  errors.value = {
+    serial: '',
+    user: '',
+    server: '',
+    container: '',
+    acl: '',
+    create: ''
+  }
+
+  // 重置搜索和显示状态
+  searchQueries.value = {
+    serial: '',
+    user: '',
+    server: ''
+  }
+  
+  dropdownStates.value = {
+    serial: false,
+    user: false,
+    server: false
+  }
+
+  // 重置其他状态
+  loading.value = {
+    serials: false,
+    users: false,
+    servers: false,
+    containers: false,
+    acl: false,
+    create: false
+  }
 }
 
-// 处理关闭
+// 修改关闭处理函数
 const handleClose = () => {
-  resetForm()
+  resetForm() // 添加重置
   emit('close')
+}
+
+// 修改创建成功的处理
+const handleCreate = async () => {
+  if (!isAllSelected.value || loading.value.create) return
+  
+  try {
+    loading.value.create = true
+    const response = await api.createRental(rentalForm.value)
+    
+    if (response.success) {
+      emit('create', response.rental)
+      resetForm() // 先重置所有数据
+      handleClose()
+    } else {
+      throw new Error(response.message || '创建失败')
+    }
+  } catch (error) {
+    console.error('创建租赁失败:', error)
+    alert('创建租赁失败: ' + error.message)
+  } finally {
+    loading.value.create = false
+  }
 }
 
 // 监听对话框显示状态
 watch(() => props.show, async (newVal) => {
   if (newVal) {
-    // 使用 nextTick 避免递归更新
-    await nextTick()
-    try {
-      // 分开加载数据，避免同时触发多个更新
-      await fetchSerials()
-      await fetchUsers()
-    } catch (error) {
-      console.error('初始化数据失败:', error)
-    }
+    // 先重置所有数据
+    resetForm()
+    // 然后重新获取所有数据
+    await Promise.all([
+      fetchSerials(),
+      fetchUsers(),
+      fetchServers(),
+      fetchAcl()
+    ])
   } else {
-    // 关闭时重置
     resetForm()
   }
 })
@@ -362,32 +420,6 @@ const handleUserSelect = (user) => {
 
 // 创建一个提交锁
 const submitLock = ref(false);
-
-// 创建租赁
-const handleCreate = async () => {
-  if (!isAllSelected.value || loading.value.create) return
-  
-  try {
-    loading.value.create = true
-    console.log('准备创建租赁，数据:', rentalForm.value) // 添加日志
-    
-    const response = await api.createRental(rentalForm.value)
-    console.log('创建租赁响应:', response) // 添加日志
-    
-    if (response.success) {
-      // 修改这里：确保发送正确的数据
-      emit('create', response.rental) // 确保 response.rental 包含新创建的租赁数据
-      handleClose()
-    } else {
-      throw new Error(response.message || '创建失败')
-    }
-  } catch (error) {
-    console.error('创建租赁失败:', error)
-    alert('创建租赁失败: ' + error.message)
-  } finally {
-    loading.value.create = false
-  }
-}
 
 // 添加错误显示计算属性
 const showError = computed(() => {
