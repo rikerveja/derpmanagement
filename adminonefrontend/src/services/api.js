@@ -184,7 +184,75 @@ const getServerContainers = (serverId) => {
   })
 }
 
+// 仪表盘相关 API
+const dashboardApi = {
+  // 获取系统概览
+  getSystemOverview() {
+    return api.get('/system/overview')
+  },
+
+  // 获取所有用户
+  getAllUsers() {
+    return api.get('/users')
+  },
+
+  // 获取所有服务器
+  getServers() {
+    return api.get('/get_servers')
+  },
+
+  // 获取所有容器
+  getContainers() {
+    return api.get('/containers')
+  },
+
+  // 获取实时流量
+  getRealTimeTraffic() {
+    return api.get('/traffic/realtime')
+  },
+
+  // 获取告警信息
+  getAlerts() {
+    return api.get('/alerts')
+  },
+
+  // 获取租赁信息
+  getRentals() {
+    return api.get('/rentals/all')
+      .then(response => {
+        console.log('API getRentals response:', response)
+        if (response.data) {
+          // 确保每个租赁对象都包含用户信息
+          const rentals = response.data.rentals || response.data
+          return {
+            success: true,
+            rentals: rentals.map(rental => ({
+              ...rental,
+              // 确保用户信息存在
+              user_info: rental.user_info || {
+                email: rental.user_email || rental.email,
+                username: rental.username
+              }
+            })),
+            message: response.data.message || '获取成功'
+          }
+        }
+        return response
+      })
+      .catch(error => {
+        console.error('API getRentals error:', error)
+        throw error
+      })
+  },
+
+  // 获取收入统计
+  getIncomeStats() {
+    return api.get('/income/stats')
+  }
+}
+
 export default {
+  ...dashboardApi,
   // 用户相关 API
   login(email, password) {
     return api.post('/login', { email, password })
@@ -444,10 +512,6 @@ export default {
   generateSerials,
   deleteSerial,
   batchDeleteSerials,
-
-  getRentals() {
-    return api.get('/rentals/all');
-  },
 
   sendVerificationCode(email) {
     return api.post('/send_verification_code', { email })
