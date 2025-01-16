@@ -202,7 +202,7 @@ def delete_serial_numbers():
         return jsonify({"success": False, "message": f"Error deleting serial numbers: {str(e)}"}), 500
 
 
-# 显示所有序列号列表
+# 显示所有序列号列表 
 @serial_bp.route('/api/serials', methods=['GET'])
 def get_serials():
     """
@@ -223,6 +223,7 @@ def get_serials():
             serial_list.append({
                 "serial_code": serial.code,
                 "status": serial.status,
+                "user_id": serial.user_id,  # 添加 user_id
                 "valid_days": serial.valid_days,  # 使用 valid_days
                 "created_at": serial.created_at.isoformat(),
                 "expires_at": serial.expires_at.isoformat() if serial.expires_at else None,
@@ -234,4 +235,3 @@ def get_serials():
     except Exception as e:
         logging.error(f"Error fetching serial numbers: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching serial numbers: {str(e)}"}), 500
-
