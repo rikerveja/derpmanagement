@@ -191,7 +191,7 @@ export default {
   },
   
   addUser(userData) {
-    return api.post('/add_user', userData)
+    return api.post('/api/add_user', userData)
   },
   
   sendVerificationEmail(email) {
@@ -447,5 +447,9 @@ export default {
 
   getRentals() {
     return api.get('/rentals/all');
+  },
+
+  sendVerificationCode(email) {
+    return api.post('/send_verification_code', { email })
   }
 } 
