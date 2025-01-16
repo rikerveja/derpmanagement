@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from app.models import User, Server, Container, Rental, Alert, Traffic
+from app.models import SerialNumber, UserContainer, UserHistory, Rental, DockerContainer, UserTraffic, Server, User, Alert, Traffic
 from app import db
 from datetime import datetime, timedelta
 import logging
@@ -27,14 +27,14 @@ def get_system_overview():
         error_servers = len([s for s in servers if s.status == 'error'])
 
         # 获取容器统计
-        containers = Container.query.all()
+        containers = DockerContainer.query.all()  # 更新为新的容器数据表
         total_containers = len(containers)
         running_containers = len([c for c in containers if c.status == 'running'])
         stopped_containers = len([c for c in containers if c.status == 'stopped'])
         error_containers = len([c for c in containers if c.status == 'error'])
 
         # 获取流量统计
-        traffic = Traffic.query.first()  # 假设有一个总流量记录
+        traffic = UserTraffic.query.first()  # 更新为新的流量数据表
         traffic_stats = {
             'used': traffic.used_traffic if traffic else 0,
             'total': traffic.total_traffic if traffic else 0
