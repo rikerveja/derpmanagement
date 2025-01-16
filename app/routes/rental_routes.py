@@ -70,7 +70,6 @@ def get_all_rentals():
         )
         return jsonify({"success": False, "message": f"Error retrieving rentals: {str(e)}"}), 500
 
-
 @rental_bp.route('/api/rental/create', methods=['POST'])
 def create_rental():
     """
@@ -105,11 +104,22 @@ def create_rental():
             )
             return jsonify({"success": False, "message": "Invalid or used serial code"}), 404
 
+        # 从序列号的前四位提取天数（例如 '180D' -> 180）
+        rental_days = int(serial_code[:3])  # 假设序列号的前4位表示租赁天数
+        if rental_days <= 0:
+            log_operation(
+                user_id=None,
+                operation="create_rental",
+                status="failed",
+                details=f"Invalid rental days in serial code: {serial_code}"
+            )
+            return jsonify({"success": False, "message": "Invalid rental days in serial code"}), 400
+
         # 激活序列号并更新状态
         serial_number.status = 'used'
         serial_number.user_id = user_id
         serial_number.start_date = datetime.utcnow()
-        serial_number.end_date = datetime.utcnow() + timedelta(days=serial_number.valid_days)
+        serial_number.end_date = datetime.utcnow() + timedelta(days=rental_days)  # 根据序列号的天数设置结束日期
         serial_number.used_at = datetime.utcnow()  # 更新使用时间
         
         # 创建租赁记录
@@ -189,7 +199,6 @@ def create_rental():
             details=f"Error creating rental: {str(e)}"
         )
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
-
 
 
 @rental_bp.route('/api/rental/renew', methods=['POST'])
