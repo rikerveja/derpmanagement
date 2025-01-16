@@ -116,9 +116,9 @@ const handleSort = (key) => {
   }
 }
 
-// 续费对话框控制
+// 续费对话框状态
 const showRenewDialog = ref(false)
-const currentRental = ref(null)
+const selectedRental = ref(null)
 
 // 历史记录数据
 const rentalHistory = ref([])
@@ -201,9 +201,20 @@ const checkExpiry = async () => {
   }
 };
 
+// 处理续费结果
+const handleRenewComplete = async (result) => {
+  showRenewDialog.value = false
+  selectedRental.value = null
+  
+  if (result.refresh) {
+    // 刷新租赁列表
+    await fetchRentals()
+  }
+}
+
 // 打开续费对话框
 const openRenewDialog = (rental) => {
-  currentRental.value = rental
+  selectedRental.value = rental
   showRenewDialog.value = true
 }
 
@@ -501,24 +512,24 @@ const getUserDisplayName = (rental) => {
                 </td>
                 <td class="px-4 py-3">
                   <div class="flex items-center space-x-1">
-                    <BaseButton
+              <BaseButton
                       :icon="mdiPencil"
-                      color="info"
+                color="info"
                       small
-                      @click="showRenewDialog = true; currentRental = rental"
+                      @click="openRenewDialog(rental)"
                       title="续费"
                     />
                     <BaseButton
                       :icon="mdiHistory"
                       color="success" 
-                      small
+                small
                       @click="viewHistory(rental.id)"
                       title="历史记录"
-                    />
-                    <BaseButton
+              />
+              <BaseButton
                       :icon="mdiDelete"
-                      color="danger"
-                      small
+                color="danger"
+                small
                       @click="deleteRental(rental.id)"
                       title="删除"
                     />
@@ -566,10 +577,11 @@ const getUserDisplayName = (rental) => {
   />
 
   <RentalRenewDialog
+    v-if="showRenewDialog"
     :show="showRenewDialog"
-    :rental="currentRental"
+    :rental="selectedRental"
     @close="showRenewDialog = false"
-    @renew="handleRenew"
+    @renew="handleRenewComplete"
   />
 
   <BaseDialogR
@@ -606,7 +618,7 @@ const getUserDisplayName = (rental) => {
       </div>
     </template>
   </BaseDialogR>
-</template>
+</template> 
 
 <style scoped>
 .form-group {
