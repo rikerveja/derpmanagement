@@ -91,7 +91,7 @@ def create_app(config_class=Config):
 
     # 新增：注册 system_bp 蓝图
     from app.routes.system import system_bp  # 导入 system_bp 蓝图
-    app.register_blueprint(system_bp, url_prefix='')  # 注册 system_bp 蓝图
+    app.register_blueprint(system_bp, url_prefix='/api')  # 注册 system_bp 蓝图，设置 url_prefix 为 /api
 
     # 蓝图注册到 Flask 应用
     app.register_blueprint(user_bp, url_prefix='')
