@@ -48,10 +48,16 @@ const filteredRentals = computed(() => {
   // 搜索过滤
   if (searchQuery.value.keyword) {
     const keyword = searchQuery.value.keyword.toLowerCase()
-    result = result.filter(rental => 
-      rental.serial_code.toLowerCase().includes(keyword) ||
-      rental.user_info.toLowerCase().includes(keyword)
-    )
+    result = result.filter(rental => {
+      // 检查序列号
+      const serialMatch = rental.serial_code?.toLowerCase().includes(keyword)
+      
+      // 检查用户信息 - 使用 getUserDisplayName 函数
+      const userInfo = getUserDisplayName(rental).toLowerCase()
+      const userMatch = userInfo.includes(keyword)
+      
+      return serialMatch || userMatch
+    })
   }
 
   // 状态过滤
@@ -70,7 +76,8 @@ const filteredRentals = computed(() => {
         compareResult = a.serial_code.localeCompare(b.serial_code)
         break
       case 'user_info':
-        compareResult = a.user_info.localeCompare(b.user_info)
+        // 使用 getUserDisplayName 函数进行排序
+        compareResult = getUserDisplayName(a).localeCompare(getUserDisplayName(b))
         break
       case 'start_date':
         compareResult = new Date(a.start_date) - new Date(b.start_date)
