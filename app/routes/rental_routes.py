@@ -179,14 +179,12 @@ def create_rental():
             db.session.commit()  # 提交 User 表的更新
 
         # 新增：检查并插入 user_server_association 关系表（避免重复）
-        existing_association = db.session.query(UserServerAssociation).filter_by(user_id=user_id, server_id=server_id).first()
+        existing_association = db.session.query(user_server_association).filter_by(user_id=user_id, server_id=server_id).first()
         if not existing_association:
             # 如果没有找到相同的记录，插入新记录
-            user_server_association = UserServerAssociation(
-                user_id=user_id,
-                server_id=server_id
+            db.session.execute(
+                user_server_association.insert().values(user_id=user_id, server_id=server_id)
             )
-            db.session.add(user_server_association)
 
         # 提交事务
         db.session.commit()
