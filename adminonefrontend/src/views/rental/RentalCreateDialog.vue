@@ -346,50 +346,31 @@ const handleUserSelect = (user) => {
 // 创建一个提交锁
 const submitLock = ref(false);
 
-const handleCreate = async (e) => {
-  e?.preventDefault();  // 阻止事件冒泡，如果事件存在的话
+// 创建租赁
+const handleCreate = async () => {
+  if (!isAllSelected.value || loading.value.create) return
   
-  if (submitLock.value || !isAllSelected.value || loading.value.create) {
-    console.log('提交被锁定或条件不满足，退出');
-    return;
-  }
-
   try {
-    submitLock.value = true;
-    loading.value.create = true;
-    console.log('开始创建租赁...', new Date().toISOString());
-
-    const submitData = {
-      serial_code: selectedSerial.value.serial_code,
-      user_id: Number(selectedUser.value.id),
-      server_id: Number(selectedServer.value.id),
-      container_id: Number(selectedContainer.value.id),
-      traffic_limit: Number(rentalForm.value.traffic_limit),
-      container_config: {
-        bandwidth_limit: 100
-      }
-    };
-
-    console.log('准备提交数据:', JSON.stringify(submitData, null, 2));
-    const response = await api.createRental(submitData);
+    loading.value.create = true
+    console.log('准备创建租赁，数据:', rentalForm.value) // 添加日志
+    
+    const response = await api.createRental(rentalForm.value)
+    console.log('创建租赁响应:', response) // 添加日志
     
     if (response.success) {
-      emit('create', response.data);
-      emit('close');
+      // 修改这里：确保发送正确的数据
+      emit('create', response.rental) // 确保 response.rental 包含新创建的租赁数据
+      handleClose()
     } else {
-      throw new Error(response.message || '创建失败');
+      throw new Error(response.message || '创建失败')
     }
   } catch (error) {
-    console.error('创建租赁失败:', error);
-    errors.value.create = error.message || '创建租赁失败';
+    console.error('创建租赁失败:', error)
+    alert('创建租赁失败: ' + error.message)
   } finally {
-    loading.value.create = false;
-    // 设置一个短暂的延时后才解锁，防止快速重复点击
-    setTimeout(() => {
-      submitLock.value = false;
-    }, 1000);
+    loading.value.create = false
   }
-};
+}
 
 // 添加错误显示计算属性
 const showError = computed(() => {

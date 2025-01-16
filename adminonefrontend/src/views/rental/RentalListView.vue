@@ -123,34 +123,33 @@ const showCreateDialog = ref(false)
 // 获取租赁列表
 const fetchRentals = async () => {
   try {
-    loading.value = true;
-    const response = await api.getRentals();
-    if (response.success) {
-      rentals.value = response.data.map(rental => ({
-        id: rental.id,
-        user_id: rental.user_id,
-        user_info: `${rental.username || '未知用户'}(${rental.email || '无邮箱'})`,
-        serial_code: rental.serial_code,
-        status: rental.status,
-        start_date: rental.start_date,
-        end_date: rental.end_date,
-        expired_at: rental.expired_at,
-        traffic_usage: rental.traffic_usage,
-        traffic_limit: rental.traffic_limit,
-        traffic_reset_date: rental.traffic_reset_date,
-        renewal_count: rental.renewal_count,
-        container_status: rental.container_status,
-        server_status: rental.server_status,
-        payment_status: rental.payment_status,
-        payment_date: rental.payment_date
-      }));
+    loading.value = true
+    console.log('开始获取租赁列表...')
+    
+    const response = await api.getRentals()
+    console.log('获取租赁列表响应:', response)
+    
+    if (response.success && Array.isArray(response.rentals)) {
+      // 处理每个租赁对象，确保包含必要的用户信息
+      rentals.value = response.rentals.map(rental => ({
+        ...rental,
+        user_info: rental.user_info || {
+          email: rental.user_email || rental.email,
+          username: rental.username
+        }
+      }))
+      console.log('更新租赁列表成功，数量:', rentals.value.length)
+    } else {
+      console.warn('响应格式不正确:', response)
+      throw new Error('获取租赁列表失败：数据格式不正确')
     }
   } catch (error) {
-    console.error('获取租赁列表失败:', error);
+    console.error('获取租赁列表失败:', error)
+    alert('获取租赁列表失败: ' + error.message)
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
 // 删除租赁
 const deleteRental = async (serialId) => {
@@ -230,9 +229,17 @@ const handleRenew = async (renewalData) => {
   }
 }
 
+// 处理租赁创建成功
+const handleRentalCreated = async () => {
+  console.log('租赁创建成功，准备刷新列表...') // 添加日志
+  showCreateDialog.value = false
+  await fetchRentals() // 确保等待刷新完成
+  console.log('租赁列表刷新完成') // 添加日志
+}
+
 // 初始化
-onMounted(async () => {
-  await fetchRentals()
+onMounted(() => {
+  fetchRentals()
 })
 
 const formatStatus = (status) => {
@@ -290,6 +297,24 @@ const formatTime = (dateString) => {
     minute: '2-digit',
     hour12: false
   })
+}
+
+// 添加用户显示名称的处理函数
+const getUserDisplayName = (rental) => {
+  // 兼容多种可能的数据结构
+  if (rental.user_info) {
+    return rental.user_info.email || rental.user_info.username || '未知用户'
+  }
+  if (rental.user) {
+    return rental.user.email || rental.user.username || '未知用户'
+  }
+  if (rental.user_email) {
+    return rental.user_email
+  }
+  if (rental.username) {
+    return rental.username
+  }
+  return '未知用户'
 }
 </script>
 
@@ -403,7 +428,7 @@ const formatTime = (dateString) => {
                 <td class="px-4 py-3">
                   <div class="flex flex-col">
                     <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {{ rental.user_info }}
+                      {{ getUserDisplayName(rental) }}
                     </span>
                     <span class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
                       序列号: {{ rental.serial_code }}
@@ -530,7 +555,7 @@ const formatTime = (dateString) => {
   <RentalCreateDialog
     :show="showCreateDialog"
     @close="showCreateDialog = false"
-    @create="handleCreate"
+    @create="handleRentalCreated"
   />
 
   <RentalRenewDialog
