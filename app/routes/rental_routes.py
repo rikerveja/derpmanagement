@@ -70,7 +70,7 @@ def get_all_rentals():
         )
         return jsonify({"success": False, "message": f"Error retrieving rentals: {str(e)}"}), 500
 
-@rental_bp.route('/api/rental/create', methods=['POST'])
+@rental_bp.route('/api/rental/create', methods=['POST']) 
 def create_rental():
     """
     创建租赁关系，激活序列号并为用户分配服务器、容器、ACL配置等资源
@@ -93,6 +93,18 @@ def create_rental():
         return jsonify({"success": False, "message": "Missing required fields"}), 400
 
     try:
+        # 查找该用户是否已经有有效的租赁记录
+        existing_rental = Rental.query.filter_by(user_id=user_id, status='active').first()
+        if existing_rental:
+            # 如果用户已有租赁记录，则不能选择服务器和容器，返回错误信息
+            log_operation(
+                user_id=user_id,
+                operation="create_rental",
+                status="failed",
+                details=f"User {user_id} already has an active rental, cannot proceed with server and container selection."
+            )
+            return jsonify({"success": False, "message": "User already has an active rental. Cannot proceed with server and container selection."}), 400
+
         # 查找对应的序列号
         serial_number = SerialNumber.query.filter_by(code=serial_code, status='unused').first()
         if not serial_number:
