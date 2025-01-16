@@ -50,12 +50,27 @@ const routes = [
   },
   {
     path: '/users',
-    name: 'users.list',
-    component: () => import('@/views/users/UserListView.vue'),
-    meta: { 
-      requiresAuth: true,
-      layout: 'authenticated'
-    }
+    children: [
+      {
+        path: '',  // 用户列表
+        name: 'users.list',
+        component: () => import('@/views/users/UserListView.vue'),
+        meta: { 
+          requiresAuth: true,
+          layout: 'authenticated'
+        }
+      },
+      {
+        path: 'add',  // 添加用户
+        name: 'users.add',
+        component: () => import('@/views/users/UserAddView.vue'),
+        meta: { 
+          requiresAuth: true,
+          layout: 'authenticated',
+          title: '添加用户'
+        }
+      }
+    ]
   },
   {
     path: '/containers',
@@ -132,6 +147,44 @@ const routes = [
         meta: {
           requiresAuth: true,
           layout: 'authenticated'
+        }
+      }
+    ]
+  },
+  {
+    path: '/traffic',
+    component: () => import('@/views/traffic/TrafficLayout.vue'),
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        redirect: '/traffic/realtime'
+      },
+      {
+        path: 'realtime',
+        name: 'traffic.realtime',
+        component: () => import('@/views/traffic/TrafficRealtimeView.vue'),
+        meta: { 
+          requiresAuth: true,
+          title: '实时监控'
+        }
+      },
+      {
+        path: 'history',
+        name: 'traffic.history',
+        component: () => import('@/views/traffic/TrafficHistoryView.vue'),
+        meta: { 
+          requiresAuth: true,
+          title: '历史记录'
+        }
+      },
+      {
+        path: 'stats',
+        name: 'traffic.stats',
+        component: () => import('@/views/traffic/TrafficStatsView.vue'),
+        meta: { 
+          requiresAuth: true,
+          title: '统计分析'
         }
       }
     ]
