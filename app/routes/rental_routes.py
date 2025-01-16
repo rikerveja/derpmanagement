@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify 
-from app.models import SerialNumber, UserContainer, UserHistory, Rental, DockerContainer, UserTraffic, Server, User
+from app.models import SerialNumber, UserContainer, UserHistory, Rental, DockerContainer, UserTraffic, Server, User, 
 from app.utils.email_utils import send_verification_email
 from app.utils.logging_utils import log_operation
 from app import db
@@ -177,6 +177,16 @@ def create_rental():
         if user:
             user.rental_expiry = serial_number.end_date  # 更新租赁过期时间为序列号的结束时间
             db.session.commit()  # 提交 User 表的更新
+
+        # 新增：检查并插入 user_server_association 关系表（避免重复）
+        existing_association = db.session.query(UserServerAssociation).filter_by(user_id=user_id, server_id=server_id).first()
+        if not existing_association:
+            # 如果没有找到相同的记录，插入新记录
+            user_server_association = UserServerAssociation(
+                user_id=user_id,
+                server_id=server_id
+            )
+            db.session.add(user_server_association)
 
         # 提交事务
         db.session.commit()
