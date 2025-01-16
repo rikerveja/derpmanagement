@@ -252,16 +252,6 @@ def renew_rental():
                 details=f"Invalid or used serial code: {serial_code}"
             )
             return jsonify({"success": False, "message": "Invalid or used serial code"}), 404
-        
-        # 检查是否传递了正确的 user_id
-        if serial_number.user_id != user_id:
-            log_operation(
-                user_id=None,
-                operation="renew_rental",
-                status="failed",
-                details=f"Serial code {serial_code} does not belong to user {user_id}"
-            )
-            return jsonify({"success": False, "message": "Serial code does not belong to the given user"}), 404
 
         # 获取租赁时长，假设序列号前4个字符代表天数（例如：180D -> 180）
         rental_days = int(serial_code[:3])  # 提取租赁天数（例如 '180D' -> 180）
@@ -274,7 +264,7 @@ def renew_rental():
             )
             return jsonify({"success": False, "message": "Invalid rental days in serial code"}), 400
 
-        # 查找用户的租赁记录
+        # 查找用户的租赁记录，不再验证serial_code是否属于此用户
         rental = Rental.query.filter_by(user_id=user_id, status='active').first()
         if not rental:
             log_operation(
