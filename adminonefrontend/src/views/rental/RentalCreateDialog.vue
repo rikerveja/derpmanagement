@@ -11,6 +11,10 @@ const props = defineProps({
   show: {
     type: Boolean,
     required: true
+  },
+  disabled: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -76,34 +80,39 @@ const fetchSerials = async () => {
 const fetchUsers = async () => {
   try {
     loading.value.users = true
+    
+    // 1. 首先获取所有租赁信息来确定已有租赁的用户
+    const rentalsResponse = await api.getRentals()
+    if (rentalsResponse.success && Array.isArray(rentalsResponse.rentals)) {
+      existingUserIds.value = rentalsResponse.rentals
+        .filter(rental => rental.status === 'active') // 只过滤活跃的租赁
+        .map(rental => rental.user_id)
+    }
+    
+    // 2. 获取用户列表
     const response = await api.getAllUsers()
     console.log('获取到的用户数据:', response)
     
-    if (response && Array.isArray(response)) {  // 直接是数组
-      userList.value = response.map(user => ({
-        id: user.id,
-        value: user.id,
-        username: user.username,
-        email: user.email,
-        label: `${user.username} (${user.email})`
-      }))
-    } else if (response && Array.isArray(response.users)) {  // 在 users 字段中
-      userList.value = response.users.map(user => ({
-        id: user.id,
-        value: user.id,
-        username: user.username,
-        email: user.email,
-        label: `${user.username} (${user.email})`
-      }))
-    } else if (response && Array.isArray(response.data)) {  // 在 data 字段中
-      userList.value = response.data.map(user => ({
-        id: user.id,
-        value: user.id,
-        username: user.username,
-        email: user.email,
-        label: `${user.username} (${user.email})`
-      }))
+    let allUsers = []
+    if (Array.isArray(response)) {
+      allUsers = response
+    } else if (response?.users) {
+      allUsers = response.users
+    } else if (response?.data) {
+      allUsers = response.data
     }
+
+    // 3. 过滤掉已有租赁的用户
+    userList.value = allUsers
+      .filter(user => !existingUserIds.value.includes(user.id))
+      .map(user => ({
+        id: user.id,
+        value: user.id,
+        username: user.username,
+        email: user.email,
+        label: `${user.username} (${user.email})`
+      }))
+
   } catch (error) {
     console.error('获取用户列表失败:', error)
     errors.value.user = '获取用户列表失败'
@@ -339,6 +348,14 @@ const validateForm = () => {
 
 // 添加用户选择处理函数
 const handleUserSelect = (user) => {
+  // 检查用户是否已有租赁
+  if (existingUserIds.value.includes(user.id)) {
+    alert('该用户已有租赁，请选择其他用户')
+    selectedUser.value = null
+    rentalForm.value.user_id = ''
+    return
+  }
+
   rentalForm.value.user_id = user.id
   selectedUser.value = user
 }
@@ -379,9 +396,9 @@ const showError = computed(() => {
 
 // 初始化数据
 onMounted(async () => {
+  await fetchUsers() // 确保先获取用户列表
   await Promise.all([
     fetchSerials(),
-    fetchUsers(),
     fetchServers(),
     fetchAcl()
   ])
@@ -529,12 +546,56 @@ watch(selectedContainer, async (newContainer) => {
 
 // 添加检查所有必选项是否已选择的计算属性
 const isAllSelected = computed(() => {
-  return selectedSerial.value && 
-         selectedUser.value && 
-         selectedServer.value && 
-         selectedContainer.value && 
-         aclContent.value
+  // 首先检查用户选择是否有效
+  if (!selectedUser.value || existingUserIds.value.includes(selectedUser.value.id)) {
+    return false
+  }
+
+  // 其他必要字段的验证
+  return !!(
+    selectedSerial.value &&
+    selectedUser.value &&
+    selectedServer.value &&
+    selectedContainer.value &&
+    rentalForm.value.traffic_limit > 0
+  )
 })
+
+// 在组件挂载时获取数据
+onMounted(async () => {
+  await fetchUsers() // 确保先获取用户列表
+  await Promise.all([
+    fetchSerials(),
+    fetchServers(),
+    fetchAcl()
+  ])
+})
+
+// 监听用户选择变化
+watch(selectedUser, (newUser) => {
+  if (newUser && existingUserIds.value.includes(newUser.id)) {
+    // 如果选择了已有租赁的用户，清空后续选择
+    selectedServer.value = null
+    selectedContainer.value = null
+    rentalForm.value.server_id = null
+    rentalForm.value.container_id = null
+    errors.value.user = '该用户已有租赁，请选择其他用户'
+  } else {
+    errors.value.user = ''
+  }
+})
+
+// 在 script setup 中添加
+const existingUserIds = ref([]) // 存储已有租赁的用户ID
+
+// 添加步骤状态控制
+const stepsEnabled = computed(() => ({
+  serial: true, // 序列号始终可选
+  user: !!selectedSerial.value, // 选择序列号后才能选择用户
+  server: !!(selectedSerial.value && selectedUser.value && !existingUserIds.value.includes(selectedUser.value.id)), // 选择用户后才能选择服务器
+  container: !!(selectedSerial.value && selectedUser.value && selectedServer.value && !existingUserIds.value.includes(selectedUser.value.id)), // 选择服务器后才能选择容器
+  acl: !!(selectedSerial.value && selectedUser.value && selectedServer.value && selectedContainer.value && !existingUserIds.value.includes(selectedUser.value.id)) // 选择容器后才能配置ACL
+}))
 </script>
 
 <template>
@@ -675,6 +736,7 @@ const isAllSelected = computed(() => {
           :loading="loading.users"
           :error="errors.user"
           @select="handleUserSelect"
+          :disabled="!stepsEnabled.user"
         >
           <template #item="{ item }">
             <div class="flex flex-col">
@@ -691,6 +753,7 @@ const isAllSelected = computed(() => {
           :loading="loading.servers"
           :error="errors.server"
           @select="handleServerSelect"
+          :disabled="!stepsEnabled.server"
         >
           <template #item="{ item }">
             {{ item.server_name || item.ip_address }} ({{ item.ip_address }}) - 
@@ -708,6 +771,7 @@ const isAllSelected = computed(() => {
               v-model="selectedContainer"
               class="form-input"
               required
+              :disabled="!stepsEnabled.container"
             >
               <option value="">请选择容器</option>
               <option 
@@ -728,8 +792,8 @@ const isAllSelected = computed(() => {
           <div v-if="errors.container" class="mt-1 text-sm text-red-600">
             {{ errors.container }}
           </div>
-          <div v-if="containerList.length === 0 && !loading.containers" class="mt-1 text-sm text-gray-500">
-            该服务器暂无可用容器
+          <div v-if="!stepsEnabled.container" class="mt-1 text-sm text-yellow-600">
+            请先选择用户和服务器
           </div>
         </div>
 
@@ -877,5 +941,16 @@ pre {
 
 .overflow-y-auto::-webkit-scrollbar-thumb {
   @apply bg-gray-400 rounded hover:bg-gray-500;
+}
+
+/* 添加禁用状态的样式 */
+.form-input:disabled,
+.search-select:disabled {
+  @apply bg-gray-100 cursor-not-allowed opacity-60;
+}
+
+/* 添加步骤提示的禁用状态样式 */
+.step-disabled {
+  @apply opacity-50 cursor-not-allowed;
 }
 </style> 
