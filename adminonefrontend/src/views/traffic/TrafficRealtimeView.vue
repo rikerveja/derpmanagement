@@ -23,17 +23,38 @@
           <select 
             v-model="selectedServer"
             class="form-select rounded-md border-gray-300 shadow-sm"
+            :disabled="loading"
           >
             <option value="">全部服务器</option>
-            <option v-for="server in servers" 
-                    :key="server.id" 
-                    :value="server.id"
-                    :disabled="server.status === 'unreachable'"
+            <option 
+              v-for="server in servers" 
+              :key="server.id" 
+              :value="server.id"
+              :disabled="server.status === 'unreachable'"
             >
-              {{ server.name }} 
+              {{ server.name }} ({{ server.ip_address }})
               {{ server.status === 'unreachable' ? '(不可达)' : '' }}
             </option>
           </select>
+
+          <!-- 容器选择 -->
+          <template v-if="selectedServer">
+            <label class="text-gray-700 dark:text-gray-300">选择容器:</label>
+            <select
+              v-model="selectedContainer"
+              class="form-select rounded-md border-gray-300 shadow-sm"
+              :disabled="loading || loadingContainers"
+            >
+              <option value="">该服务器所有容器</option>
+              <option
+                v-for="container in serverContainers"
+                :key="container.id"
+                :value="container.id"
+              >
+                {{ container.container_name || container.id }}
+              </option>
+            </select>
+          </template>
         </div>
         <div class="flex space-x-2">
           <BaseButton
@@ -66,7 +87,7 @@
     </div>
 
     <!-- 流量概览卡片 -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
       <CardBox class="hover:shadow-lg transition-shadow">
         <div class="flex items-center">
           <div class="p-3 rounded-full bg-green-100 dark:bg-green-800">
@@ -101,9 +122,23 @@
             <BaseIcon :path="mdiChartLine" class="w-6 h-6 text-purple-500"/>
           </div>
           <div class="ml-4">
-            <h3 class="text-gray-500 text-sm">总流量</h3>
+            <h3 class="text-gray-500 text-sm">剩余流量</h3>
             <p class="text-2xl font-semibold">
-              {{ formatTraffic(totalUpload + totalDownload) }}
+              {{ formatTraffic(remainingTraffic) }}
+            </p>
+          </div>
+        </div>
+      </CardBox>
+
+      <CardBox class="hover:shadow-lg transition-shadow">
+        <div class="flex items-center">
+          <div class="p-3 rounded-full bg-yellow-100 dark:bg-yellow-800">
+            <BaseIcon :path="mdiGauge" class="w-6 h-6 text-yellow-500"/>
+          </div>
+          <div class="ml-4">
+            <h3 class="text-gray-500 text-sm">流量限制</h3>
+            <p class="text-2xl font-semibold">
+              {{ formatTraffic(trafficLimit) }}
             </p>
           </div>
         </div>
@@ -111,12 +146,15 @@
     </div>
 
     <!-- 流量图表 -->
-    <CardBox>
-      <Line 
-        :data="chartData" 
+    <CardBox class="h-96">
+      <Line
+        v-if="trafficData.length > 0"
+        :data="chartData"
         :options="chartOptions"
-        class="h-80"
       />
+      <div v-else class="h-full flex items-center justify-center text-gray-500">
+        暂无数据
+      </div>
     </CardBox>
 
     <!-- 实时数据表格 -->
@@ -126,7 +164,7 @@
           <thead>
             <tr>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                容器ID
+                容器名称
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 上传流量
@@ -141,7 +179,7 @@
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
             <tr v-for="item in trafficData" :key="item.timestamp">
-              <td class="px-6 py-4 whitespace-nowrap">{{ item.container_id }}</td>
+              <td class="px-6 py-4 whitespace-nowrap">{{ getContainerName(item.container_id) }}</td>
               <td class="px-6 py-4 whitespace-nowrap">{{ formatTraffic(item.upload_traffic) }}</td>
               <td class="px-6 py-4 whitespace-nowrap">{{ formatTraffic(item.download_traffic) }}</td>
               <td class="px-6 py-4 whitespace-nowrap">{{ formatTime(item.timestamp) }}</td>
@@ -150,11 +188,30 @@
         </table>
       </div>
     </CardBox>
+
+    <div class="flex space-x-4">
+      <div class="text-gray-600">
+        流量限制: {{ formatTrafficWithUnit(trafficLimit) }}
+      </div>
+      <div class="text-gray-600">
+        剩余流量: {{ formatTrafficWithUnit(remainingTraffic) }}
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js'
 import { Line } from 'vue-chartjs'
 import { 
   mdiUpload, 
@@ -163,91 +220,181 @@ import {
   mdiRefresh,
   mdiPlay,
   mdiStop,
-  mdiAlert
+  mdiAlert,
+  mdiGauge
 } from '@mdi/js'
 import CardBox from '@/components/CardBox.vue'
-import BaseIcon from '@/components/BaseIcon.vue'
 import BaseButton from '@/components/BaseButton.vue'
+import BaseIcon from '@/components/BaseIcon.vue'
 import api from '@/services/api'
 
+// 注册 Chart.js 组件
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+)
+
+// 初始化状态
+const loading = ref(false)
+const error = ref('')
 const servers = ref([])
 const selectedServer = ref('')
 const trafficData = ref([])
 const refreshInterval = ref(null)
-const loading = ref(false)
-const error = ref(null)
 const isAutoRefresh = ref(false)
-const serverCheckPromises = ref([])
+const remainingTraffic = ref(0)
+const trafficLimit = ref(0)
+const selectedContainer = ref(null)  // 选中的容器
+const serverContainers = ref([])     // 当前服务器的容器列表
+const loadingContainers = ref(false) // 容器列表加载状态
+const serverTrafficLimit = ref(0)
 
 // 获取服务器列表
 const fetchServers = async () => {
-  error.value = null
-  loading.value = true
-  
   try {
+    console.log('开始获取服务器列表')
     const response = await api.getServers()
+    console.log('获取服务器列表 - 原始响应:', response)
+
     if (response.success) {
       servers.value = response.servers.map(server => ({
-        ...server,
-        status: 'checking'
+        id: server.id,
+        name: server.server_name,
+        status: server.status || 'checking',
+        ip_address: server.ip_address,
+        total_traffic: server.total_traffic || 0
       }))
-      // 并行检查所有服务器状态
-      await checkAllServersStatus()
+      console.log('处理后的服务器列表:', servers.value)
+    } else {
+      throw new Error(response.message || '获取服务器列表失败')
     }
   } catch (err) {
+    console.error('获取服务器列表失败:', err)
     error.value = '获取服务器列表失败: ' + (err.message || '未知错误')
     servers.value = []
-  } finally {
-    loading.value = false
   }
 }
 
-// 并行检查所有服务器状态
-const checkAllServersStatus = async () => {
-  const checkPromises = servers.value.map(async server => {
-    try {
-      const response = await api.checkServerStatus(server.id)
-      server.status = response.success ? 'online' : 'unreachable'
-    } catch (err) {
-      server.status = 'unreachable'
-      console.error(`服务器 ${server.name} 状态检查失败:`, err)
+// 获取服务器的容器列表
+const fetchServerContainers = async (serverId) => {
+  if (!serverId) return
+  try {
+    loadingContainers.value = true
+    console.log('正在获取容器列表, serverId:', serverId)
+    const response = await api.getServerContainers(serverId)
+    console.log('容器列表响应:', response)
+    
+    if (response.success) {
+      // 确保容器数据包含必要的字段
+      serverContainers.value = response.containers.filter(container => 
+        container.server_id === serverId
+      ).map(container => ({
+        id: container.id,
+        container_name: container.container_name,
+        server_ip: container.server_ip,
+        node_exporter_port: container.node_exporter_port, // 这就是 metrics_port
+        status: container.status
+      }))
+      console.log('处理后的容器列表:', serverContainers.value)
+      selectedContainer.value = null
+    } else {
+      throw new Error(response.message || '获取容器列表失败')
     }
-  })
-
-  // 使用 Promise.allSettled 确保所有检查都完成
-  await Promise.allSettled(checkPromises)
+  } catch (error) {
+    console.error('获取容器列表失败:', error)
+    error.value = '获取容器列表失败: ' + error.message
+    serverContainers.value = []
+  } finally {
+    loadingContainers.value = false
+  }
 }
 
-// 获取流量数据（带重试机制）
+// 监听服务器选择变化
+watch(selectedServer, (newServerId) => {
+  selectedContainer.value = null // 清空容器选择
+  if (newServerId) {
+    console.log('服务器选择变化，获取对应容器列表:', newServerId)
+    fetchServerContainers(newServerId)
+  } else {
+    serverContainers.value = []
+  }
+})
+
+// 修改获取流量数据的方法
 const fetchTrafficData = async () => {
   try {
-    if (loading.value) return; // 防止重复请求
-    
+    if (loading.value) return
     loading.value = true
     error.value = ''
     
-    // 添加超时控制
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
+    let response
+    console.log('开始获取流量数据')
+
+    if (selectedContainer.value) {
+      // 获取单个容器的流量数据
+      response = await api.trafficApi.getContainerTraffic(selectedContainer.value)
+      console.log('单个容器流量响应:', response)
+      
+      if (response.success) {
+        // 转换响应格式以匹配图表需求
+        response = {
+          success: true,
+          traffic_data: [{
+            container_id: selectedContainer.value,
+            ...response.traffic,
+            timestamp: response.timestamp
+          }]
+        }
+      }
+    } else if (selectedServer.value) {
+      // 获取服务器所有容器的流量数据
+      const containerPromises = serverContainers.value.map(container => 
+        api.trafficApi.getContainerTraffic(container.id)
+      )
+      const results = await Promise.all(containerPromises)
+      
+      response = {
+        success: true,
+        traffic_data: results
+          .filter(r => r.success)
+          .map(r => ({
+            container_id: r.container_id,
+            upload_traffic: r.traffic.upload_traffic,
+            download_traffic: r.traffic.download_traffic,
+            timestamp: r.timestamp
+          }))
+      }
+    } else {
+      // 获取所有容器的流量数据
+      response = await api.trafficApi.getAllContainersTraffic()
+    }
     
-    const response = await api.getTrafficData(selectedServer.value, {
-      signal: controller.signal
-    })
+    console.log('最终流量数据:', response)
     
-    clearTimeout(timeoutId);
-    
-    if (response.success) {
-      trafficData.value = response.data
+    if (response?.success) {
+      trafficData.value = response.traffic_data.map(data => ({
+        container_id: data.container_id,
+        upload_traffic: data.upload_traffic || 0,
+        download_traffic: data.download_traffic || 0,
+        timestamp: data.timestamp
+      }))
+      
+      // 更新流量限制和剩余流量
+      updateTrafficLimits()
+      
       error.value = ''
     } else {
-      error.value = response.message || '获取数据失败'
+      throw new Error(response?.message || '获取数据失败')
     }
   } catch (err) {
-    if (err.name === 'AbortError') {
-      error.value = '请求超时，请稍后重试'
-    } else {
-      error.value = err.message || '获取数据失败'
-    }
+    console.error('获取流量数据失败:', err)
+    error.value = '获取流量数据失败: ' + (err.message || '未知错误')
+    trafficData.value = []
   } finally {
     loading.value = false
   }
@@ -292,23 +439,6 @@ const stopAutoRefresh = () => {
   isAutoRefresh.value = false
 }
 
-// 监听服务器选择变化
-watch(selectedServer, async (newValue) => {
-  if (newValue) {
-    const server = servers.value.find(s => s.id === newValue)
-    if (server?.status === 'unreachable') {
-      error.value = '所选服务器当前不可用'
-      return
-    }
-  }
-  if (isAutoRefresh.value) {
-    stopAutoRefresh()
-    startAutoRefresh()
-  } else {
-    await fetchTrafficData()
-  }
-})
-
 // 组件初始化
 onMounted(async () => {
   await fetchServers()
@@ -317,15 +447,6 @@ onMounted(async () => {
 // 组件卸载清理
 onUnmounted(() => {
   stopAutoRefresh()
-  if (controller.value) {
-    controller.value.abort()
-  }
-  // 取消所有未完成的服务器状态检查
-  serverCheckPromises.value.forEach(promise => {
-    if (promise.cancel) {
-      promise.cancel()
-    }
-  })
 })
 
 // 计算总流量
@@ -348,13 +469,17 @@ const chartData = computed(() => {
         label: '上传流量',
         data: data.map(d => d.upload_traffic / 1024 / 1024),
         borderColor: '#10B981',
-        tension: 0.1
+        backgroundColor: '#10B981',
+        tension: 0.1,
+        fill: false
       },
       {
         label: '下载流量',
         data: data.map(d => d.download_traffic / 1024 / 1024),
         borderColor: '#3B82F6',
-        tension: 0.1
+        backgroundColor: '#3B82F6',
+        tension: 0.1,
+        fill: false
       }
     ]
   }
@@ -375,19 +500,102 @@ const chartOptions = {
         text: '流量 (MB)'
       }
     }
+  },
+  plugins: {
+    legend: {
+      position: 'top'
+    }
   }
 }
 
 // 格式化流量数据
 const formatTraffic = (bytes) => {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB'
-  if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(2) + ' MB'
-  return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB'
+  const mb = bytes / (1024 * 1024)
+  return `${mb.toFixed(2)} MB`
 }
 
 // 格式化时间
 const formatTime = (timestamp) => {
   return new Date(timestamp).toLocaleString()
+}
+
+// 在 script setup 中添加 getStatusText 方法
+const getStatusText = (status) => {
+  const statusMap = {
+    'online': '在线',
+    'unreachable': '不可达',
+    'checking': '检查中',
+    'healthy': '健康'  // 添加 healthy 状态的映射
+  }
+  return statusMap[status] || status
+}
+
+// 修改服务器状态指示器的样式类
+const getStatusClass = (status) => {
+  const classMap = {
+    'online': 'bg-green-100 text-green-800',
+    'healthy': 'bg-green-100 text-green-800',
+    'unreachable': 'bg-red-100 text-red-800',
+    'checking': 'bg-gray-100 text-gray-800'
+  }
+  return classMap[status] || 'bg-gray-100 text-gray-800'
+}
+
+// 修改流量限制和剩余流量的计算逻辑
+const updateTrafficLimits = () => {
+  // 将字节转换为MB
+  const bytesToMB = (bytes) => bytes / (1024 * 1024)
+  const gbToMB = (gb) => gb * 1024  // 新增：GB转MB的转换函数
+
+  // 计算已使用的总流量（MB）
+  const totalTrafficMB = trafficData.value.reduce((sum, item) => 
+    sum + bytesToMB(item.upload_traffic || 0) + bytesToMB(item.download_traffic || 0), 0
+  )
+
+  if (selectedContainer.value) {
+    // 单个容器的流量限制
+    const container = serverContainers.value.find(c => c.id === selectedContainer.value)
+    if (container) {
+      // 容器的总流量限制为上传和下载限制之和（MB）
+      // 注意：container.max_upload_traffic 和 max_download_traffic 是以GB为单位
+      const containerLimit = gbToMB(container.max_upload_traffic || 0) + gbToMB(container.max_download_traffic || 0)
+      trafficLimit.value = containerLimit
+      remainingTraffic.value = Math.max(0, containerLimit - totalTrafficMB)
+    }
+  } else if (selectedServer.value) {
+    // 服务器的流量限制 (GB转MB)
+    const server = servers.value.find(s => s.id === selectedServer.value)
+    if (server?.total_traffic) {
+      // server.total_traffic 是以GB为单位，需要转换为MB
+      trafficLimit.value = gbToMB(server.total_traffic)
+      remainingTraffic.value = Math.max(0, trafficLimit.value - totalTrafficMB)
+    }
+  } else {
+    // 全部服务器流量 (GB转MB)
+    const totalGBLimit = servers.value.reduce((sum, server) => sum + (server.total_traffic || 0), 0)
+    trafficLimit.value = gbToMB(totalGBLimit)
+    remainingTraffic.value = Math.max(0, trafficLimit.value - totalTrafficMB)
+  }
+}
+
+// 监听选择变化
+watch([selectedServer, selectedContainer], () => {
+  updateTrafficLimits()
+})
+
+// 添加一个方法来获取容器名称
+const getContainerName = (containerId) => {
+  // 先在当前服务器的容器列表中查找
+  const container = serverContainers.value.find(c => c.id === containerId)
+  if (container) {
+    return container.container_name || containerId
+  }
+  // 如果找不到，返回容器ID
+  return containerId
+}
+
+// 修改流量格式化函数，统一使用MB单位显示
+const formatTrafficWithUnit = (value) => {
+  return `${value.toFixed(2)} MB`
 }
 </script> 

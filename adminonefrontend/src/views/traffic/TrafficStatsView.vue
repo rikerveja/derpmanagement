@@ -1,99 +1,55 @@
 <template>
   <div class="grid gap-6">
-    <!-- 统计筛选器 -->
+    <!-- 统计类型选择 -->
     <CardBox>
-      <div class="flex flex-wrap gap-4">
-        <div class="flex items-center space-x-2">
-          <label class="text-gray-700 dark:text-gray-300">统计类型:</label>
-          <select 
-            v-model="statsType"
-            class="form-select rounded-md border-gray-300 shadow-sm"
-          >
-            <option value="user">按用户统计</option>
-            <option value="server">按服务器统计</option>
-          </select>
-        </div>
+      <div class="flex items-center space-x-4">
+        <label class="text-gray-700 dark:text-gray-300">统计类型:</label>
+        <select 
+          v-model="statsType"
+          class="form-select rounded-md border-gray-300 shadow-sm"
+        >
+          <option value="user">按用户统计</option>
+          <option value="server">按服务器统计</option>
+        </select>
 
-        <div class="flex items-center space-x-2" v-if="statsType === 'user'">
+        <template v-if="statsType === 'user'">
           <label class="text-gray-700 dark:text-gray-300">选择用户:</label>
-          <select 
-            v-model="selectedUserId"
-            class="form-select rounded-md border-gray-300 shadow-sm"
-          >
-            <option value="">请选择用户</option>
+          <select v-model="selectedId" class="form-select">
             <option v-for="user in users" :key="user.id" :value="user.id">
-              {{ user.name }}
+              {{ user.username }}
             </option>
           </select>
-        </div>
+        </template>
 
-        <div class="flex items-center space-x-2" v-else>
+        <template v-else>
           <label class="text-gray-700 dark:text-gray-300">选择服务器:</label>
-          <select 
-            v-model="selectedServerId"
-            class="form-select rounded-md border-gray-300 shadow-sm"
-          >
-            <option value="">请选择服务器</option>
+          <select v-model="selectedId" class="form-select">
             <option v-for="server in servers" :key="server.id" :value="server.id">
               {{ server.name }}
             </option>
           </select>
-        </div>
-
-        <BaseButton
-          color="info"
-          label="查询统计"
-          :icon="mdiMagnify"
-          @click="fetchStats"
-        />
+        </template>
       </div>
     </CardBox>
 
     <!-- 统计图表 -->
-    <CardBox v-if="statsData.length > 0">
-      <Line 
-        :data="chartData" 
-        :options="chartOptions"
-        class="h-80"
-      />
+    <CardBox class="h-96">
+      <!-- 图表组件 -->
     </CardBox>
-
-    <!-- 统计摘要 -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6" v-if="summary">
-      <CardBox>
-        <div class="text-center">
-          <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">总流量</h3>
-          <p class="mt-2 text-3xl font-semibold text-primary-600">
-            {{ formatTraffic(summary.total_traffic) }}
-          </p>
-        </div>
-      </CardBox>
-      
-      <CardBox>
-        <div class="text-center">
-          <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">剩余流量</h3>
-          <p class="mt-2 text-3xl font-semibold text-green-600">
-            {{ formatTraffic(summary.remaining_traffic) }}
-          </p>
-        </div>
-      </CardBox>
-      
-      <CardBox>
-        <div class="text-center">
-          <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">流量限制</h3>
-          <p class="mt-2 text-3xl font-semibold text-blue-600">
-            {{ formatTraffic(summary.traffic_limit) }}
-          </p>
-        </div>
-      </CardBox>
-    </div>
 
     <!-- 统计数据表格 -->
     <CardBox>
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-          <!-- 表头和数据行的实现类似于其他视图 -->
-        </table>
+      <!-- 数据表格 -->
+    </CardBox>
+
+    <!-- 超流量用户警告 -->
+    <CardBox v-if="overlimitUsers.length > 0" class="bg-red-50">
+      <h3 class="text-red-700 font-medium mb-4">超流量用户警告</h3>
+      <div class="space-y-2">
+        <div v-for="user in overlimitUsers" :key="user.container_id" class="flex justify-between items-center">
+          <span>容器 ID: {{ user.container_id }}</span>
+          <span class="text-red-600">超出: {{ formatTraffic(-user.remaining_traffic) }}</span>
+        </div>
       </div>
     </CardBox>
   </div>
@@ -109,14 +65,14 @@ import { mdiChartLine, mdiRefresh, mdiAlert, mdiMagnify } from '@mdi/js'
 import api from '@/services/api'
 
 const statsType = ref('user')
-const selectedUserId = ref('')
-const selectedServerId = ref('')
+const selectedId = ref('')
 const users = ref([])
 const servers = ref([])
 const statsData = ref([])
 const summary = ref(null)
 const loading = ref(false)
 const error = ref(null)
+const overlimitUsers = ref([])
 
 // 获取用户和服务器列表
 const fetchOptions = async () => {
@@ -139,7 +95,7 @@ const fetchOptions = async () => {
 
 // 获取统计数据
 const fetchStats = async () => {
-  const id = statsType.value === 'user' ? selectedUserId.value : selectedServerId.value
+  const id = statsType.value === 'user' ? selectedId.value : selectedId.value
   if (!id) {
     error.value = `请选择${statsType.value === 'user' ? '用户' : '服务器'}`
     return
@@ -171,8 +127,7 @@ const fetchStats = async () => {
 
 // 监听统计类型变化
 watch(statsType, () => {
-  selectedUserId.value = ''
-  selectedServerId.value = ''
+  selectedId.value = ''
   statsData.value = []
   summary.value = null
   error.value = null
@@ -227,7 +182,24 @@ const formatTime = (timestamp) => {
   return new Date(timestamp).toLocaleString()
 }
 
+// 获取超流量用户
+const fetchOverlimitUsers = async () => {
+  try {
+    const response = await api.getOverLimitUsers()
+    
+    if (response.success) {
+      overlimitUsers.value = response.users
+    } else {
+      throw new Error(response.message || '获取超流量用户失败')
+    }
+  } catch (err) {
+    error.value = err.message
+    overlimitUsers.value = []
+  }
+}
+
 onMounted(() => {
   fetchOptions()
+  fetchOverlimitUsers()
 })
 </script> 

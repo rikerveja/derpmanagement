@@ -6,46 +6,29 @@
         <label class="text-gray-700 dark:text-gray-300">选择用户:</label>
         <select 
           v-model="selectedUserId"
-          class="form-select rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring focus:ring-primary-500"
-          :disabled="loading"
-          @change="fetchHistory"
+          class="form-select rounded-md border-gray-300 shadow-sm"
         >
           <option value="">请选择用户</option>
-          <option v-for="user in users" :key="user.id" :value="user.id">
-            {{ user.name }}
+          <option v-for="user in users" 
+                  :key="user.id" 
+                  :value="user.id"
+          >
+            {{ user.username }}
           </option>
         </select>
       </div>
     </CardBox>
 
-    <!-- 错误提示 -->
-    <CardBox v-if="error" class="bg-red-50 dark:bg-red-900/50">
-      <div class="flex items-center text-red-700 dark:text-red-300">
-        <BaseIcon :path="mdiAlert" class="w-6 h-6 mr-2"/>
-        <span>{{ error }}</span>
-      </div>
-    </CardBox>
-
-    <!-- 加载状态 -->
-    <CardBox v-if="loading" class="flex justify-center items-center py-8">
-      <BaseIcon :path="mdiLoading" class="w-8 h-8 animate-spin text-primary-500"/>
-      <span class="ml-2">加载中...</span>
-    </CardBox>
-
-    <!-- 无数据提示 -->
-    <CardBox v-else-if="!loading && historyData.length === 0" class="py-8">
-      <div class="text-center text-gray-500">
-        {{ selectedUserId ? '暂无流量记录' : '请选择用户查看流量历史' }}
-      </div>
-    </CardBox>
-
     <!-- 历史数据图表 -->
-    <CardBox v-if="historyData.length > 0">
-      <Line 
-        :data="chartData" 
+    <CardBox class="h-96">
+      <Line
+        v-if="historyData.length > 0"
+        :data="chartData"
         :options="chartOptions"
-        class="h-80"
       />
+      <div v-else class="h-full flex items-center justify-center text-gray-500">
+        请选择用户查看历史数据
+      </div>
     </CardBox>
 
     <!-- 历史数据表格 -->
@@ -55,7 +38,7 @@
           <thead>
             <tr>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                容器ID
+                时间
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 上传流量
@@ -66,18 +49,14 @@
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 剩余流量
               </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                时间
-              </th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
             <tr v-for="item in historyData" :key="item.timestamp">
-              <td class="px-6 py-4 whitespace-nowrap">{{ item.container_id }}</td>
+              <td class="px-6 py-4 whitespace-nowrap">{{ formatTime(item.timestamp) }}</td>
               <td class="px-6 py-4 whitespace-nowrap">{{ formatTraffic(item.upload_traffic) }}</td>
               <td class="px-6 py-4 whitespace-nowrap">{{ formatTraffic(item.download_traffic) }}</td>
               <td class="px-6 py-4 whitespace-nowrap">{{ formatTraffic(item.remaining_traffic) }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">{{ formatTime(item.timestamp) }}</td>
             </tr>
           </tbody>
         </table>
