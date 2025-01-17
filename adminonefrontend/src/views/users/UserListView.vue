@@ -9,58 +9,109 @@ import {
   mdiHistory,
   mdiDownload,
   mdiBellRing,
-  mdiRefresh 
+  mdiRefresh,
+  mdiPlus,
+  mdiMagnify,
+  mdiPencil,
+  mdiChartLine
 } from '@mdi/js'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseIcon from '@/components/BaseIcon.vue'
 import api from '@/services/api'
+import UserEditDialog from './UserEditDialog.vue'
+
+// 添加 loading 状态
+const loading = ref(false)
 
 // 用户数据
 const users = ref([])
 const currentPage = ref(1)
 const itemsPerPage = 10
-const sortKey = ref('username')
-const sortOrder = ref(1)
 
-// 计算分页数据
+// 搜索条件
+const searchQuery = ref({
+  keyword: '',  // 统一的搜索关键字，用于用户名和邮箱
+  role: ''      // 角色筛选
+})
+
+// 排序相关状态
+const sortConfig = ref({
+  key: 'username',
+  order: 'asc'
+})
+
+// 过滤后的用户列表
+const filteredUsers = computed(() => {
+  let result = users.value
+
+  // 搜索过滤
+  if (searchQuery.value.keyword) {
+    const keyword = searchQuery.value.keyword.toLowerCase()
+    result = result.filter(user => {
+      return user.username.toLowerCase().includes(keyword) ||
+             user.email.toLowerCase().includes(keyword)
+    })
+  }
+
+  // 角色过滤
+  if (searchQuery.value.role) {
+    result = result.filter(user => user.role === searchQuery.value.role)
+  }
+
+  // 排序
+  result = [...result].sort((a, b) => {
+    let compareResult = 0
+    switch (sortConfig.value.key) {
+      case 'username':
+        compareResult = a.username.localeCompare(b.username)
+        break
+      case 'email':
+        compareResult = a.email.localeCompare(b.email)
+        break
+      case 'last_login':
+        compareResult = new Date(a.last_login || 0) - new Date(b.last_login || 0)
+        break
+      default:
+        compareResult = 0
+    }
+    return sortConfig.value.order === 'desc' ? -compareResult : compareResult
+  })
+
+  return result
+})
+
+// 分页数据
 const paginatedUsers = computed(() => {
   const start = (currentPage.value - 1) * itemsPerPage
   const end = start + itemsPerPage
-  return users.value.slice(start, end)
+  return filteredUsers.value.slice(start, end)
 })
 
-// 排序函数
-const sortData = (data, key) => {
-  if (sortKey.value === key) {
-    sortOrder.value *= -1
+// 总页数
+const totalPages = computed(() => 
+  Math.ceil(filteredUsers.value.length / itemsPerPage)
+)
+
+// 处理排序
+const handleSort = (key) => {
+  if (sortConfig.value.key === key) {
+    sortConfig.value.order = sortConfig.value.order === 'asc' ? 'desc' : 'asc'
   } else {
-    sortKey.value = key
-    sortOrder.value = 1
+    sortConfig.value.key = key
+    sortConfig.value.order = 'asc'
   }
-  data.sort((a, b) => {
-    // 对于日期类型的字段进行特殊处理
-    if (key === 'rental_expiry' || key === 'last_login') {
-      return (new Date(a[key] || 0) - new Date(b[key] || 0)) * sortOrder.value
-    }
-    if (a[key] < b[key]) return -1 * sortOrder.value
-    if (a[key] > b[key]) return 1 * sortOrder.value
-    return 0
-  })
 }
 
 // 刷新数据
 const refreshData = async () => {
   try {
+    loading.value = true
     console.log('开始刷新用户数据')
     const response = await api.getAllUsers()
     console.log('获取到的用户数据:', response)
     
-    if (response && Array.isArray(response)) {
-      users.value = response
-    } else if (response && Array.isArray(response.data)) {
-      users.value = response.data
-    } else if (response && response.users && Array.isArray(response.users)) {
+    if (response.success && Array.isArray(response.users)) {
       users.value = response.users
     } else {
       console.error('用户数据格式不符合预期:', response)
@@ -69,25 +120,43 @@ const refreshData = async () => {
   } catch (error) {
     console.error('获取用户数据失败:', error)
     users.value = []
+  } finally {
+    loading.value = false
   }
 }
 
-// 用户操作函数
-const viewRentalInfo = async (userId) => {
-  try {
-    const rentalInfo = await api.getRentalInfo(userId)
-    console.log('租赁详情:', rentalInfo)
-  } catch (error) {
-    console.error('获取租赁详情失败:', error)
+// 添加编辑对话框状态
+const showEditDialog = ref(false)
+const currentUser = ref(null)
+
+// 修改编辑用户信息函数
+const editUserInfo = async (userId) => {
+  // 打印一下看看是否能找到用户数据
+  console.log('当前用户列表:', users.value)
+  console.log('要编辑的用户ID:', userId)
+  
+  const userToEdit = users.value.find(user => user.id === userId)
+  console.log('找到的用户数据:', userToEdit)
+  
+  if (userToEdit) {
+    currentUser.value = userToEdit
+    showEditDialog.value = true
+  } else {
+    console.error('未找到用户数据')
   }
 }
 
-const viewRentalHistory = async (userId) => {
+// 处理用户信息更新
+const handleUserUpdate = () => {
+  refreshData() // 刷新用户列表
+}
+
+const viewTrafficDetails = async (userId) => {
   try {
-    const rentalHistory = await api.getRentalHistory(userId)
-    console.log('租赁历史:', rentalHistory)
+    const trafficInfo = await api.getUserTraffic(userId)
+    console.log('流量详情:', trafficInfo)
   } catch (error) {
-    console.error('获取租赁历史失败:', error)
+    console.error('获取流量详情失败:', error)
   }
 }
 
@@ -116,86 +185,175 @@ onMounted(() => {
 <template>
   <LayoutAuthenticated>
     <SectionMain>
-      <SectionTitleLineWithButton :icon="mdiAccountMultiple" title="用户管理" main>
-        <BaseButton :icon="mdiRefresh" label="刷新" @click="refreshData" />
-      </SectionTitleLineWithButton>
-
-      <!-- 用户列表 -->
-      <CardBox>
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead class="bg-gray-50 dark:bg-gray-800">
-              <tr>
-                <th @click="sortData(users, 'username')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">用户名</th>
-                <th @click="sortData(users, 'email')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">Email</th>
-                <th @click="sortData(users, 'role')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">角色</th>
-                <th @click="sortData(users, 'rental_expiry')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">租约到期</th>
-                <th @click="sortData(users, 'last_login')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">登陆时间</th>
-                <th @click="sortData(users, 'isVerified')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">验证</th>
-                <th @click="sortData(users, 'verificationCode')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">序列号</th>
-                <th class="px-4 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">操作</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-              <tr v-for="user in paginatedUsers" :key="user.id">
-                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.username }}</td>
-                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.email }}</td>
-                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.role }}</td>
-                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.rental_expiry }}</td>
-                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.last_login }}</td>
-                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.isVerified ? '是' : '否' }}</td>
-                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.verificationCode }}</td>
-                <td class="px-4 py-2 whitespace-nowrap text-sm text-center">
-                  <div class="flex justify-center space-x-2">
-                    <button 
-                      @click="viewRentalInfo(user.id)" 
-                      class="text-blue-600 hover:text-blue-800 dark:text-blue-400"
-                      title="租赁详情"
-                    >
-                      <BaseIcon :path="mdiInformation" size="18" />
-                    </button>
-                    <button 
-                      @click="viewRentalHistory(user.id)" 
-                      class="text-green-600 hover:text-green-800 dark:text-green-400"
-                      title="租赁历史"
-                    >
-                      <BaseIcon :path="mdiHistory" size="18" />
-                    </button>
-                    <button 
-                      @click="downloadAcl(user.id)" 
-                      class="text-purple-600 hover:text-purple-800 dark:text-purple-400"
-                      title="下载ACL"
-                    >
-                      <BaseIcon :path="mdiDownload" size="18" />
-                    </button>
-                    <button 
-                      @click="sendReminder(user.id)" 
-                      class="text-orange-600 hover:text-orange-800 dark:text-orange-400"
-                      title="续费通知"
-                    >
-                      <BaseIcon :path="mdiBellRing" size="18" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="mt-4 flex justify-between items-center">
-          <span class="text-sm text-gray-600">
-            共 {{ users.length }} 个用户
-          </span>
-          <div class="space-x-2">
-            <BaseButton @click="currentPage--" :disabled="currentPage === 1" label="上一页" />
-            <BaseButton @click="currentPage++" :disabled="currentPage * itemsPerPage >= users.length" label="下一页" />
+      <CardBox class="mb-6 dark:bg-gray-900">
+        <!-- 标题和操作按钮 -->
+        <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+          <h1 class="text-2xl font-bold dark:text-white">用户管理</h1>
+          <div class="flex flex-wrap gap-2">
+            <BaseButton
+              :icon="mdiRefresh"
+              color="info"
+              @click="refreshData"
+              :loading="loading"
+              title="刷新"
+              class="whitespace-nowrap"
+            />
+            <BaseButton
+              :icon="mdiPlus"
+              color="success"
+              label="添加用户"
+              :to="`/users/add`"
+              class="whitespace-nowrap"
+            />
           </div>
         </div>
+
+        <!-- 搜索区域 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div class="form-group">
+            <label class="block text-sm font-medium mb-2 dark:text-gray-300">搜索</label>
+            <input
+              v-model="searchQuery.keyword"
+              type="text"
+              class="form-input dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700"
+              placeholder="搜索用户名/邮箱"
+            />
+          </div>
+          <div class="form-group">
+            <label class="block text-sm font-medium mb-2 dark:text-gray-300">角色</label>
+            <select 
+              v-model="searchQuery.role" 
+              class="form-input dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700"
+            >
+              <option value="">全部</option>
+              <option value="普通用户">普通用户</option>
+              <option value="分销员">分销员</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 用户列表 -->
+        <CardBox>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead class="bg-gray-50 dark:bg-gray-800">
+                <tr>
+                  <th @click="handleSort('username')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">用户名</th>
+                  <th @click="handleSort('email')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">Email</th>
+                  <th @click="handleSort('role')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">角色</th>
+                  <th @click="handleSort('rental_expiry')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">租约到期</th>
+                  <th @click="handleSort('last_login')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">登陆时间</th>
+                  <th @click="handleSort('isVerified')" class="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider cursor-pointer">验证</th>
+                  <th class="px-4 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">操作</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                <tr v-for="user in paginatedUsers" :key="user.id">
+                  <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.username }}</td>
+                  <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.email }}</td>
+                  <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.role }}</td>
+                  <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.rental_expiry }}</td>
+                  <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{{ user.last_login }}</td>
+                  <td class="px-4 py-3">
+                    <span :class="{
+                      'px-2 py-1 rounded-full text-xs': true,
+                      'bg-green-100 text-green-800': user.is_verified,
+                      'bg-red-100 text-red-800': !user.is_verified
+                    }">
+                      {{ user.is_verified ? '已验证' : '未验证' }}
+                    </span>
+                  </td>
+                  <td class="px-4 py-2 whitespace-nowrap text-sm text-center">
+                    <div class="flex justify-center space-x-2">
+                      <button 
+                        @click="editUserInfo(user.id)" 
+                        class="text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                        title="修改信息"
+                      >
+                        <BaseIcon :path="mdiPencil" size="18" />
+                      </button>
+                      <button 
+                        @click="viewTrafficDetails(user.id)" 
+                        class="text-green-600 hover:text-green-800 dark:text-green-400"
+                        title="流量详情"
+                      >
+                        <BaseIcon :path="mdiChartLine" size="18" />
+                      </button>
+                      <button 
+                        @click="downloadAcl(user.id)" 
+                        class="text-purple-600 hover:text-purple-800 dark:text-purple-400"
+                        title="下载ACL"
+                      >
+                        <BaseIcon :path="mdiDownload" size="18" />
+                      </button>
+                      <button 
+                        @click="sendReminder(user.id)" 
+                        class="text-orange-600 hover:text-orange-800 dark:text-orange-400"
+                        title="续费通知"
+                      >
+                        <BaseIcon :path="mdiBellRing" size="18" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 分页控件 -->
+          <div class="mt-4 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="text-sm text-gray-700 dark:text-gray-300">
+              共 {{ filteredUsers.length }} 个用户
+            </div>
+            <div class="flex items-center space-x-2">
+              <BaseButton
+                :disabled="currentPage === 1"
+                @click="currentPage--"
+                label="上一页"
+                :class="{ 'opacity-50 cursor-not-allowed': currentPage === 1 }"
+              />
+              <span class="px-4 py-2">
+                {{ currentPage }} / {{ totalPages }}
+              </span>
+              <BaseButton
+                :disabled="currentPage >= totalPages"
+                @click="currentPage++"
+                label="下一页"
+                :class="{ 'opacity-50 cursor-not-allowed': currentPage >= totalPages }"
+              />
+            </div>
+          </div>
+        </CardBox>
       </CardBox>
     </SectionMain>
   </LayoutAuthenticated>
-</template>
+
+  <!-- 添加编辑对话框 -->
+  <UserEditDialog
+    :show="showEditDialog"
+    :user="currentUser"
+    @close="showEditDialog = false"
+    @update="handleUserUpdate"
+  />
+</template> 
 
 <style scoped>
+.form-group {
+  @apply relative;
+}
+
+.form-input {
+  @apply w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm 
+         focus:ring-2 focus:ring-blue-500 focus:border-blue-500 
+         transition-colors duration-200
+         dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300;
+}
+
+.form-input:disabled {
+  @apply bg-gray-100 cursor-not-allowed
+         dark:bg-gray-700 dark:text-gray-500;
+}
+
 /* 工具提示样式 */
 button {
   position: relative;
