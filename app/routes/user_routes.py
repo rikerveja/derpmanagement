@@ -62,6 +62,10 @@ def update_user_info():
     if 'password' in data:
         hashed_password = hash_password(data.get('password'))
         user.password = hashed_password
+
+    # 更新 email
+    if 'email' in data:
+        user.email = data.get('email')  # 更新邮箱地址
     
     # 更新 updated_at 时间戳
     user.updated_at = db.func.now()
