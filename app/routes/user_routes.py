@@ -20,25 +20,25 @@ def validate_required_fields(data, fields):
 @user_bp.route('/api/user/update_info', methods=['POST'])
 def update_user_info():
     data = request.json
-    required_fields = ['email', 'password']
+    required_fields = ['user_id', 'password']  # user_id 作为必填字段
     missing_fields = validate_required_fields(data, required_fields)
 
     if missing_fields:
         log_operation(None, "update_user_info", "failed", f"Missing fields: {', '.join(missing_fields)}")
         return jsonify({"success": False, "message": f"Missing fields: {', '.join(missing_fields)}"}), 400
 
-    email = data.get('email')
-    password = data.get('password')
+    user_id = data.get('user_id')  # 获取用户ID
+    password = data.get('password')  # 获取密码
 
     # 查找用户
-    user = User.query.filter_by(email=email).first()
+    user = User.query.get(user_id)  # 使用 user_id 查找用户
     if not user:
-        log_operation(None, "update_user_info", "failed", f"User not found for email: {email}")
+        log_operation(None, "update_user_info", "failed", f"User not found for user_id: {user_id}")
         return jsonify({"success": False, "message": "User not found"}), 404
 
     # 检查密码是否正确
     if not check_password(password, user.password):
-        log_operation(None, "update_user_info", "failed", f"Incorrect password for email: {email}")
+        log_operation(None, "update_user_info", "failed", f"Incorrect password for user_id: {user_id}")
         return jsonify({"success": False, "message": "Incorrect password"}), 400
 
     # 更新字段：支持更新所有用户信息
@@ -69,8 +69,9 @@ def update_user_info():
     # 提交更新
     db.session.commit()
 
-    log_operation(user.id, "update_user_info", "success", f"User info updated successfully for email: {email}")
+    log_operation(user.id, "update_user_info", "success", f"User info updated successfully for user_id: {user_id}")
     return jsonify({"success": True, "message": "User information updated successfully"}), 200
+
 
 # 获取所有用户
 @user_bp.route('/api/users', methods=['GET'])
