@@ -233,13 +233,28 @@ def fetch_traffic_metrics(url):
         response.raise_for_status()
         metrics = {}
 
+        # 处理返回的多行文本数据
         for line in response.text.splitlines():
-            if "node_network_receive_bytes_total" in line:
-                metrics["download_traffic"] = int(float(line.split(" ")[1]))
-            elif "node_network_transmit_bytes_total" in line:
-                metrics["upload_traffic"] = int(float(line.split(" ")[1]))
+            # 检查上传流量
+            if "node_network_transmit_bytes_total" in line:
+                # 解析 eth0 设备的上传流量
+                if 'eth0' in line:
+                    metrics["upload_traffic"] = float(line.split(" ")[1])
 
-        return metrics
+            # 检查下载流量
+            elif "node_network_receive_bytes_total" in line:
+                # 解析 eth0 设备的下载流量
+                if 'eth0' in line:
+                    metrics["download_traffic"] = float(line.split(" ")[1])
+
+        # 如果找到了上传和下载流量，就返回 metrics
+        if "upload_traffic" in metrics and "download_traffic" in metrics:
+            return metrics
+        else:
+            logging.error("Could not extract traffic data from metrics.")
+            return None
+
     except Exception as e:
         logging.error(f"Error fetching metrics from {url}: {str(e)}")
         return None
+
