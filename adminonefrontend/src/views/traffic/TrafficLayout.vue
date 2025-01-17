@@ -1,27 +1,25 @@
 <template>
   <LayoutAuthenticated>
     <SectionMain>
-      <div class="grid gap-6">
-        <!-- 导航标签 -->
-        <div class="flex space-x-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-          <router-link 
-            v-for="nav in navigation" 
-            :key="nav.name"
-            :to="nav.to"
-            class="px-4 py-2 rounded-md"
-            :class="[
-              $route.name === nav.name 
-                ? 'bg-primary-500 text-white' 
-                : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
-            ]"
-          >
-            {{ nav.label }}
-          </router-link>
-        </div>
-        
-        <!-- 子路由内容 -->
-        <router-view></router-view>
+      <!-- 导航标签 -->
+      <div class="flex space-x-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
+        <router-link 
+          v-for="nav in navigation" 
+          :key="nav.name"
+          :to="nav.to"
+          class="px-4 py-2 rounded-md"
+          :class="[
+            $route.name === nav.name 
+              ? 'bg-primary-500 text-white' 
+              : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+          ]"
+        >
+          {{ nav.label }}
+        </router-link>
       </div>
+      
+      <!-- 子路由内容 -->
+      <router-view></router-view>
     </SectionMain>
   </LayoutAuthenticated>
 </template>

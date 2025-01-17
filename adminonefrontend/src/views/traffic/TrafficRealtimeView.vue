@@ -54,12 +54,16 @@
     </CardBox>
 
     <!-- 错误提示 -->
-    <CardBox v-if="error" class="bg-red-50 dark:bg-red-900/50">
-      <div class="flex items-center text-red-700 dark:text-red-300">
-        <BaseIcon :path="mdiAlert" class="w-6 h-6 mr-2"/>
-        <span>{{ error }}</span>
-      </div>
-    </CardBox>
+    <div v-if="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+      <span class="block sm:inline">{{ error }}</span>
+      <button @click="error = ''" class="absolute top-0 bottom-0 right-0 px-4 py-3">
+        <span class="sr-only">关闭</span>
+        <svg class="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+          <title>关闭</title>
+          <path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/>
+        </svg>
+      </button>
+    </div>
 
     <!-- 流量概览卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -215,38 +219,34 @@ const checkAllServersStatus = async () => {
 }
 
 // 获取流量数据（带重试机制）
-const fetchTrafficData = async (retryCount = 2) => {
-  error.value = null
-  loading.value = true
-  
+const fetchTrafficData = async () => {
   try {
-    // 检查选中服务器的状态
-    if (selectedServer.value) {
-      const server = servers.value.find(s => s.id === selectedServer.value)
-      if (server?.status === 'unreachable') {
-        throw new Error('所选服务器当前不可用')
-      }
-    }
-
-    const response = await api.getRealTimeTraffic({
-      server_id: selectedServer.value || undefined
+    if (loading.value) return; // 防止重复请求
+    
+    loading.value = true
+    error.value = ''
+    
+    // 添加超时控制
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
+    
+    const response = await api.getTrafficData(selectedServer.value, {
+      signal: controller.signal
     })
     
+    clearTimeout(timeoutId);
+    
     if (response.success) {
-      trafficData.value = response.traffic_data
+      trafficData.value = response.data
+      error.value = ''
     } else {
-      throw new Error(response.message || '获取流量数据失败')
+      error.value = response.message || '获取数据失败'
     }
   } catch (err) {
-    error.value = err.message
-    trafficData.value = []
-    
-    // 重试逻辑
-    if (retryCount > 0 && err.message !== '所选服务器当前不可用') {
-      console.log(`重试获取流量数据，剩余重试次数: ${retryCount}`)
-      setTimeout(() => {
-        fetchTrafficData(retryCount - 1)
-      }, 2000) // 2秒后重试
+    if (err.name === 'AbortError') {
+      error.value = '请求超时，请稍后重试'
+    } else {
+      error.value = err.message || '获取数据失败'
     }
   } finally {
     loading.value = false
@@ -263,6 +263,10 @@ const toggleAutoRefresh = () => {
 }
 
 const startAutoRefresh = async () => {
+  if (refreshInterval.value) {
+    stopAutoRefresh()
+  }
+  
   if (selectedServer.value) {
     const server = servers.value.find(s => s.id === selectedServer.value)
     if (server?.status === 'unreachable') {
@@ -273,10 +277,10 @@ const startAutoRefresh = async () => {
   
   await fetchTrafficData()
   refreshInterval.value = setInterval(() => {
-    if (!loading.value) { // 只在不在加载状态时刷新
+    if (!loading.value) {
       fetchTrafficData()
     }
-  }, 30000)
+  }, 30000) // 30秒刷新一次
   isAutoRefresh.value = true
 }
 
@@ -313,6 +317,9 @@ onMounted(async () => {
 // 组件卸载清理
 onUnmounted(() => {
   stopAutoRefresh()
+  if (controller.value) {
+    controller.value.abort()
+  }
   // 取消所有未完成的服务器状态检查
   serverCheckPromises.value.forEach(promise => {
     if (promise.cancel) {
@@ -330,23 +337,28 @@ const totalDownload = computed(() =>
 )
 
 // 图表配置
-const chartData = computed(() => ({
-  labels: trafficData.value.map(d => formatTime(d.timestamp)),
-  datasets: [
-    {
-      label: '上传流量',
-      data: trafficData.value.map(d => d.upload_traffic / 1024 / 1024),
-      borderColor: '#10B981',
-      tension: 0.1
-    },
-    {
-      label: '下载流量',
-      data: trafficData.value.map(d => d.download_traffic / 1024 / 1024),
-      borderColor: '#3B82F6',
-      tension: 0.1
-    }
-  ]
-}))
+const chartData = computed(() => {
+  const maxDataPoints = 50 // 最多显示50个数据点
+  const data = trafficData.value.slice(-maxDataPoints)
+  
+  return {
+    labels: data.map(d => formatTime(d.timestamp)),
+    datasets: [
+      {
+        label: '上传流量',
+        data: data.map(d => d.upload_traffic / 1024 / 1024),
+        borderColor: '#10B981',
+        tension: 0.1
+      },
+      {
+        label: '下载流量',
+        data: data.map(d => d.download_traffic / 1024 / 1024),
+        borderColor: '#3B82F6',
+        tension: 0.1
+      }
+    ]
+  }
+})
 
 const chartOptions = {
   responsive: true,
