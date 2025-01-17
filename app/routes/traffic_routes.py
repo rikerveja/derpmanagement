@@ -7,6 +7,14 @@ import logging
 # 定义蓝图
 traffic_bp = Blueprint('traffic', __name__)
 
+# 从容器名称提取 IP 地址
+def extract_ip_from_container_name(container_name):
+    # 假设容器名称的格式为 "120_79_137_248_derper_4"，可以通过替换下划线为点来提取 IP
+    parts = container_name.split('_')
+    if len(parts) >= 4:  # 确保名称中有至少 4 个部分，前 3 部分为 IP 地址
+        return '.'.join(parts[:4])  # 提取前三个部分并将它们连接成 IP 地址
+    return None  # 如果容器名称不符合预期格式，返回 None
+
 # 实时流量监控（所有容器）
 @traffic_bp.route('/api/traffic/realtime', methods=['GET'])
 def realtime_traffic():
@@ -18,7 +26,12 @@ def realtime_traffic():
         containers = UserContainer.query.all()
         
         for container in containers:
-            metrics_url = f"http://{container.server_ip}:{container.metrics_port}/metrics"
+            # 从容器名称中提取 IP 地址
+            server_ip = extract_ip_from_container_name(container.container_name)
+            if not server_ip:
+                continue  # 如果无法提取 IP 地址，跳过该容器
+
+            metrics_url = f"http://{server_ip}:{container.metrics_port}/metrics"
             metrics = fetch_traffic_metrics(metrics_url)
             
             if metrics:
@@ -46,7 +59,12 @@ def get_realtime_traffic(container_id):
         if not container:
             return jsonify({"success": False, "message": "Container not found"}), 404
 
-        metrics_url = f"http://{container.server_ip}:{container.metrics_port}/metrics"
+        # 从容器名称中提取 IP 地址
+        server_ip = extract_ip_from_container_name(container.container_name)
+        if not server_ip:
+            return jsonify({"success": False, "message": "Invalid container name format, unable to extract IP"}), 400
+
+        metrics_url = f"http://{server_ip}:{container.metrics_port}/metrics"
         metrics = fetch_traffic_metrics(metrics_url)
 
         if metrics:
