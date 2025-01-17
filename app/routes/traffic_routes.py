@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from app.models import UserContainer, DockerContainer, DockerContainerTraffic, ServerTraffic, UserTraffic, Rental
+from app.models import DockerContainer, DockerContainerTraffic, ServerTraffic, UserTraffic, Rental
 from datetime import datetime
 import requests
 import logging
@@ -25,29 +25,26 @@ def realtime_traffic():
     """
     try:
         traffic_data = []
-        containers = UserContainer.query.all()
+        containers = DockerContainer.query.all()  # 获取所有 Docker 容器
         
         for container in containers:
-            # 根据 UserContainer 获取对应的 DockerContainer
-            docker_container = DockerContainer.query.get(container.container_id)
-            if docker_container:
-                # 从 DockerContainer 中提取 container_name
-                server_ip = extract_ip_from_container_name(docker_container.container_name)
-                if not server_ip:
-                    continue  # 如果无法从容器名称中提取 IP 地址，跳过此容器
+            # 从 DockerContainer 中提取 container_name
+            server_ip = extract_ip_from_container_name(container.container_name)
+            if not server_ip:
+                continue  # 如果无法从容器名称中提取 IP 地址，跳过此容器
 
-                # 使用 node_exporter_port 获取流量数据
-                metrics_url = f"http://{server_ip}:{docker_container.node_exporter_port}/metrics"
-                metrics = fetch_traffic_metrics(metrics_url)
+            # 使用 node_exporter_port 获取流量数据
+            metrics_url = f"http://{server_ip}:{container.node_exporter_port}/metrics"
+            metrics = fetch_traffic_metrics(metrics_url)
 
-                if metrics:
-                    traffic_data.append({
-                        "container_id": container.id,
-                        "server_id": container.server_id,
-                        "upload_traffic": metrics.get("upload_traffic"),
-                        "download_traffic": metrics.get("download_traffic"),
-                        "timestamp": datetime.utcnow().isoformat()
-                    })
+            if metrics:
+                traffic_data.append({
+                    "container_id": container.id,
+                    "server_id": container.server_id,
+                    "upload_traffic": metrics.get("upload_traffic"),
+                    "download_traffic": metrics.get("download_traffic"),
+                    "timestamp": datetime.utcnow().isoformat()
+                })
 
         return jsonify({"success": True, "traffic_data": traffic_data}), 200
     except Exception as e:
@@ -61,22 +58,17 @@ def get_realtime_traffic(container_id):
     获取容器的实时流量数据
     """
     try:
-        container = UserContainer.query.get(container_id)
+        container = DockerContainer.query.get(container_id)  # 从 DockerContainer 获取容器
         if not container:
             return jsonify({"success": False, "message": "Container not found"}), 404
 
-        # 根据 UserContainer 获取对应的 DockerContainer
-        docker_container = DockerContainer.query.get(container.container_id)
-        if not docker_container:
-            return jsonify({"success": False, "message": "Docker container not found"}), 404
-        
         # 从 DockerContainer 中提取 container_name
-        server_ip = extract_ip_from_container_name(docker_container.container_name)
+        server_ip = extract_ip_from_container_name(container.container_name)
         if not server_ip:
             return jsonify({"success": False, "message": "Invalid container name format, unable to extract IP"}), 400
 
         # 使用 node_exporter_port 获取流量数据
-        metrics_url = f"http://{server_ip}:{docker_container.node_exporter_port}/metrics"
+        metrics_url = f"http://{server_ip}:{container.node_exporter_port}/metrics"
         metrics = fetch_traffic_metrics(metrics_url)
 
         if metrics:
@@ -265,26 +257,3 @@ def get_traffic_stats():
     except Exception as e:
         logging.error(f"Error fetching traffic stats: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching traffic stats: {str(e)}"}), 500
-
-# 超流量检测
-@traffic_bp.route('/api/traffic/overlimit', methods=['GET'])
-def detect_overlimit_users():
-    """
-    检测超流量用户
-    """
-    try:
-        overlimit_users = DockerContainerTraffic.query.filter(DockerContainerTraffic.remaining_traffic < 0).limit(100).all()
-        response_data = [
-            {
-                "container_id": record.container_id,
-                "total_traffic": record.upload_traffic + record.download_traffic,
-                "remaining_traffic": record.remaining_traffic
-            }
-            for record in overlimit_users
-        ]
-
-        return jsonify({"success": True, "overlimit_users": response_data}), 200
-    except Exception as e:
-        logging.error(f"Error detecting overlimit users: {str(e)}")
-        return jsonify({"success": False, "message": f"Error detecting overlimit users: {str(e)}"}), 500
-
