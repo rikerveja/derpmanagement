@@ -158,16 +158,13 @@ const routes = [
     children: [
       {
         path: '',
-        redirect: '/traffic/realtime'
+        redirect: { name: 'traffic.realtime' }
       },
       {
         path: 'realtime',
         name: 'traffic.realtime',
         component: () => import('@/views/traffic/TrafficRealtimeView.vue'),
-        meta: { 
-          requiresAuth: true,
-          title: '实时监控'
-        }
+        meta: { requiresAuth: true }
       },
       {
         path: 'history',
