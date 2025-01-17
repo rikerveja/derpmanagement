@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from app.models import UserContainer, DockerContainerTraffic, ServerTraffic, UserTraffic, Rental
+from app.models import UserContainer, DockerContainer, DockerContainerTraffic, ServerTraffic, UserTraffic, Rental
 from datetime import datetime
 import requests
 import logging
@@ -15,6 +15,16 @@ def extract_ip_from_container_name(container_name):
         return '.'.join(parts[:4])  # 提取前三个部分并将它们连接成 IP 地址
     return None  # 如果容器名称不符合预期格式，返回 None
 
+# 从容器名称提取 IP 地址
+def extract_ip_from_container_name(container_name):
+    """
+    从容器名称中提取 IP 地址，假设容器名称格式为 "120_79_137_248_derper_4"
+    """
+    parts = container_name.split('_')
+    if len(parts) >= 4:  # 确保容器名称包含 IP 地址
+        return '.'.join(parts[:4])  # 提取前三个部分并将它们连接成 IP 地址
+    return None  # 如果容器名称格式不正确，返回 None
+
 # 实时流量监控（所有容器）
 @traffic_bp.route('/api/traffic/realtime', methods=['GET'])
 def realtime_traffic():
@@ -26,22 +36,25 @@ def realtime_traffic():
         containers = UserContainer.query.all()
         
         for container in containers:
-            # 从容器名称中提取 IP 地址
-            server_ip = extract_ip_from_container_name(container.container_name)
-            if not server_ip:
-                continue  # 如果无法提取 IP 地址，跳过该容器
+            # 根据 UserContainer 获取对应的 DockerContainer
+            docker_container = DockerContainer.query.get(container.container_id)
+            if docker_container:
+                # 从 DockerContainer 中提取 container_name
+                server_ip = extract_ip_from_container_name(docker_container.container_name)
+                if not server_ip:
+                    continue  # 如果无法从容器名称中提取 IP 地址，跳过此容器
 
-            metrics_url = f"http://{server_ip}:{container.metrics_port}/metrics"
-            metrics = fetch_traffic_metrics(metrics_url)
-            
-            if metrics:
-                traffic_data.append({
-                    "container_id": container.id,
-                    "server_id": container.server_id,
-                    "upload_traffic": metrics.get("upload_traffic"),
-                    "download_traffic": metrics.get("download_traffic"),
-                    "timestamp": datetime.utcnow().isoformat()
-                })
+                metrics_url = f"http://{server_ip}:{container.metrics_port}/metrics"
+                metrics = fetch_traffic_metrics(metrics_url)
+
+                if metrics:
+                    traffic_data.append({
+                        "container_id": container.id,
+                        "server_id": container.server_id,
+                        "upload_traffic": metrics.get("upload_traffic"),
+                        "download_traffic": metrics.get("download_traffic"),
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
 
         return jsonify({"success": True, "traffic_data": traffic_data}), 200
     except Exception as e:
@@ -59,8 +72,13 @@ def get_realtime_traffic(container_id):
         if not container:
             return jsonify({"success": False, "message": "Container not found"}), 404
 
-        # 从容器名称中提取 IP 地址
-        server_ip = extract_ip_from_container_name(container.container_name)
+        # 根据 UserContainer 获取对应的 DockerContainer
+        docker_container = DockerContainer.query.get(container.container_id)
+        if not docker_container:
+            return jsonify({"success": False, "message": "Docker container not found"}), 404
+        
+        # 从 DockerContainer 中提取 container_name
+        server_ip = extract_ip_from_container_name(docker_container.container_name)
         if not server_ip:
             return jsonify({"success": False, "message": "Invalid container name format, unable to extract IP"}), 400
 
@@ -81,6 +99,38 @@ def get_realtime_traffic(container_id):
     except Exception as e:
         logging.error(f"Error fetching realtime traffic for container {container_id}: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching realtime traffic: {str(e)}"}), 500
+
+# 从 metrics 提取流量数据
+def fetch_traffic_metrics(url):
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        metrics = {}
+
+        # 处理返回的多行文本数据
+        for line in response.text.splitlines():
+            # 检查上传流量
+            if "node_network_transmit_bytes_total" in line:
+                # 解析 eth0 设备的上传流量
+                if 'eth0' in line:
+                    metrics["upload_traffic"] = float(line.split(" ")[1])
+
+            # 检查下载流量
+            elif "node_network_receive_bytes_total" in line:
+                # 解析 eth0 设备的下载流量
+                if 'eth0' in line:
+                    metrics["download_traffic"] = float(line.split(" ")[1])
+
+        # 如果找到了上传和下载流量，就返回 metrics
+        if "upload_traffic" in metrics and "download_traffic" in metrics:
+            return metrics
+        else:
+            logging.error("Could not extract traffic data from metrics.")
+            return None
+
+    except Exception as e:
+        logging.error(f"Error fetching metrics from {url}: {str(e)}")
+        return None
 
 # 用户流量历史统计
 @traffic_bp.route('/api/traffic/history/<int:user_id>', methods=['GET'])
@@ -243,36 +293,4 @@ def detect_overlimit_users():
     except Exception as e:
         logging.error(f"Error detecting overlimit users: {str(e)}")
         return jsonify({"success": False, "message": f"Error detecting overlimit users: {str(e)}"}), 500
-
-# 从 metrics 提取流量数据
-def fetch_traffic_metrics(url):
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-        metrics = {}
-
-        # 处理返回的多行文本数据
-        for line in response.text.splitlines():
-            # 检查上传流量
-            if "node_network_transmit_bytes_total" in line:
-                # 解析 eth0 设备的上传流量
-                if 'eth0' in line:
-                    metrics["upload_traffic"] = float(line.split(" ")[1])
-
-            # 检查下载流量
-            elif "node_network_receive_bytes_total" in line:
-                # 解析 eth0 设备的下载流量
-                if 'eth0' in line:
-                    metrics["download_traffic"] = float(line.split(" ")[1])
-
-        # 如果找到了上传和下载流量，就返回 metrics
-        if "upload_traffic" in metrics and "download_traffic" in metrics:
-            return metrics
-        else:
-            logging.error("Could not extract traffic data from metrics.")
-            return None
-
-    except Exception as e:
-        logging.error(f"Error fetching metrics from {url}: {str(e)}")
-        return None
 
