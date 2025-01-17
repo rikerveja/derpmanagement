@@ -44,8 +44,22 @@ const sendVerificationCode = async () => {
 
   try {
     loading.value = true
-    const response = await api.sendVerificationCode(form.value.email)
-    if (response.success) {
+    console.log('正在发送验证码到:', form.value.email)
+    
+    const response = await fetch('/api/send_verification_email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        email: form.value.email
+      })
+    })
+    
+    const data = await response.json()
+    console.log('验证码发送响应:', data)
+    
+    if (data.success) {
       verificationSent.value = true
       countdown.value = 60
       const timer = setInterval(() => {
@@ -56,10 +70,11 @@ const sendVerificationCode = async () => {
         }
       }, 1000)
     } else {
-      error.value = response.message || '发送验证码失败'
+      error.value = data.message || '发送验证码失败'
     }
   } catch (err) {
-    error.value = '发送验证码失败: ' + (err.message || '未知错误')
+    console.error('发送验证码错误:', err)
+    error.value = `发送验证码失败: ${err.message}`
   } finally {
     loading.value = false
   }
@@ -72,11 +87,20 @@ const submit = async () => {
 
   try {
     loading.value = true
-    const response = await api.addUser(form.value)
-    if (response.success) {
+    const response = await fetch('/api/add_user', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(form.value)
+    })
+    
+    const data = await response.json()
+    if (data.success) {
       router.push('/users')
     } else {
-      error.value = response.message || '添加用户失败'
+      error.value = data.message || '添加用户失败'
     }
   } catch (err) {
     console.error('添加用户失败:', err)
