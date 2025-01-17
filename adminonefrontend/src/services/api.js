@@ -251,8 +251,32 @@ const dashboardApi = {
   }
 }
 
+// 流量相关 API
+const trafficApi = {
+  // 获取所有容器的实时流量
+  getAllContainersTraffic() {
+    return api.get('/traffic/realtime')
+  },
+
+  // 获取单个容器的实时流量
+  getContainerTraffic(containerId) {
+    return api.get(`/traffic/realtime/${containerId}`)
+  },
+
+  // 获取用户流量历史
+  getTrafficHistory(userId) {
+    return api.get(`/traffic/history/${userId}`)
+  },
+
+  // 获取流量统计
+  getTrafficStats(params) {
+    return api.post('/traffic/stats', params)
+  }
+}
+
 export default {
   ...dashboardApi,
+  trafficApi,  // 直接导出 trafficApi 对象
   // 用户相关 API
   login(email, password) {
     return api.post('/login', { email, password })
@@ -380,8 +404,16 @@ export default {
     return api.post('/rental/send_expiry_notifications', { user_id: userId, expiry_date: expiryDate })
   },
   
-  renewRental(rentalId, newExpiryDate) {
-    return api.post('/rental/renew', { rental_id: rentalId, new_expiry_date: newExpiryDate })
+  renewRental(data) {
+    return api.post('/rental/renew', data)
+      .then(response => {
+        console.log('续费响应:', response)
+        return response.data
+      })
+      .catch(error => {
+        console.error('续费失败:', error)
+        throw error
+      })
   },
   
   deleteRental(serialId) {
@@ -515,5 +547,7 @@ export default {
 
   sendVerificationCode(email) {
     return api.post('/send_verification_code', { email })
-  }
+  },
+
+  //getTrafficData
 } 
