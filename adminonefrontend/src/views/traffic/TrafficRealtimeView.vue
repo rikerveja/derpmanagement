@@ -86,63 +86,39 @@
       </button>
     </div>
 
-    <!-- 流量概览卡片 -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-      <CardBox class="hover:shadow-lg transition-shadow">
+    <!-- 流量统计卡片 -->
+    <div class="grid grid-cols-4 gap-4">
+      <div class="bg-white p-4 rounded-lg shadow">
         <div class="flex items-center">
-          <div class="p-3 rounded-full bg-green-100 dark:bg-green-800">
-            <BaseIcon :path="mdiUpload" class="w-6 h-6 text-green-500"/>
-          </div>
-          <div class="ml-4">
-            <h3 class="text-gray-500 text-sm">上传流量</h3>
-            <p class="text-2xl font-semibold">
-              {{ formatTraffic(totalUpload) }}
-            </p>
-          </div>
+          <BaseIcon :path="mdiUpload" class="text-emerald-500 mr-2" />
+          <span class="text-gray-600">上传流量</span>
         </div>
-      </CardBox>
-      
-      <CardBox class="hover:shadow-lg transition-shadow">
-        <div class="flex items-center">
-          <div class="p-3 rounded-full bg-blue-100 dark:bg-blue-800">
-            <BaseIcon :path="mdiDownload" class="w-6 h-6 text-blue-500"/>
-          </div>
-          <div class="ml-4">
-            <h3 class="text-gray-500 text-sm">下载流量</h3>
-            <p class="text-2xl font-semibold">
-              {{ formatTraffic(totalDownload) }}
-            </p>
-          </div>
-        </div>
-      </CardBox>
-      
-      <CardBox class="hover:shadow-lg transition-shadow">
-        <div class="flex items-center">
-          <div class="p-3 rounded-full bg-purple-100 dark:bg-purple-800">
-            <BaseIcon :path="mdiChartLine" class="w-6 h-6 text-purple-500"/>
-          </div>
-          <div class="ml-4">
-            <h3 class="text-gray-500 text-sm">剩余流量</h3>
-            <p class="text-2xl font-semibold">
-              {{ formatTraffic(remainingTraffic) }}
-            </p>
-          </div>
-        </div>
-      </CardBox>
+        <div class="text-2xl font-bold mt-2">{{ formatTraffic(totalUpload) }}</div>
+      </div>
 
-      <CardBox class="hover:shadow-lg transition-shadow">
+      <div class="bg-white p-4 rounded-lg shadow">
         <div class="flex items-center">
-          <div class="p-3 rounded-full bg-yellow-100 dark:bg-yellow-800">
-            <BaseIcon :path="mdiGauge" class="w-6 h-6 text-yellow-500"/>
-          </div>
-          <div class="ml-4">
-            <h3 class="text-gray-500 text-sm">流量限制</h3>
-            <p class="text-2xl font-semibold">
-              {{ formatTraffic(trafficLimit) }}
-            </p>
-          </div>
+          <BaseIcon :path="mdiDownload" class="text-blue-500 mr-2" />
+          <span class="text-gray-600">下载流量</span>
         </div>
-      </CardBox>
+        <div class="text-2xl font-bold mt-2">{{ formatTraffic(totalDownload) }}</div>
+      </div>
+
+      <div class="bg-white p-4 rounded-lg shadow">
+        <div class="flex items-center">
+          <BaseIcon :path="mdiGauge" class="text-purple-500 mr-2" />
+          <span class="text-gray-600">剩余流量</span>
+        </div>
+        <div class="text-2xl font-bold mt-2">{{ formatTrafficWithUnit(remainingTraffic) }}</div>
+      </div>
+
+      <div class="bg-white p-4 rounded-lg shadow">
+        <div class="flex items-center">
+          <BaseIcon :path="mdiChartLine" class="text-yellow-500 mr-2" />
+          <span class="text-gray-600">流量限制</span>
+        </div>
+        <div class="text-2xl font-bold mt-2">{{ formatTrafficWithUnit(trafficLimit) }}</div>
+      </div>
     </div>
 
     <!-- 流量图表 -->
@@ -259,7 +235,7 @@ const fetchServers = async () => {
   try {
     console.log('开始获取服务器列表')
     const response = await api.getServers()
-    console.log('获取服务器列表 - 原始响应:', response)
+    console.log('服务器原始数据:', response)
 
     if (response.success) {
       servers.value = response.servers.map(server => ({
@@ -267,16 +243,13 @@ const fetchServers = async () => {
         name: server.server_name,
         status: server.status || 'checking',
         ip_address: server.ip_address,
-        total_traffic: server.total_traffic || 0
+        total_traffic: server.total_traffic || 0  // 确保这里获取到正确的值
       }))
-      console.log('处理后的服务器列表:', servers.value)
-    } else {
-      throw new Error(response.message || '获取服务器列表失败')
+      console.log('处理后的服务器列表和流量限制:', servers.value)
+      updateTrafficLimits()
     }
   } catch (err) {
     console.error('获取服务器列表失败:', err)
-    error.value = '获取服务器列表失败: ' + (err.message || '未知错误')
-    servers.value = []
   }
 }
 
@@ -383,8 +356,7 @@ const fetchTrafficData = async () => {
         download_traffic: data.download_traffic || 0,
         timestamp: data.timestamp
       }))
-      
-      // 更新流量限制和剩余流量
+      console.log('当前流量数据:', trafficData.value)
       updateTrafficLimits()
       
       error.value = ''
@@ -449,25 +421,24 @@ onUnmounted(() => {
   stopAutoRefresh()
 })
 
-// 计算总流量
-const totalUpload = computed(() => 
-  trafficData.value.reduce((sum, item) => sum + item.upload_traffic, 0)
-)
-const totalDownload = computed(() => 
-  trafficData.value.reduce((sum, item) => sum + item.download_traffic, 0)
-)
+// 计算总上传和下载流量
+const totalUpload = computed(() => {
+  return trafficData.value.reduce((sum, item) => sum + (item.upload_traffic || 0), 0)
+})
 
-// 图表配置
+const totalDownload = computed(() => {
+  return trafficData.value.reduce((sum, item) => sum + (item.download_traffic || 0), 0)
+})
+
+// 修改图表数据的计算
 const chartData = computed(() => {
-  const maxDataPoints = 50 // 最多显示50个数据点
-  const data = trafficData.value.slice(-maxDataPoints)
-  
+  const data = trafficData.value.slice().reverse()
   return {
-    labels: data.map(d => formatTime(d.timestamp)),
+    labels: data.map(d => new Date(d.timestamp).toLocaleTimeString()),
     datasets: [
       {
         label: '上传流量',
-        data: data.map(d => d.upload_traffic / 1024 / 1024),
+        data: data.map(d => (d.upload_traffic || 0) / (1024 * 1024)), // 转换为 MB
         borderColor: '#10B981',
         backgroundColor: '#10B981',
         tension: 0.1,
@@ -475,7 +446,7 @@ const chartData = computed(() => {
       },
       {
         label: '下载流量',
-        data: data.map(d => d.download_traffic / 1024 / 1024),
+        data: data.map(d => (d.download_traffic || 0) / (1024 * 1024)), // 转换为 MB
         borderColor: '#3B82F6',
         backgroundColor: '#3B82F6',
         tension: 0.1,
@@ -543,38 +514,45 @@ const getStatusClass = (status) => {
 
 // 修改流量限制和剩余流量的计算逻辑
 const updateTrafficLimits = () => {
-  // 将字节转换为MB
-  const bytesToMB = (bytes) => bytes / (1024 * 1024)
-  const gbToMB = (gb) => gb * 1024  // 新增：GB转MB的转换函数
+  console.log('开始更新流量限制')
+  
+  // 将字节转换为 MB
+  const bytesToMB = (bytes) => {
+    const mb = bytes / (1024 * 1024)
+    console.log(`转换字节到MB: ${bytes} bytes = ${mb} MB`)
+    return mb
+  }
+  
+  // GB 转 MB
+  const gbToMB = (gb) => {
+    const mb = gb * 1024
+    console.log(`转换GB到MB: ${gb} GB = ${mb} MB`)
+    return mb
+  }
 
   // 计算已使用的总流量（MB）
-  const totalTrafficMB = trafficData.value.reduce((sum, item) => 
-    sum + bytesToMB(item.upload_traffic || 0) + bytesToMB(item.download_traffic || 0), 0
-  )
+  const totalTrafficMB = bytesToMB(totalUpload.value + totalDownload.value)
+  console.log('当前已使用总流量(MB):', totalTrafficMB)
 
-  if (selectedContainer.value) {
-    // 单个容器的流量限制
-    const container = serverContainers.value.find(c => c.id === selectedContainer.value)
-    if (container) {
-      // 容器的总流量限制为上传和下载限制之和（MB）
-      // 注意：container.max_upload_traffic 和 max_download_traffic 是以GB为单位
-      const containerLimit = gbToMB(container.max_upload_traffic || 0) + gbToMB(container.max_download_traffic || 0)
-      trafficLimit.value = containerLimit
-      remainingTraffic.value = Math.max(0, containerLimit - totalTrafficMB)
-    }
-  } else if (selectedServer.value) {
-    // 服务器的流量限制 (GB转MB)
+  if (selectedServer.value) {
+    // 服务器的流量限制
     const server = servers.value.find(s => s.id === selectedServer.value)
     if (server?.total_traffic) {
-      // server.total_traffic 是以GB为单位，需要转换为MB
+      // 这里的 total_traffic 是 GB，需要转换为 MB
       trafficLimit.value = gbToMB(server.total_traffic)
+      console.log('服务器流量限制(MB):', trafficLimit.value)
       remainingTraffic.value = Math.max(0, trafficLimit.value - totalTrafficMB)
+      console.log('剩余流量(MB):', remainingTraffic.value)
     }
   } else {
-    // 全部服务器流量 (GB转MB)
+    // 全部服务器流量
     const totalGBLimit = servers.value.reduce((sum, server) => sum + (server.total_traffic || 0), 0)
+    console.log('所有服务器总流量限制(GB):', totalGBLimit)
+    // 将 GB 转换为 MB
     trafficLimit.value = gbToMB(totalGBLimit)
+    console.log('所有服务器总流量限制(MB):', trafficLimit.value)
     remainingTraffic.value = Math.max(0, trafficLimit.value - totalTrafficMB)
+    console.log('剩余流量(MB):', remainingTraffic.value)
   }
 }
 
@@ -594,8 +572,9 @@ const getContainerName = (containerId) => {
   return containerId
 }
 
-// 修改流量格式化函数，统一使用MB单位显示
+// 修改流量格式化函数，确保显示正确的 MB 值
 const formatTrafficWithUnit = (value) => {
+  if (typeof value !== 'number') return '0.00 MB'
   return `${value.toFixed(2)} MB`
 }
 </script> 
