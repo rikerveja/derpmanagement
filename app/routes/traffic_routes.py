@@ -1,6 +1,5 @@
 from flask import Blueprint, request, jsonify
-from app import db  # 正确导入 db 实例
-from app.models import DockerContainer, DockerContainerTraffic, ServerTraffic, UserTraffic, Rental, Server
+from app.models import DockerContainer, DockerContainerTraffic, ServerTraffic, UserTraffic, Rental
 from datetime import datetime
 import requests
 import logging
@@ -18,10 +17,11 @@ def extract_ip_from_container_name(container_name):
         return '.'.join(parts[:4])  # 提取前三个部分并将它们连接成 IP 地址
     return None  # 如果容器名称格式不正确，返回 None
 
+# 实时流量监控（所有容器）
 @traffic_bp.route('/api/traffic/realtime', methods=['GET'])
 def realtime_traffic():
     """
-    获取所有容器的实时流量监控，并更新相关数据表
+    获取所有容器的实时流量监控
     """
     try:
         traffic_data = []
@@ -38,53 +38,27 @@ def realtime_traffic():
             metrics = fetch_traffic_metrics(metrics_url)
 
             if metrics:
-                upload_traffic_gb = metrics.get("upload_traffic")
-                download_traffic_gb = metrics.get("download_traffic")
-                
-                logging.info(f"Container {container.id} - Upload: {upload_traffic_gb} GB, Download: {download_traffic_gb} GB")
-
-                # 更新容器的流量数据
-                container.upload_traffic = upload_traffic_gb
-                container.download_traffic = download_traffic_gb
-                db.session.commit()  # 提交容器流量更新
-                logging.info(f"Updated container {container.id}: upload_traffic={upload_traffic_gb}, download_traffic={download_traffic_gb}")
-
-                # 更新服务器的 remaining_traffic
-                server = Server.query.filter_by(id=container.server_id).first()
-                if server:
-                    total_used_traffic = sum(
-                        c.upload_traffic + c.download_traffic for c in DockerContainer.query.filter_by(server_id=container.server_id).all()
-                    )
-                    server.remaining_traffic = round(server.total_traffic - total_used_traffic, 2)  # 计算剩余流量并转换为GB
-                    db.session.commit()  # 提交服务器流量更新
-                    logging.info(f"Updated server {server.id}: remaining_traffic={server.remaining_traffic}")
-
-                # 添加容器流量数据到返回的结果
                 traffic_data.append({
                     "container_id": container.id,
                     "server_id": container.server_id,
-                    "upload_traffic": upload_traffic_gb,
-                    "download_traffic": download_traffic_gb,
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "status": "success"  # 添加状态字段，标记为成功
+                    "upload_traffic": metrics.get("upload_traffic"),
+                    "download_traffic": metrics.get("download_traffic"),
+                    "timestamp": datetime.utcnow().isoformat()
                 })
 
         return jsonify({"success": True, "traffic_data": traffic_data}), 200
-
     except Exception as e:
         logging.error(f"Error fetching realtime traffic data: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching realtime traffic: {str(e)}"}), 500
-
 
 # 实时流量监控（单个容器）
 @traffic_bp.route('/api/traffic/realtime/<int:container_id>', methods=['GET'])
 def get_realtime_traffic(container_id):
     """
-    获取容器的实时流量数据，并更新相关的服务器和容器数据
+    获取容器的实时流量数据
     """
     try:
-        # 从 DockerContainer 获取容器
-        container = DockerContainer.query.get(container_id)
+        container = DockerContainer.query.get(container_id)  # 从 DockerContainer 获取容器
         if not container:
             return jsonify({"success": False, "message": "Container not found"}), 404
 
@@ -98,45 +72,16 @@ def get_realtime_traffic(container_id):
         metrics = fetch_traffic_metrics(metrics_url)
 
         if metrics:
-            # 获取流量数据并转换为 GB，并确保是 DECIMAL(10, 2) 格式
-            upload_traffic_gb = round(metrics.get("upload_traffic") / (1024 * 1024 * 1024), 2)  # 转换为GB
-            download_traffic_gb = round(metrics.get("download_traffic") / (1024 * 1024 * 1024), 2)  # 转换为GB
-
-            # 更新容器的流量数据
-            container.upload_traffic = upload_traffic_gb
-            container.download_traffic = download_traffic_gb
-            db.session.commit()  # 提交容器流量更新
-
-            # 更新服务器的 remaining_traffic（假设剩余流量是由所有容器的流量之和计算的）
-            server = Server.query.filter_by(id=container.server_id).first()  # 修改为 Server 类
-            if server:
-                total_used_traffic = sum(
-                    container.upload_traffic + container.download_traffic for container in DockerContainer.query.filter_by(server_id=container.server_id).all()
-                )
-                # 更新服务器剩余流量，假设 `server.total_traffic` 存储了服务器的总流量
-                server.remaining_traffic = round(server.total_traffic - total_used_traffic, 2)  # 计算剩余流量并转换为GB
-                db.session.commit()  # 提交服务器流量更新
-
             return jsonify({
                 "success": True,
-                "container": {
-                    "id": container.id,
-                    "name": container.container_name
-                },
                 "traffic": {
-                    "upload_traffic": container.upload_traffic,  # 返回更新后的容器流量（GB）
-                    "download_traffic": container.download_traffic  # 返回更新后的容器流量（GB）
+                    "upload_traffic": metrics.get("upload_traffic"),
+                    "download_traffic": metrics.get("download_traffic")
                 },
-                "server": {
-                    "id": server.id if server else None,
-                    "remaining_traffic": server.remaining_traffic if server else None  # 返回服务器剩余流量（GB）
-                },
-                "timestamp": datetime.utcnow().isoformat(),
-                "status": "success"  # 添加状态字段，标记为成功
+                "timestamp": datetime.utcnow().isoformat()
             }), 200
 
         return jsonify({"success": False, "message": "Failed to fetch metrics"}), 500
-
     except Exception as e:
         logging.error(f"Error fetching realtime traffic for container {container_id}: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching realtime traffic: {str(e)}"}), 500
@@ -145,11 +90,8 @@ def get_realtime_traffic(container_id):
 def fetch_traffic_metrics(url):
     try:
         response = requests.get(url)
-        response.raise_for_status()  # 如果返回状态码不是 200，会抛出异常
+        response.raise_for_status()
         metrics = {}
-
-        # 打印原始的响应内容，检查返回的数据
-        logging.info(f"Metrics response: {response.text[:500]}")  # 打印前500字符，避免过长
 
         # 处理返回的多行文本数据
         for line in response.text.splitlines():
@@ -157,25 +99,16 @@ def fetch_traffic_metrics(url):
             if "node_network_transmit_bytes_total" in line:
                 # 解析 eth0 设备的上传流量
                 if 'eth0' in line:
-                    try:
-                        upload_traffic_bytes = float(line.split(" ")[1])  # 提取字节数
-                        metrics["upload_traffic"] = round(upload_traffic_bytes / (1024 * 1024 * 1024), 2)  # 转换为GB并保留两位小数
-                    except ValueError:
-                        logging.error(f"Error parsing upload traffic in line: {line}")
+                    metrics["upload_traffic"] = float(line.split(" ")[1])
 
             # 检查下载流量
             elif "node_network_receive_bytes_total" in line:
                 # 解析 eth0 设备的下载流量
                 if 'eth0' in line:
-                    try:
-                        download_traffic_bytes = float(line.split(" ")[1])  # 提取字节数
-                        metrics["download_traffic"] = round(download_traffic_bytes / (1024 * 1024 * 1024), 2)  # 转换为GB并保留两位小数
-                    except ValueError:
-                        logging.error(f"Error parsing download traffic in line: {line}")
+                    metrics["download_traffic"] = float(line.split(" ")[1])
 
         # 如果找到了上传和下载流量，就返回 metrics
         if "upload_traffic" in metrics and "download_traffic" in metrics:
-            logging.info(f"Extracted metrics: {metrics}")
             return metrics
         else:
             logging.error("Could not extract traffic data from metrics.")
@@ -184,7 +117,6 @@ def fetch_traffic_metrics(url):
     except Exception as e:
         logging.error(f"Error fetching metrics from {url}: {str(e)}")
         return None
-
 
 # 用户流量历史统计
 @traffic_bp.route('/api/traffic/history/<int:user_id>', methods=['GET'])
@@ -211,150 +143,117 @@ def traffic_history(user_id):
         logging.error(f"Error fetching traffic history for user {user_id}: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching traffic history: {str(e)}"}), 500
 
-@traffic_bp.route('/api/traffic/stats', methods=['POST']) 
+# 按用户或服务器统计流量
+@traffic_bp.route('/api/traffic/stats', methods=['POST'])
 def get_traffic_stats():
     """
-    按用户或服务器统计流量，并更新数据表
+    按用户或服务器统计流量
     """
     data = request.json
     user_id = data.get('user_id')
     server_id = data.get('server_id')
 
     try:
-        # 按用户统计流量
         if user_id:
-            # 从 docker_containers 表查询用户相关的容器流量
-            user_traffic = DockerContainer.query.filter_by(user_id=user_id).limit(100).all()
+            user_traffic = DockerContainerTraffic.query.filter_by(user_id=user_id).limit(100).all()
             response_data = [
                 {
-                    "container_id": record.id,
-                    "upload_traffic": round(record.upload_traffic / (1024 * 1024 * 1024), 2),  # 转换为GB，保留两位小数
-                    "download_traffic": round(record.download_traffic / (1024 * 1024 * 1024), 2),  # 转换为GB，保留两位小数
-                    "updated_at": record.updated_at.isoformat()  # 使用 updated_at 字段
+                    "container_id": record.container_id,
+                    "upload_traffic": record.upload_traffic,
+                    "download_traffic": record.download_traffic,
+                    "remaining_traffic": record.remaining_traffic,
+                    "timestamp": record.timestamp.isoformat()
                 }
                 for record in user_traffic
             ]
 
             # 更新用户流量统计
-            total_traffic = sum((r.upload_traffic + r.download_traffic) / (1024 * 1024 * 1024) for r in user_traffic)  # 转换为GB
-            traffic_limit = max(r.max_upload_traffic for r in user_traffic)  # 使用 max_upload_traffic
+            total_traffic = sum(r.upload_traffic + r.download_traffic for r in user_traffic)
+            remaining_traffic = sum(r.remaining_traffic for r in user_traffic)
+            traffic_limit = max(r.traffic_limit for r in user_traffic)
 
-            # 将 total_traffic 和 traffic_limit 转换为 float，避免类型冲突
-            total_traffic = float(total_traffic)
-            traffic_limit = float(traffic_limit)
-
-            # 更新或插入用户流量统计记录
             user_record = UserTraffic.query.filter_by(user_id=user_id).first()
             if user_record:
-                user_record.upload_traffic = round(sum(r.upload_traffic for r in user_traffic) / (1024 * 1024 * 1024), 2)  # 转换为GB
-                user_record.download_traffic = round(sum(r.download_traffic for r in user_traffic) / (1024 * 1024 * 1024), 2)  # 转换为GB
-                user_record.total_traffic = round(total_traffic, 2)
+                user_record.upload_traffic = sum(r.upload_traffic for r in user_traffic)
+                user_record.download_traffic = sum(r.download_traffic for r in user_traffic)
+                user_record.total_traffic = total_traffic
+                user_record.remaining_traffic = remaining_traffic
+                user_record.traffic_limit = traffic_limit
                 user_record.updated_at = datetime.utcnow()
             else:
                 user_record = UserTraffic(
                     user_id=user_id,
-                    upload_traffic=round(sum(r.upload_traffic for r in user_traffic) / (1024 * 1024 * 1024), 2),
-                    download_traffic=round(sum(r.download_traffic for r in user_traffic) / (1024 * 1024 * 1024), 2),
-                    total_traffic=round(total_traffic, 2),
+                    upload_traffic=sum(r.upload_traffic for r in user_traffic),
+                    download_traffic=sum(r.download_traffic for r in user_traffic),
+                    total_traffic=total_traffic,
+                    remaining_traffic=remaining_traffic,
+                    traffic_limit=traffic_limit,
                     updated_at=datetime.utcnow()
                 )
-                db.session.add(user_record)
 
-            db.session.commit()
+            UserTraffic.query.session.add(user_record)
+            UserTraffic.query.session.commit()
 
             # 更新租赁表的 traffic_usage
-            rental_record = Rental.query.filter_by(user_id=user_id).first()  # 使用正确的 Rental 类
+            rental_record = Rentals.query.filter_by(user_id=user_id).first()
             if rental_record:
-                rental_record.traffic_usage = round(total_traffic, 2)
+                rental_record.traffic_usage = total_traffic
                 rental_record.updated_at = datetime.utcnow()
-                db.session.commit()
-
-            # 更新容器流量
-            for record in user_traffic:
-                container = DockerContainer.query.get(record.id)
-                if container:
-                    container.upload_traffic = round(record.upload_traffic / (1024 * 1024 * 1024), 2)  # 转换为GB
-                    container.download_traffic = round(record.download_traffic / (1024 * 1024 * 1024), 2)  # 转换为GB
-                    db.session.commit()
+                Rentals.query.session.commit()
 
             return jsonify({"success": True, "user_traffic": response_data, "user_summary": {
-                "total_traffic": round(total_traffic, 2),
+                "total_traffic": total_traffic,
+                "remaining_traffic": remaining_traffic,
                 "traffic_limit": traffic_limit
             }}), 200
 
-        # 按服务器统计流量
         if server_id:
-            # 从 docker_containers 表查询服务器相关的容器流量
-            server_traffic = DockerContainer.query.filter_by(server_id=server_id).limit(100).all()
+            server_traffic = DockerContainerTraffic.query.filter_by(server_id=server_id).limit(100).all()
             response_data = [
                 {
-                    "container_id": record.id,
-                    "upload_traffic": round(record.upload_traffic / (1024 * 1024 * 1024), 2),  # 转换为GB，保留两位小数
-                    "download_traffic": round(record.download_traffic / (1024 * 1024 * 1024), 2),  # 转换为GB，保留两位小数
-                    "updated_at": record.updated_at.isoformat()  # 使用 updated_at 字段
+                    "container_id": record.container_id,
+                    "upload_traffic": record.upload_traffic,
+                    "download_traffic": record.download_traffic,
+                    "remaining_traffic": record.remaining_traffic,
+                    "timestamp": record.timestamp.isoformat()
                 }
                 for record in server_traffic
             ]
 
             # 更新服务器流量统计
-            total_traffic = sum((r.upload_traffic + r.download_traffic) / (1024 * 1024 * 1024) for r in server_traffic)  # 转换为GB
+            total_traffic = sum(r.upload_traffic + r.download_traffic for r in server_traffic)
+            remaining_traffic = sum(r.remaining_traffic for r in server_traffic)
+            traffic_limit = max(r.traffic_limit for r in server_traffic)
 
-            # 获取服务器的 remaining_traffic（从 server 表中）
-            server = Server.query.get(server_id)  # 修改为 Server 类
-            remaining_traffic = round(server.remaining_traffic / (1024 * 1024 * 1024), 2) if server else 0  # 转换为GB
-
-            # 获取 max_upload_traffic（流量限制）
-            traffic_limit = max(r.max_upload_traffic for r in server_traffic)  # 使用 max_upload_traffic
-
-            # 将 total_traffic 和 traffic_limit 转换为 float，避免类型冲突
-            total_traffic = float(total_traffic)
-            traffic_limit = float(traffic_limit)
-
-            # 更新或插入服务器流量统计记录
-            server_record = ServerTraffic.query.filter_by(server_id=server_id).first()  # 使用 Server 类
+            server_record = ServerTraffic.query.filter_by(server_id=server_id).first()
             if server_record:
-                server_record.total_traffic = round(total_traffic, 2)
+                server_record.total_traffic = total_traffic
                 server_record.remaining_traffic = remaining_traffic
                 server_record.traffic_limit = traffic_limit
-                server_record.traffic_used = round(total_traffic - remaining_traffic, 2)
+                server_record.traffic_used = total_traffic - remaining_traffic
                 server_record.updated_at = datetime.utcnow()
             else:
                 server_record = ServerTraffic(
                     server_id=server_id,
-                    total_traffic=round(total_traffic, 2),
+                    total_traffic=total_traffic,
                     remaining_traffic=remaining_traffic,
                     traffic_limit=traffic_limit,
-                    traffic_used=round(total_traffic - remaining_traffic, 2),
+                    traffic_used=total_traffic - remaining_traffic,
                     traffic_reset_date=datetime.utcnow(),
                     updated_at=datetime.utcnow(),
                     created_at=datetime.utcnow()
                 )
-                db.session.add(server_record)
 
-            db.session.commit()
-
-            # 更新服务器的 remaining_traffic
-            if server:
-                server.remaining_traffic = remaining_traffic
-                db.session.commit()
-
-            # 更新容器流量
-            for record in server_traffic:
-                container = DockerContainer.query.get(record.id)
-                if container:
-                    container.upload_traffic = round(record.upload_traffic / (1024 * 1024 * 1024), 2)  # 转换为GB
-                    container.download_traffic = round(record.download_traffic / (1024 * 1024 * 1024), 2)  # 转换为GB
-                    db.session.commit()
+            ServerTraffic.query.session.add(server_record)
+            ServerTraffic.query.session.commit()
 
             return jsonify({"success": True, "server_traffic": response_data, "server_summary": {
-                "total_traffic": round(total_traffic, 2),
+                "total_traffic": total_traffic,
                 "remaining_traffic": remaining_traffic,
                 "traffic_limit": traffic_limit
             }}), 200
 
         return jsonify({"success": False, "message": "Missing user_id or server_id"}), 400
-
     except Exception as e:
         logging.error(f"Error fetching traffic stats: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching traffic stats: {str(e)}"}), 500
-
