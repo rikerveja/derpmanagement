@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
+from app import db  # 从 app 模块导入 db 实例
 from app.models import DockerContainer, DockerContainerTraffic, ServerTraffic, UserTraffic, Rental
-from app import db  # 正确导入 db 实例
 from datetime import datetime
 import requests
 import logging
