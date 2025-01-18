@@ -166,7 +166,6 @@ def get_traffic_stats():
                     "container_id": record.id,
                     "upload_traffic": round(record.upload_traffic / (1024 * 1024 * 1024), 2),  # 转换为GB
                     "download_traffic": round(record.download_traffic / (1024 * 1024 * 1024), 2),  # 转换为GB
-                    "remaining_traffic": round(record.remaining_traffic / (1024 * 1024 * 1024), 2),  # 转换为GB
                     "timestamp": record.timestamp.isoformat()
                 }
                 for record in user_traffic
@@ -174,7 +173,6 @@ def get_traffic_stats():
 
             # 更新用户流量统计
             total_traffic = sum((r.upload_traffic + r.download_traffic) / (1024 * 1024 * 1024) for r in user_traffic)  # 转换为GB
-            remaining_traffic = sum(r.remaining_traffic / (1024 * 1024 * 1024) for r in user_traffic)  # 转换为GB
             traffic_limit = max(r.traffic_limit for r in user_traffic)
 
             # 更新或插入用户流量统计记录
@@ -183,8 +181,6 @@ def get_traffic_stats():
                 user_record.upload_traffic = round(sum(r.upload_traffic for r in user_traffic) / (1024 * 1024 * 1024), 2)  # 转换为GB
                 user_record.download_traffic = round(sum(r.download_traffic for r in user_traffic) / (1024 * 1024 * 1024), 2)  # 转换为GB
                 user_record.total_traffic = round(total_traffic, 2)
-                user_record.remaining_traffic = round(remaining_traffic, 2)
-                user_record.traffic_limit = traffic_limit
                 user_record.updated_at = datetime.utcnow()
             else:
                 user_record = UserTraffic(
@@ -192,8 +188,6 @@ def get_traffic_stats():
                     upload_traffic=round(sum(r.upload_traffic for r in user_traffic) / (1024 * 1024 * 1024), 2),
                     download_traffic=round(sum(r.download_traffic for r in user_traffic) / (1024 * 1024 * 1024), 2),
                     total_traffic=round(total_traffic, 2),
-                    remaining_traffic=round(remaining_traffic, 2),
-                    traffic_limit=traffic_limit,
                     updated_at=datetime.utcnow()
                 )
                 db.session.add(user_record)
@@ -217,7 +211,6 @@ def get_traffic_stats():
 
             return jsonify({"success": True, "user_traffic": response_data, "user_summary": {
                 "total_traffic": round(total_traffic, 2),
-                "remaining_traffic": round(remaining_traffic, 2),
                 "traffic_limit": traffic_limit
             }}), 200
 
@@ -230,7 +223,6 @@ def get_traffic_stats():
                     "container_id": record.id,
                     "upload_traffic": round(record.upload_traffic / (1024 * 1024 * 1024), 2),  # 转换为GB
                     "download_traffic": round(record.download_traffic / (1024 * 1024 * 1024), 2),  # 转换为GB
-                    "remaining_traffic": round(record.remaining_traffic / (1024 * 1024 * 1024), 2),  # 转换为GB
                     "timestamp": record.timestamp.isoformat()
                 }
                 for record in server_traffic
@@ -238,14 +230,18 @@ def get_traffic_stats():
 
             # 更新服务器流量统计
             total_traffic = sum((r.upload_traffic + r.download_traffic) / (1024 * 1024 * 1024) for r in server_traffic)  # 转换为GB
-            remaining_traffic = sum(r.remaining_traffic / (1024 * 1024 * 1024) for r in server_traffic)  # 转换为GB
+
+            # 获取服务器的 remaining_traffic（从 servers 表中）
+            server = Servers.query.get(server_id)
+            remaining_traffic = round(server.remaining_traffic / (1024 * 1024 * 1024), 2) if server else 0  # 转换为GB
+
             traffic_limit = max(r.traffic_limit for r in server_traffic)
 
             # 更新或插入服务器流量统计记录
             server_record = ServerTraffic.query.filter_by(server_id=server_id).first()
             if server_record:
                 server_record.total_traffic = round(total_traffic, 2)
-                server_record.remaining_traffic = round(remaining_traffic, 2)
+                server_record.remaining_traffic = remaining_traffic
                 server_record.traffic_limit = traffic_limit
                 server_record.traffic_used = round(total_traffic - remaining_traffic, 2)
                 server_record.updated_at = datetime.utcnow()
@@ -253,7 +249,7 @@ def get_traffic_stats():
                 server_record = ServerTraffic(
                     server_id=server_id,
                     total_traffic=round(total_traffic, 2),
-                    remaining_traffic=round(remaining_traffic, 2),
+                    remaining_traffic=remaining_traffic,
                     traffic_limit=traffic_limit,
                     traffic_used=round(total_traffic - remaining_traffic, 2),
                     traffic_reset_date=datetime.utcnow(),
@@ -265,9 +261,8 @@ def get_traffic_stats():
             db.session.commit()
 
             # 更新服务器的 remaining_traffic
-            server = Servers.query.get(server_id)
             if server:
-                server.remaining_traffic = round(remaining_traffic, 2)
+                server.remaining_traffic = remaining_traffic
                 db.session.commit()
 
             # 更新容器流量
@@ -280,7 +275,7 @@ def get_traffic_stats():
 
             return jsonify({"success": True, "server_traffic": response_data, "server_summary": {
                 "total_traffic": round(total_traffic, 2),
-                "remaining_traffic": round(remaining_traffic, 2),
+                "remaining_traffic": remaining_traffic,
                 "traffic_limit": traffic_limit
             }}), 200
 
