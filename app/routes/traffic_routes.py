@@ -148,6 +148,9 @@ def fetch_traffic_metrics(url):
         response.raise_for_status()  # 如果返回状态码不是 200，会抛出异常
         metrics = {}
 
+        # 打印原始的响应内容，检查返回的数据
+        logging.info(f"Metrics response: {response.text[:500]}")  # 打印前500字符，避免过长
+
         # 处理返回的多行文本数据
         for line in response.text.splitlines():
             # 检查上传流量
@@ -166,6 +169,7 @@ def fetch_traffic_metrics(url):
 
         # 如果找到了上传和下载流量，就返回 metrics
         if "upload_traffic" in metrics and "download_traffic" in metrics:
+            logging.info(f"Extracted metrics: {metrics}")
             return metrics
         else:
             logging.error("Could not extract traffic data from metrics.")
@@ -174,7 +178,6 @@ def fetch_traffic_metrics(url):
     except Exception as e:
         logging.error(f"Error fetching metrics from {url}: {str(e)}")
         return None
-
 
 # 用户流量历史统计
 @traffic_bp.route('/api/traffic/history/<int:user_id>', methods=['GET'])
