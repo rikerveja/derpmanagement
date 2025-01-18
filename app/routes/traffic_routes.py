@@ -27,7 +27,6 @@ def realtime_traffic():
     try:
         traffic_data = []
         containers = DockerContainer.query.all()  # 获取所有 Docker 容器
-        
         for container in containers:
             # 从 DockerContainer 中提取 container_name
             server_ip = extract_ip_from_container_name(container.container_name)
@@ -49,7 +48,7 @@ def realtime_traffic():
                 db.session.commit()  # 提交容器流量更新
 
                 # 更新服务器的 remaining_traffic
-                server = Servers.query.filter_by(id=container.server_id).first()
+                server = Server.query.filter_by(id=container.server_id).first()  # 修改为 Server 类
                 if server:
                     # 计算该服务器所有容器的总流量
                     total_used_traffic = sum(
@@ -65,7 +64,8 @@ def realtime_traffic():
                     "server_id": container.server_id,
                     "upload_traffic": upload_traffic_gb,
                     "download_traffic": download_traffic_gb,
-                    "timestamp": datetime.utcnow().isoformat()
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "status": "success"  # 添加状态字段，标记为成功
                 })
 
         return jsonify({"success": True, "traffic_data": traffic_data}), 200
@@ -75,7 +75,7 @@ def realtime_traffic():
         return jsonify({"success": False, "message": f"Error fetching realtime traffic: {str(e)}"}), 500
 
 
-# 实时流量监控（单个容器）   
+# 实时流量监控（单个容器）
 @traffic_bp.route('/api/traffic/realtime/<int:container_id>', methods=['GET'])
 def get_realtime_traffic(container_id):
     """
@@ -107,7 +107,7 @@ def get_realtime_traffic(container_id):
             db.session.commit()  # 提交容器流量更新
 
             # 更新服务器的 remaining_traffic（假设剩余流量是由所有容器的流量之和计算的）
-            server = Servers.query.filter_by(id=container.server_id).first()
+            server = Server.query.filter_by(id=container.server_id).first()  # 修改为 Server 类
             if server:
                 total_used_traffic = sum(
                     container.upload_traffic + container.download_traffic for container in DockerContainer.query.filter_by(server_id=container.server_id).all()
@@ -130,7 +130,8 @@ def get_realtime_traffic(container_id):
                     "id": server.id if server else None,
                     "remaining_traffic": server.remaining_traffic if server else None  # 返回服务器剩余流量（GB）
                 },
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
+                "status": "success"  # 添加状态字段，标记为成功
             }), 200
 
         return jsonify({"success": False, "message": "Failed to fetch metrics"}), 500
