@@ -7,6 +7,10 @@ import logging
 # 定义蓝图
 traffic_bp = Blueprint('traffic', __name__)
 
+# 将字节转换为 GB
+def bytes_to_gb(bytes_value):
+    return round(bytes_value / (1024 ** 3), 2)  # 1GB = 1024^3 字节
+
 # 从容器名称提取 IP 地址
 def extract_ip_from_container_name(container_name):
     """
@@ -38,11 +42,20 @@ def realtime_traffic():
             metrics = fetch_traffic_metrics(metrics_url)
 
             if metrics:
+                # 转换流量为 GB 单位
+                upload_traffic_gb = bytes_to_gb(metrics.get("upload_traffic"))
+                download_traffic_gb = bytes_to_gb(metrics.get("download_traffic"))
+
+                # 更新数据库中的流量
+                container.upload_traffic = upload_traffic_gb
+                container.download_traffic = download_traffic_gb
+                db.session.commit()  # 提交更新
+
                 traffic_data.append({
                     "container_id": container.id,
                     "server_id": container.server_id,
-                    "upload_traffic": metrics.get("upload_traffic"),
-                    "download_traffic": metrics.get("download_traffic"),
+                    "upload_traffic": upload_traffic_gb,
+                    "download_traffic": download_traffic_gb,
                     "timestamp": datetime.utcnow().isoformat()
                 })
 
@@ -72,6 +85,10 @@ def get_realtime_traffic(container_id):
         metrics = fetch_traffic_metrics(metrics_url)
 
         if metrics:
+            # 转换流量为 GB 单位
+            upload_traffic_gb = bytes_to_gb(metrics.get("upload_traffic"))
+            download_traffic_gb = bytes_to_gb(metrics.get("download_traffic"))
+
             return jsonify({
                 "success": True,
                 "container": {
@@ -79,8 +96,8 @@ def get_realtime_traffic(container_id):
                     "name": container.container_name
                 },
                 "traffic": {
-                    "upload_traffic": metrics.get("upload_traffic"),
-                    "download_traffic": metrics.get("download_traffic")
+                    "upload_traffic": upload_traffic_gb,
+                    "download_traffic": download_traffic_gb
                 },
                 "timestamp": datetime.utcnow().isoformat()
             }), 200
@@ -101,13 +118,11 @@ def fetch_traffic_metrics(url):
         for line in response.text.splitlines():
             # 检查上传流量
             if "node_network_transmit_bytes_total" in line:
-                # 解析 eth0 设备的上传流量
                 if 'eth0' in line:
                     metrics["upload_traffic"] = float(line.split(" ")[1])
 
             # 检查下载流量
             elif "node_network_receive_bytes_total" in line:
-                # 解析 eth0 设备的下载流量
                 if 'eth0' in line:
                     metrics["download_traffic"] = float(line.split(" ")[1])
 
@@ -134,8 +149,8 @@ def traffic_history(user_id):
         response_data = [
             {
                 "container_id": record.container_id,
-                "upload_traffic": record.upload_traffic,
-                "download_traffic": record.download_traffic,
+                "upload_traffic": bytes_to_gb(record.upload_traffic),
+                "download_traffic": bytes_to_gb(record.download_traffic),
                 "remaining_traffic": record.remaining_traffic,
                 "timestamp": record.timestamp.isoformat()
             }
@@ -163,8 +178,8 @@ def get_traffic_stats():
             response_data = [
                 {
                     "container_id": record.container_id,
-                    "upload_traffic": record.upload_traffic,
-                    "download_traffic": record.download_traffic,
+                    "upload_traffic": bytes_to_gb(record.upload_traffic),
+                    "download_traffic": bytes_to_gb(record.download_traffic),
                     "remaining_traffic": record.remaining_traffic,
                     "timestamp": record.timestamp.isoformat()
                 }
@@ -216,8 +231,8 @@ def get_traffic_stats():
             response_data = [
                 {
                     "container_id": record.container_id,
-                    "upload_traffic": record.upload_traffic,
-                    "download_traffic": record.download_traffic,
+                    "upload_traffic": bytes_to_gb(record.upload_traffic),
+                    "download_traffic": bytes_to_gb(record.download_traffic),
                     "remaining_traffic": record.remaining_traffic,
                     "timestamp": record.timestamp.isoformat()
                 }
