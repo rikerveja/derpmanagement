@@ -22,12 +22,11 @@ def extract_ip_from_container_name(container_name):
 @traffic_bp.route('/api/traffic/realtime', methods=['GET'])
 def realtime_traffic():
     """
-    获取所有容器的实时流量监控
+    获取所有容器的实时流量监控，并更新相关数据表
     """
     try:
         traffic_data = []
         containers = DockerContainer.query.all()  # 获取所有 Docker 容器
-        
         for container in containers:
             # 从 DockerContainer 中提取 container_name
             server_ip = extract_ip_from_container_name(container.container_name)
@@ -39,18 +38,39 @@ def realtime_traffic():
             metrics = fetch_traffic_metrics(metrics_url)
 
             if metrics:
+                # 获取实时流量并更新容器的流量数据
+                upload_traffic_gb = round(metrics.get("upload_traffic") / (1024 * 1024 * 1024), 2)  # 转换为GB
+                download_traffic_gb = round(metrics.get("download_traffic") / (1024 * 1024 * 1024), 2)  # 转换为GB
+
+                # 更新容器的流量数据
+                container.upload_traffic = upload_traffic_gb
+                container.download_traffic = download_traffic_gb
+                db.session.commit()  # 提交容器流量更新
+
+                # 更新服务器的 remaining_traffic
+                server = Servers.query.filter_by(id=container.server_id).first()
+                if server:
+                    total_used_traffic = sum(
+                        c.upload_traffic + c.download_traffic for c in DockerContainer.query.filter_by(server_id=container.server_id).all()
+                    )
+                    server.remaining_traffic = round(server.total_traffic - total_used_traffic, 2)  # 计算剩余流量并转换为GB
+                    db.session.commit()  # 提交服务器流量更新
+
+                # 添加容器流量数据到返回的结果
                 traffic_data.append({
                     "container_id": container.id,
                     "server_id": container.server_id,
-                    "upload_traffic": metrics.get("upload_traffic"),
-                    "download_traffic": metrics.get("download_traffic"),
+                    "upload_traffic": upload_traffic_gb,
+                    "download_traffic": download_traffic_gb,
                     "timestamp": datetime.utcnow().isoformat()
                 })
 
         return jsonify({"success": True, "traffic_data": traffic_data}), 200
+
     except Exception as e:
         logging.error(f"Error fetching realtime traffic data: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching realtime traffic: {str(e)}"}), 500
+
 
 # 实时流量监控（单个容器）   
 @traffic_bp.route('/api/traffic/realtime/<int:container_id>', methods=['GET'])
