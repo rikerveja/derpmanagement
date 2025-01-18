@@ -233,8 +233,8 @@ class Server(db.Model):
     server_type = Column(String(255))
     region = Column(String(255))
     user_count = Column(Integer, default=0)
-    total_traffic = Column(Integer)
-    remaining_traffic = Column(Integer)
+    total_traffic = Column(DECIMAL(10, 2))
+    remaining_traffic = Column(DECIMAL(10, 2))
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
