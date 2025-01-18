@@ -26,7 +26,7 @@ def realtime_traffic():
     try:
         traffic_data = []
         containers = DockerContainer.query.all()  # 获取所有 Docker 容器
-        
+
         for container in containers:
             # 从 DockerContainer 中提取 container_name
             server_ip = extract_ip_from_container_name(container.container_name)
@@ -36,8 +36,7 @@ def realtime_traffic():
             # 使用 node_exporter_port 获取流量数据
             metrics_url = f"http://{server_ip}:{container.node_exporter_port}/metrics"
             metrics = fetch_traffic_metrics(metrics_url)
-            
-            # 打印日志，查看是否成功获取流量数据
+
             if metrics:
                 logging.info(f"Container {container.id} - Upload: {metrics.get('upload_traffic')} GB, Download: {metrics.get('download_traffic')} GB")
 
@@ -49,17 +48,17 @@ def realtime_traffic():
                 container.upload_traffic = upload_traffic_gb
                 container.download_traffic = download_traffic_gb
                 db.session.commit()  # 提交容器流量更新
+                logging.info(f"Updated container {container.id}: upload_traffic={upload_traffic_gb}, download_traffic={download_traffic_gb}")
 
                 # 更新服务器的 remaining_traffic
-                server = Server.query.filter_by(id=container.server_id).first()  # 修改为 Server 类
+                server = Server.query.filter_by(id=container.server_id).first()
                 if server:
-                    # 计算该服务器所有容器的总流量
                     total_used_traffic = sum(
                         c.upload_traffic + c.download_traffic for c in DockerContainer.query.filter_by(server_id=container.server_id).all()
                     )
-                    # 更新服务器剩余流量，确保是 DECIMAL(10, 2) 格式
                     server.remaining_traffic = round(server.total_traffic - total_used_traffic, 2)  # 计算剩余流量并转换为GB
                     db.session.commit()  # 提交服务器流量更新
+                    logging.info(f"Updated server {server.id}: remaining_traffic={server.remaining_traffic}")
 
                 # 添加容器流量数据到返回的结果
                 traffic_data.append({
