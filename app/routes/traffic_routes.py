@@ -27,6 +27,7 @@ def realtime_traffic():
     try:
         traffic_data = []
         containers = DockerContainer.query.all()  # 获取所有 Docker 容器
+        
         for container in containers:
             # 从 DockerContainer 中提取 container_name
             server_ip = extract_ip_from_container_name(container.container_name)
@@ -38,7 +39,7 @@ def realtime_traffic():
             metrics = fetch_traffic_metrics(metrics_url)
 
             if metrics:
-                # 获取实时流量并更新容器的流量数据
+                # 获取实时流量并转换为 GB，并确保是 DECIMAL(10, 2) 格式
                 upload_traffic_gb = round(metrics.get("upload_traffic") / (1024 * 1024 * 1024), 2)  # 转换为GB
                 download_traffic_gb = round(metrics.get("download_traffic") / (1024 * 1024 * 1024), 2)  # 转换为GB
 
@@ -50,9 +51,11 @@ def realtime_traffic():
                 # 更新服务器的 remaining_traffic
                 server = Servers.query.filter_by(id=container.server_id).first()
                 if server:
+                    # 计算该服务器所有容器的总流量
                     total_used_traffic = sum(
                         c.upload_traffic + c.download_traffic for c in DockerContainer.query.filter_by(server_id=container.server_id).all()
                     )
+                    # 更新服务器剩余流量，确保是 DECIMAL(10, 2) 格式
                     server.remaining_traffic = round(server.total_traffic - total_used_traffic, 2)  # 计算剩余流量并转换为GB
                     db.session.commit()  # 提交服务器流量更新
 
@@ -94,7 +97,7 @@ def get_realtime_traffic(container_id):
         metrics = fetch_traffic_metrics(metrics_url)
 
         if metrics:
-            # 获取流量数据并转换为 GB
+            # 获取流量数据并转换为 GB，并确保是 DECIMAL(10, 2) 格式
             upload_traffic_gb = round(metrics.get("upload_traffic") / (1024 * 1024 * 1024), 2)  # 转换为GB
             download_traffic_gb = round(metrics.get("download_traffic") / (1024 * 1024 * 1024), 2)  # 转换为GB
 
