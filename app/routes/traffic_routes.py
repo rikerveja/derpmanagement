@@ -173,7 +173,8 @@ def get_traffic_stats():
 
             # 更新用户流量统计
             total_traffic = sum((r.upload_traffic + r.download_traffic) / (1024 * 1024 * 1024) for r in user_traffic)  # 转换为GB
-            traffic_limit = max(r.traffic_limit for r in user_traffic)
+            # 这里替换 traffic_limit 为 max_upload_traffic
+            traffic_limit = max(r.max_upload_traffic for r in user_traffic)  # 使用 max_upload_traffic
 
             # 更新或插入用户流量统计记录
             user_record = UserTraffic.query.filter_by(user_id=user_id).first()
@@ -235,7 +236,8 @@ def get_traffic_stats():
             server = Servers.query.get(server_id)
             remaining_traffic = round(server.remaining_traffic / (1024 * 1024 * 1024), 2) if server else 0  # 转换为GB
 
-            traffic_limit = max(r.traffic_limit for r in server_traffic)
+            # 获取 max_upload_traffic（流量限制）
+            traffic_limit = max(r.max_upload_traffic for r in server_traffic)  # 使用 max_upload_traffic
 
             # 更新或插入服务器流量统计记录
             server_record = ServerTraffic.query.filter_by(server_id=server_id).first()
