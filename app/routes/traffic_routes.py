@@ -1,5 +1,4 @@
 from flask import Blueprint, request, jsonify
-from app import db  # 从 app 模块导入 db 实例
 from app.models import DockerContainer, DockerContainerTraffic, ServerTraffic, UserTraffic, Rental
 from datetime import datetime
 import requests
@@ -148,13 +147,6 @@ def traffic_history(user_id):
         logging.error(f"Error fetching traffic history for user {user_id}: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching traffic history: {str(e)}"}), 500
 
-from flask import Blueprint, jsonify, request
-from . import db  # 导入 db 实例
-from datetime import datetime
-from .models import Rental  # 导入 Rental 类，确保模型被导入
-
-traffic_bp = Blueprint('traffic_bp', __name__)
-
 @traffic_bp.route('/api/traffic/stats', methods=['POST'])
 def get_traffic_stats():
     """
@@ -181,6 +173,7 @@ def get_traffic_stats():
 
             # 更新用户流量统计
             total_traffic = sum((r.upload_traffic + r.download_traffic) / (1024 * 1024 * 1024) for r in user_traffic)  # 转换为GB
+            # 这里替换 traffic_limit 为 max_upload_traffic
             traffic_limit = max(r.max_upload_traffic for r in user_traffic)  # 使用 max_upload_traffic
 
             # 更新或插入用户流量统计记录
@@ -203,7 +196,7 @@ def get_traffic_stats():
             db.session.commit()
 
             # 更新租赁表的 traffic_usage
-            rental_record = Rental.query.filter_by(user_id=user_id).first()  # 修改为 Rental
+            rental_record = Rentals.query.filter_by(user_id=user_id).first()
             if rental_record:
                 rental_record.traffic_usage = round(total_traffic, 2)
                 rental_record.updated_at = datetime.utcnow()
@@ -293,6 +286,4 @@ def get_traffic_stats():
     except Exception as e:
         logging.error(f"Error fetching traffic stats: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching traffic stats: {str(e)}"}), 500
-
-
 
