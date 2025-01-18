@@ -133,6 +133,7 @@ const downloadAcl = async (acl) => {
           lines.push(`                        "Name": "${node.Name}",`)
           lines.push(`                        "RegionID": ${node.RegionID},`)
           lines.push(`                        "DERPPort": ${node.DERPPort},`)
+          lines.push(`                        "STUNPort": ${node.STUNPort},`)  // 新增 STUNPort
           lines.push(`                        "ipv4": "${node.ipv4}",`)
           lines.push(`                        "InsecureForTests": ${node.InsecureForTests}`)
           lines.push('                    },')
@@ -145,6 +146,7 @@ const downloadAcl = async (acl) => {
       lines.push('        },')
       lines.push('    },')
 
+      // 将生成的 ACL 配置字符串显示在弹窗中
       currentAclContent.value = lines.join('\n')
       showAclDialog.value = true
     } else {
@@ -157,6 +159,7 @@ const downloadAcl = async (acl) => {
     loading.value = false
   }
 }
+
 
 // 复制到剪贴板
 const copyToClipboard = async () => {
@@ -184,7 +187,7 @@ const deleteAcl = async (aclId) => {
       } else {
         throw new Error(response.message)
       }
-    } catch (error) {
+  } catch (error) {
       console.error('删除ACL失败:', error)
       alert('删除ACL失败: ' + error.message)
     } finally {
@@ -219,11 +222,11 @@ onMounted(() => {
   <LayoutAuthenticated>
     <SectionMain>
       <SectionTitleLineWithButton :icon="mdiShieldAccount" title="ACL管理" main>
-        <BaseButton
+        <BaseButton 
           :icon="mdiPlus"
           color="success"
           label="新建ACL"
-          to="/acl/generate"
+          to="/acl/generate" 
           small
         />
       </SectionTitleLineWithButton>
@@ -273,10 +276,10 @@ onMounted(() => {
                     <div class="truncate" :title="acl.containers[0]?.name">
                       <!-- 调试信息 -->
                       <template v-if="!acl.containers[0]?.name">
-                        <small class="text-gray-500">
+            <small class="text-gray-500">
                           {{ JSON.stringify(acl.containers[0]) }}
-                        </small>
-                      </template>
+            </small>
+          </template>
                       <template v-else>
                         {{ acl.containers[0]?.name }}
                       </template>
@@ -300,9 +303,9 @@ onMounted(() => {
                 </td>
                 <td class="px-1 py-1">
                   <div class="flex justify-center space-x-1">
-                    <BaseButton
+              <BaseButton
                       :icon="mdiDownload"
-                      color="info"
+                color="info"
                       small
                       :disabled="loading"
                       @click="downloadAcl(acl)"
@@ -311,14 +314,14 @@ onMounted(() => {
                     <BaseButton
                       :icon="mdiPencil"
                       color="warning"
-                      small
+                small
                       :disabled="loading"
                       @click="editAcl(acl)"
                       title="编辑"
-                    />
-                    <BaseButton
+              />
+              <BaseButton
                       :icon="mdiDelete"
-                      color="danger"
+                color="danger"
                       small
                       :disabled="loading"
                       @click="deleteAcl(acl.id)"
@@ -346,11 +349,11 @@ onMounted(() => {
             />
             <BaseButton
               label="下一页"
-              small
+                small
               class="px-3 py-1 text-xs whitespace-nowrap"
               :disabled="currentPage >= Math.ceil(filteredAcls.length / itemsPerPage)"
               @click="currentPage++"
-            />
+              />
           </div>
         </div>
       </CardBox>
@@ -369,7 +372,7 @@ onMounted(() => {
     :content="currentAclContent"
     @close="showAclDialog = false"
   />
-</template>
+</template> 
 
 <style scoped>
 /* 调整表格行高 */
