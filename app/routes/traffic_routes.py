@@ -18,7 +18,6 @@ def extract_ip_from_container_name(container_name):
         return '.'.join(parts[:4])  # 提取前三个部分并将它们连接成 IP 地址
     return None  # 如果容器名称格式不正确，返回 None
 
-# 实时流量监控（所有容器）
 @traffic_bp.route('/api/traffic/realtime', methods=['GET'])
 def realtime_traffic():
     """
@@ -27,6 +26,7 @@ def realtime_traffic():
     try:
         traffic_data = []
         containers = DockerContainer.query.all()  # 获取所有 Docker 容器
+        
         for container in containers:
             # 从 DockerContainer 中提取 container_name
             server_ip = extract_ip_from_container_name(container.container_name)
@@ -36,8 +36,11 @@ def realtime_traffic():
             # 使用 node_exporter_port 获取流量数据
             metrics_url = f"http://{server_ip}:{container.node_exporter_port}/metrics"
             metrics = fetch_traffic_metrics(metrics_url)
-
+            
+            # 打印日志，查看是否成功获取流量数据
             if metrics:
+                logging.info(f"Container {container.id} - Upload: {metrics.get('upload_traffic')} GB, Download: {metrics.get('download_traffic')} GB")
+
                 # 获取实时流量并转换为 GB，并确保是 DECIMAL(10, 2) 格式
                 upload_traffic_gb = round(metrics.get("upload_traffic") / (1024 * 1024 * 1024), 2)  # 转换为GB
                 download_traffic_gb = round(metrics.get("download_traffic") / (1024 * 1024 * 1024), 2)  # 转换为GB
