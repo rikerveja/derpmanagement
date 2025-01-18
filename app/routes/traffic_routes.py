@@ -140,12 +140,11 @@ def get_realtime_traffic(container_id):
         logging.error(f"Error fetching realtime traffic for container {container_id}: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching realtime traffic: {str(e)}"}), 500
 
-
 # 从 metrics 提取流量数据
 def fetch_traffic_metrics(url):
     try:
         response = requests.get(url)
-        response.raise_for_status()
+        response.raise_for_status()  # 如果返回状态码不是 200，会抛出异常
         metrics = {}
 
         # 处理返回的多行文本数据
@@ -172,6 +171,7 @@ def fetch_traffic_metrics(url):
     except Exception as e:
         logging.error(f"Error fetching metrics from {url}: {str(e)}")
         return None
+
 
 # 用户流量历史统计
 @traffic_bp.route('/api/traffic/history/<int:user_id>', methods=['GET'])
