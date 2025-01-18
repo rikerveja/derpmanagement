@@ -51,7 +51,7 @@ def realtime_traffic():
         logging.error(f"Error fetching realtime traffic data: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching realtime traffic: {str(e)}"}), 500
 
-# 实时流量监控（单个容器）
+# 实时流量监控（单个容器） 
 @traffic_bp.route('/api/traffic/realtime/<int:container_id>', methods=['GET'])
 def get_realtime_traffic(container_id):
     """
@@ -74,6 +74,10 @@ def get_realtime_traffic(container_id):
         if metrics:
             return jsonify({
                 "success": True,
+                "container": {
+                    "id": container.id,
+                    "name": container.container_name
+                },
                 "traffic": {
                     "upload_traffic": metrics.get("upload_traffic"),
                     "download_traffic": metrics.get("download_traffic")
