@@ -242,8 +242,6 @@ def generate_acl():
 
     return jsonify({"success": True, "message": "Tailscale ACL generated successfully", "acl": access_control_code}), 200
 
-
-# 手动更新 ACL 配置
 @acl_bp.route('/api/acl/update', methods=['POST'])
 def update_acl():
     """
@@ -299,6 +297,7 @@ def update_acl():
             container_node_name = region_code.lower() + container.container_name[2:]  # 生成容器节点名称，如：hklinuxserver -> szlinuxserver
 
             derp_port = container.port  # 获取容器的端口
+            stun_port = container.stun_port  # 获取容器的 STUN 端口
             ipv4 = server.ip_address  # 获取服务器的 IP 地址
 
             region_id = 901  # 假设 901 对应于深圳
@@ -316,6 +315,7 @@ def update_acl():
                 "Name": container_node_name,
                 "RegionID": region_id,
                 "DERPPort": derp_port,
+                "STUNPort": stun_port,  # 添加 STUNPort
                 "ipv4": ipv4,
                 "InsecureForTests": True
             })
@@ -334,7 +334,7 @@ def update_acl():
         user_id=user.id,
         ip_address=request.remote_addr,
         location="Unknown",  # 可用外部服务获取用户地理位置
-        details=f"acl_version: v1.0 - ACL generated for user {user.username}"  # 将 acl_version 放到 details 字段
+        details=f"acl_version: v1.1 - ACL updated for user {user.username}"  # 将 acl_version 放到 details 字段
     )
     db.session.add(acl_log)
     db.session.commit()
