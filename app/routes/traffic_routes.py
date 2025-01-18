@@ -157,15 +157,21 @@ def fetch_traffic_metrics(url):
             if "node_network_transmit_bytes_total" in line:
                 # 解析 eth0 设备的上传流量
                 if 'eth0' in line:
-                    upload_traffic_bytes = float(line.split(" ")[1])  # 提取字节数
-                    metrics["upload_traffic"] = round(upload_traffic_bytes / (1024 * 1024 * 1024), 2)  # 转换为GB并保留两位小数
+                    try:
+                        upload_traffic_bytes = float(line.split(" ")[1])  # 提取字节数
+                        metrics["upload_traffic"] = round(upload_traffic_bytes / (1024 * 1024 * 1024), 2)  # 转换为GB并保留两位小数
+                    except ValueError:
+                        logging.error(f"Error parsing upload traffic in line: {line}")
 
             # 检查下载流量
             elif "node_network_receive_bytes_total" in line:
                 # 解析 eth0 设备的下载流量
                 if 'eth0' in line:
-                    download_traffic_bytes = float(line.split(" ")[1])  # 提取字节数
-                    metrics["download_traffic"] = round(download_traffic_bytes / (1024 * 1024 * 1024), 2)  # 转换为GB并保留两位小数
+                    try:
+                        download_traffic_bytes = float(line.split(" ")[1])  # 提取字节数
+                        metrics["download_traffic"] = round(download_traffic_bytes / (1024 * 1024 * 1024), 2)  # 转换为GB并保留两位小数
+                    except ValueError:
+                        logging.error(f"Error parsing download traffic in line: {line}")
 
         # 如果找到了上传和下载流量，就返回 metrics
         if "upload_traffic" in metrics and "download_traffic" in metrics:
@@ -178,6 +184,7 @@ def fetch_traffic_metrics(url):
     except Exception as e:
         logging.error(f"Error fetching metrics from {url}: {str(e)}")
         return None
+
 
 # 用户流量历史统计
 @traffic_bp.route('/api/traffic/history/<int:user_id>', methods=['GET'])
