@@ -155,13 +155,15 @@ def fetch_traffic_metrics(url):
             if "node_network_transmit_bytes_total" in line:
                 # 解析 eth0 设备的上传流量
                 if 'eth0' in line:
-                    metrics["upload_traffic"] = float(line.split(" ")[1])
+                    upload_traffic_bytes = float(line.split(" ")[1])  # 提取字节数
+                    metrics["upload_traffic"] = round(upload_traffic_bytes / (1024 * 1024 * 1024), 2)  # 转换为GB并保留两位小数
 
             # 检查下载流量
             elif "node_network_receive_bytes_total" in line:
                 # 解析 eth0 设备的下载流量
                 if 'eth0' in line:
-                    metrics["download_traffic"] = float(line.split(" ")[1])
+                    download_traffic_bytes = float(line.split(" ")[1])  # 提取字节数
+                    metrics["download_traffic"] = round(download_traffic_bytes / (1024 * 1024 * 1024), 2)  # 转换为GB并保留两位小数
 
         # 如果找到了上传和下载流量，就返回 metrics
         if "upload_traffic" in metrics and "download_traffic" in metrics:
