@@ -176,6 +176,10 @@ def get_traffic_stats():
             total_traffic = sum((r.upload_traffic + r.download_traffic) / (1024 * 1024 * 1024) for r in user_traffic)  # 转换为GB
             traffic_limit = max(r.max_upload_traffic for r in user_traffic)  # 使用 max_upload_traffic
 
+            # 将 total_traffic 和 traffic_limit 转换为 float，避免类型冲突
+            total_traffic = float(total_traffic)
+            traffic_limit = float(traffic_limit)
+
             # 更新或插入用户流量统计记录
             user_record = UserTraffic.query.filter_by(user_id=user_id).first()
             if user_record:
@@ -239,6 +243,10 @@ def get_traffic_stats():
             # 获取 max_upload_traffic（流量限制）
             traffic_limit = max(r.max_upload_traffic for r in server_traffic)  # 使用 max_upload_traffic
 
+            # 将 total_traffic 和 traffic_limit 转换为 float，避免类型冲突
+            total_traffic = float(total_traffic)
+            traffic_limit = float(traffic_limit)
+
             # 更新或插入服务器流量统计记录
             server_record = ServerTraffic.query.filter_by(server_id=server_id).first()  # 使用 Server 类
             if server_record:
@@ -286,4 +294,3 @@ def get_traffic_stats():
     except Exception as e:
         logging.error(f"Error fetching traffic stats: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching traffic stats: {str(e)}"}), 500
-
