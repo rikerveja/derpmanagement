@@ -52,7 +52,14 @@ def get_acl_configs():
 
             # 获取关联的容器信息
             containers = DockerContainer.query.filter(DockerContainer.id.in_(acl.container_ids)).all()
-            container_info = [{"id": container.id, "name": container.container_name, "port": container.port, "status": container.status} for container in containers]
+            # 增加 STUNPort 信息
+            container_info = [{
+                "id": container.id, 
+                "name": container.container_name, 
+                "port": container.port, 
+                "status": container.status,
+                "STUNPort": container.stun_port  # 添加 STUNPort
+            } for container in containers]
 
             # 格式化 derpMap 结构
             access_control_code = json.loads(acl.acl_data)  # 解析存储的 ACL 数据
