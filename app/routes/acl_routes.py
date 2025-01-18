@@ -101,7 +101,7 @@ def format_derp_map(access_control_code):
     json_string = json_string.replace("}", "},").replace("]", "],").rstrip(",") + ","
     return json_string
 
-@acl_bp.route('/api/acl/generate', methods=['POST'])
+@acl_bp.route('/api/acl/generate', methods=['POST']) 
 def generate_acl():
     """
     动态生成用户的 Tailscale Access Control 配置代码
@@ -151,6 +151,7 @@ def generate_acl():
             container_node_name = f"{region_code.lower()}linuxserver"
 
             derp_port = container.port  # 获取容器的端口
+            stun_port = container.stun_port  # 获取容器的 STUN 端口
             ipv4 = server.ip_address  # 获取服务器的 IP 地址
 
             # 假设 region_id 是从服务器表中得来的
@@ -165,11 +166,12 @@ def generate_acl():
                     "Nodes": [],
                 }
 
-            # 添加新的节点
+            # 添加新的节点，增加 STUNPort 信息
             access_control_code["derpMap"]["Regions"][str(region_id)]["Nodes"].append({
                 "Name": container_node_name,
                 "RegionID": region_id,
                 "DERPPort": derp_port,
+                "STUNPort": stun_port,  # 新增 STUNPort
                 "ipv4": ipv4,
                 "InsecureForTests": True,
             })
@@ -239,6 +241,7 @@ def generate_acl():
     logging.info(f"Tailscale ACL generated for user {user.username}")
 
     return jsonify({"success": True, "message": "Tailscale ACL generated successfully", "acl": access_control_code}), 200
+
 
 # 手动更新 ACL 配置
 @acl_bp.route('/api/acl/update', methods=['POST'])
