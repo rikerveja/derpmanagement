@@ -3,6 +3,7 @@ from app.models import DockerContainer, DockerContainerTraffic, ServerTraffic, U
 from datetime import datetime
 import requests
 import logging
+from app import db
 
 # 定义蓝图
 traffic_bp = Blueprint('traffic', __name__)
