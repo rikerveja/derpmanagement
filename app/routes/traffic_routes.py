@@ -36,13 +36,12 @@ def realtime_traffic():
             # 使用 node_exporter_port 获取流量数据
             metrics_url = f"http://{server_ip}:{container.node_exporter_port}/metrics"
             metrics = fetch_traffic_metrics(metrics_url)
-            
-            if metrics:
-                # 获取实时流量并转换为 GB，并确保是 DECIMAL(10, 2) 格式
-                upload_traffic_gb = round(metrics.get("upload_traffic") / (1024 * 1024 * 1024), 2)  # 转换为GB
-                download_traffic_gb = round(metrics.get("download_traffic") / (1024 * 1024 * 1024), 2)  # 转换为GB
 
-                logging.info(f"Converted upload_traffic to {upload_traffic_gb} GB, download_traffic to {download_traffic_gb} GB")
+            if metrics:
+                upload_traffic_gb = metrics.get("upload_traffic")
+                download_traffic_gb = metrics.get("download_traffic")
+                
+                logging.info(f"Container {container.id} - Upload: {upload_traffic_gb} GB, Download: {download_traffic_gb} GB")
 
                 # 更新容器的流量数据
                 container.upload_traffic = upload_traffic_gb
@@ -75,6 +74,7 @@ def realtime_traffic():
     except Exception as e:
         logging.error(f"Error fetching realtime traffic data: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching realtime traffic: {str(e)}"}), 500
+
 
 # 实时流量监控（单个容器）
 @traffic_bp.route('/api/traffic/realtime/<int:container_id>', methods=['GET'])
