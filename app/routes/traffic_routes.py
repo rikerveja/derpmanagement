@@ -159,10 +159,11 @@ def get_traffic_stats():
     try:
         # 按用户统计流量
         if user_id:
-            user_traffic = DockerContainerTraffic.query.filter_by(user_id=user_id).limit(100).all()
+            # 从 docker_containers 表查询用户相关的容器流量
+            user_traffic = DockerContainer.query.filter_by(user_id=user_id).limit(100).all()
             response_data = [
                 {
-                    "container_id": record.container_id,
+                    "container_id": record.id,
                     "upload_traffic": round(record.upload_traffic / (1024 * 1024 * 1024), 2),  # 转换为GB
                     "download_traffic": round(record.download_traffic / (1024 * 1024 * 1024), 2),  # 转换为GB
                     "remaining_traffic": round(record.remaining_traffic / (1024 * 1024 * 1024), 2),  # 转换为GB
@@ -208,7 +209,7 @@ def get_traffic_stats():
 
             # 更新容器流量
             for record in user_traffic:
-                container = DockerContainer.query.get(record.container_id)
+                container = DockerContainer.query.get(record.id)
                 if container:
                     container.upload_traffic = round(record.upload_traffic / (1024 * 1024 * 1024), 2)  # 转换为GB
                     container.download_traffic = round(record.download_traffic / (1024 * 1024 * 1024), 2)  # 转换为GB
@@ -222,10 +223,11 @@ def get_traffic_stats():
 
         # 按服务器统计流量
         if server_id:
-            server_traffic = DockerContainerTraffic.query.filter_by(server_id=server_id).limit(100).all()
+            # 从 docker_containers 表查询服务器相关的容器流量
+            server_traffic = DockerContainer.query.filter_by(server_id=server_id).limit(100).all()
             response_data = [
                 {
-                    "container_id": record.container_id,
+                    "container_id": record.id,
                     "upload_traffic": round(record.upload_traffic / (1024 * 1024 * 1024), 2),  # 转换为GB
                     "download_traffic": round(record.download_traffic / (1024 * 1024 * 1024), 2),  # 转换为GB
                     "remaining_traffic": round(record.remaining_traffic / (1024 * 1024 * 1024), 2),  # 转换为GB
@@ -270,7 +272,7 @@ def get_traffic_stats():
 
             # 更新容器流量
             for record in server_traffic:
-                container = DockerContainer.query.get(record.container_id)
+                container = DockerContainer.query.get(record.id)
                 if container:
                     container.upload_traffic = round(record.upload_traffic / (1024 * 1024 * 1024), 2)  # 转换为GB
                     container.download_traffic = round(record.download_traffic / (1024 * 1024 * 1024), 2)  # 转换为GB
@@ -287,3 +289,4 @@ def get_traffic_stats():
     except Exception as e:
         logging.error(f"Error fetching traffic stats: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching traffic stats: {str(e)}"}), 500
+
