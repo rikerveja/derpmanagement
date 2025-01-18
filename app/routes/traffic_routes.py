@@ -1,9 +1,9 @@
 from flask import Blueprint, request, jsonify
 from app.models import DockerContainer, DockerContainerTraffic, ServerTraffic, UserTraffic, Rental
+from app import db  # 正确导入 db 实例
 from datetime import datetime
 import requests
 import logging
-from app import db
 
 # 定义蓝图
 traffic_bp = Blueprint('traffic', __name__)
