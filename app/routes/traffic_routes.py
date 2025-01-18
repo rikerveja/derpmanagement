@@ -232,15 +232,15 @@ def get_traffic_stats():
             # 更新服务器流量统计
             total_traffic = sum((r.upload_traffic + r.download_traffic) / (1024 * 1024 * 1024) for r in server_traffic)  # 转换为GB
 
-            # 获取服务器的 remaining_traffic（从 servers 表中）
-            server = Servers.query.get(server_id)
+            # 获取服务器的 remaining_traffic（从 server 表中）
+            server = Server.query.get(server_id)  # 修改为 Server 类
             remaining_traffic = round(server.remaining_traffic / (1024 * 1024 * 1024), 2) if server else 0  # 转换为GB
 
             # 获取 max_upload_traffic（流量限制）
             traffic_limit = max(r.max_upload_traffic for r in server_traffic)  # 使用 max_upload_traffic
 
             # 更新或插入服务器流量统计记录
-            server_record = ServerTraffic.query.filter_by(server_id=server_id).first()
+            server_record = ServerTraffic.query.filter_by(server_id=server_id).first()  # 使用 Server 类
             if server_record:
                 server_record.total_traffic = round(total_traffic, 2)
                 server_record.remaining_traffic = remaining_traffic
@@ -286,3 +286,4 @@ def get_traffic_stats():
     except Exception as e:
         logging.error(f"Error fetching traffic stats: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching traffic stats: {str(e)}"}), 500
+
