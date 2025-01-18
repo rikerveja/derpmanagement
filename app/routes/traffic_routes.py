@@ -174,7 +174,6 @@ def get_traffic_stats():
 
             # 更新用户流量统计
             total_traffic = sum((r.upload_traffic + r.download_traffic) / (1024 * 1024 * 1024) for r in user_traffic)  # 转换为GB
-            # 这里替换 traffic_limit 为 max_upload_traffic
             traffic_limit = max(r.max_upload_traffic for r in user_traffic)  # 使用 max_upload_traffic
 
             # 更新或插入用户流量统计记录
@@ -197,7 +196,7 @@ def get_traffic_stats():
             db.session.commit()
 
             # 更新租赁表的 traffic_usage
-            rental_record = Rentals.query.filter_by(user_id=user_id).first()
+            rental_record = Rental.query.filter_by(user_id=user_id).first()  # 使用正确的 Rental 类
             if rental_record:
                 rental_record.traffic_usage = round(total_traffic, 2)
                 rental_record.updated_at = datetime.utcnow()
@@ -287,4 +286,3 @@ def get_traffic_stats():
     except Exception as e:
         logging.error(f"Error fetching traffic stats: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching traffic stats: {str(e)}"}), 500
-
