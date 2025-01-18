@@ -166,7 +166,7 @@ def get_traffic_stats():
                     "container_id": record.id,
                     "upload_traffic": round(record.upload_traffic / (1024 * 1024 * 1024), 2),  # 转换为GB
                     "download_traffic": round(record.download_traffic / (1024 * 1024 * 1024), 2),  # 转换为GB
-                    "timestamp": record.timestamp.isoformat()
+                    "updated_at": record.updated_at.isoformat()  # 使用 updated_at 字段
                 }
                 for record in user_traffic
             ]
@@ -223,7 +223,7 @@ def get_traffic_stats():
                     "container_id": record.id,
                     "upload_traffic": round(record.upload_traffic / (1024 * 1024 * 1024), 2),  # 转换为GB
                     "download_traffic": round(record.download_traffic / (1024 * 1024 * 1024), 2),  # 转换为GB
-                    "timestamp": record.timestamp.isoformat()
+                    "updated_at": record.updated_at.isoformat()  # 使用 updated_at 字段
                 }
                 for record in server_traffic
             ]
@@ -284,4 +284,5 @@ def get_traffic_stats():
     except Exception as e:
         logging.error(f"Error fetching traffic stats: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching traffic stats: {str(e)}"}), 500
+
 
