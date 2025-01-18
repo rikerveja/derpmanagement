@@ -52,14 +52,15 @@ def realtime_traffic():
         logging.error(f"Error fetching realtime traffic data: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching realtime traffic: {str(e)}"}), 500
 
-# 实时流量监控（单个容器） 
+# 实时流量监控（单个容器）   
 @traffic_bp.route('/api/traffic/realtime/<int:container_id>', methods=['GET'])
 def get_realtime_traffic(container_id):
     """
-    获取容器的实时流量数据
+    获取容器的实时流量数据，并更新相关的服务器和容器数据
     """
     try:
-        container = DockerContainer.query.get(container_id)  # 从 DockerContainer 获取容器
+        # 从 DockerContainer 获取容器
+        container = DockerContainer.query.get(container_id)
         if not container:
             return jsonify({"success": False, "message": "Container not found"}), 404
 
@@ -73,6 +74,25 @@ def get_realtime_traffic(container_id):
         metrics = fetch_traffic_metrics(metrics_url)
 
         if metrics:
+            # 获取流量数据并转换为 GB
+            upload_traffic_gb = round(metrics.get("upload_traffic") / (1024 * 1024 * 1024), 2)  # 转换为GB
+            download_traffic_gb = round(metrics.get("download_traffic") / (1024 * 1024 * 1024), 2)  # 转换为GB
+
+            # 更新容器的流量数据
+            container.upload_traffic = upload_traffic_gb
+            container.download_traffic = download_traffic_gb
+            db.session.commit()  # 提交容器流量更新
+
+            # 更新服务器的 remaining_traffic（假设剩余流量是由所有容器的流量之和计算的）
+            server = Servers.query.filter_by(id=container.server_id).first()
+            if server:
+                total_used_traffic = sum(
+                    container.upload_traffic + container.download_traffic for container in DockerContainer.query.filter_by(server_id=container.server_id).all()
+                )
+                # 更新服务器剩余流量，假设 `server.total_traffic` 存储了服务器的总流量
+                server.remaining_traffic = round(server.total_traffic - total_used_traffic, 2)  # 计算剩余流量并转换为GB
+                db.session.commit()  # 提交服务器流量更新
+
             return jsonify({
                 "success": True,
                 "container": {
@@ -80,16 +100,22 @@ def get_realtime_traffic(container_id):
                     "name": container.container_name
                 },
                 "traffic": {
-                    "upload_traffic": metrics.get("upload_traffic"),
-                    "download_traffic": metrics.get("download_traffic")
+                    "upload_traffic": container.upload_traffic,  # 返回更新后的容器流量（GB）
+                    "download_traffic": container.download_traffic  # 返回更新后的容器流量（GB）
+                },
+                "server": {
+                    "id": server.id if server else None,
+                    "remaining_traffic": server.remaining_traffic if server else None  # 返回服务器剩余流量（GB）
                 },
                 "timestamp": datetime.utcnow().isoformat()
             }), 200
 
         return jsonify({"success": False, "message": "Failed to fetch metrics"}), 500
+
     except Exception as e:
         logging.error(f"Error fetching realtime traffic for container {container_id}: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching realtime traffic: {str(e)}"}), 500
+
 
 # 从 metrics 提取流量数据
 def fetch_traffic_metrics(url):
