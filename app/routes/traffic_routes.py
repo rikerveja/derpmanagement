@@ -1,11 +1,156 @@
 from flask import Blueprint, request, jsonify
-from app.models import DockerContainer, DockerContainerTraffic, ServerTraffic, UserTraffic, Rental
-from datetime import datetime
+from app import db
+from app.models import DockerContainer, DockerContainerTraffic, ServerTraffic, ServerTrafficMonitoring, UserTraffic, Rentals
+from datetime import datetime, timedelta
 import requests
 import logging
 
 # 定义蓝图
 traffic_bp = Blueprint('traffic', __name__)
+
+# 字节转GB并保留2位小数
+def bytes_to_gb(byte_value):
+    """
+    将字节转换为GB，并保留两位小数
+    :param byte_value: 字节数
+    :return: 转换后的GB数
+    """
+    if byte_value is None:
+        return 0.00
+    gb_value = byte_value / (1024 ** 3)
+    return round(gb_value, 2)
+
+# 获取下个月1日的日期
+def get_next_month_first_day():
+    today = datetime.utcnow()
+    next_month = today.replace(day=28) + timedelta(days=4)  # 通过28号加4天来跳到下个月
+    return next_month.replace(day=1)
+
+# 保存流量数据接口
+@traffic_bp.route('/api/traffic/save_traffic', methods=['POST'])
+def save_traffic():
+    """
+    保存流量数据到多个数据表
+    :param container_id: 容器ID
+    :param upload_traffic: 上传流量
+    :param download_traffic: 下载流量
+    :param traffic_limit: 流量限制
+    :param remaining_traffic: 剩余流量
+    """
+    try:
+        # 获取请求的数据
+        data = request.get_json()
+        container_id = data.get('container_id')
+        upload_traffic = data.get('upload_traffic')  # 上传流量（字节）
+        download_traffic = data.get('download_traffic')  # 下载流量（字节）
+        traffic_limit = data.get('traffic_limit', 0)  # 流量限制，默认为0
+        remaining_traffic = data.get('remaining_traffic', 0)  # 剩余流量，默认为0
+
+        if not container_id or upload_traffic is None or download_traffic is None:
+            return jsonify({'error': 'Missing container_id, upload_traffic or download_traffic'}), 400
+
+        # 转换字节为GB
+        upload_traffic_gb = bytes_to_gb(upload_traffic)
+        download_traffic_gb = bytes_to_gb(download_traffic)
+
+        # 获取当前时间戳
+        timestamp = datetime.utcnow()
+        next_month_first_day = get_next_month_first_day()
+
+        # 1. 保存容器流量数据到 `DockerContainerTraffic`
+        traffic_entry = DockerContainerTraffic(
+            container_id=container_id,
+            upload_traffic=upload_traffic_gb,
+            download_traffic=download_traffic_gb,
+            traffic_limit=traffic_limit,
+            remaining_traffic=remaining_traffic,
+            timestamp=timestamp,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        db.session.add(traffic_entry)
+
+        # 2. 更新服务器流量监控数据到 `ServerTrafficMonitoring`
+        server_id = DockerContainer.query.filter_by(container_id=container_id).first().server_id
+        server_traffic_monitoring_entry = ServerTrafficMonitoring(
+            server_id=server_id,
+            total_traffic=upload_traffic + download_traffic,  # 总流量（字节）
+            used_traffic=upload_traffic + download_traffic,
+            remaining_traffic=remaining_traffic,
+            timestamp=timestamp
+        )
+        db.session.add(server_traffic_monitoring_entry)
+
+        # 3. 更新 `ServerTraffic` 表
+        server_traffic = ServerTraffic.query.filter_by(server_id=server_id).first()
+        if server_traffic:
+            server_traffic.total_traffic += (upload_traffic + download_traffic)
+            server_traffic.remaining_traffic = remaining_traffic
+            server_traffic.traffic_used = server_traffic.total_traffic - server_traffic.remaining_traffic
+            server_traffic.traffic_reset_date = next_month_first_day  # 设置为下个月1日
+            server_traffic.updated_at = datetime.utcnow()
+        else:
+            server_traffic = ServerTraffic(
+                server_id=server_id,
+                total_traffic=upload_traffic + download_traffic,
+                remaining_traffic=remaining_traffic,
+                traffic_limit=traffic_limit,
+                traffic_used=upload_traffic + download_traffic,
+                traffic_reset_date=next_month_first_day,
+                updated_at=datetime.utcnow(),
+                created_at=datetime.utcnow()
+            )
+            db.session.add(server_traffic)
+
+        # 4. 更新 `UserTraffic` 表
+        user_id = DockerContainer.query.filter_by(container_id=container_id).first().user_id
+        user_traffic = UserTraffic.query.filter_by(user_id=user_id).first()
+        if user_traffic:
+            user_traffic.upload_traffic += upload_traffic_gb
+            user_traffic.download_traffic += download_traffic_gb
+            user_traffic.total_traffic += (upload_traffic_gb + download_traffic_gb)
+            user_traffic.remaining_traffic = remaining_traffic
+            user_traffic.updated_at = datetime.utcnow()
+        else:
+            user_traffic = UserTraffic(
+                user_id=user_id,
+                upload_traffic=upload_traffic_gb,
+                download_traffic=download_traffic_gb,
+                total_traffic=(upload_traffic_gb + download_traffic_gb),
+                remaining_traffic=remaining_traffic,
+                updated_at=datetime.utcnow()
+            )
+            db.session.add(user_traffic)
+
+# 5. 更新 `docker_containers` 表
+container = DockerContainer.query.filter_by(container_id=container_id).first()
+if container:
+    # 根据POST参数来更新指定的字段
+    if upload_traffic is not None:
+        container.upload_traffic = upload_traffic_gb  # 精准更新上传流量
+    if download_traffic is not None:
+        container.download_traffic = download_traffic_gb  # 精准更新下载流量
+
+    db.session.commit()
+
+# 6. 更新 `servers` 表中的剩余流量
+server = Server.query.filter_by(server_id=server_id).first()
+if server:
+    # 根据传入的参数更新剩余流量
+    if remaining_traffic is not None:
+        server.remaining_traffic = remaining_traffic  # 精准更新剩余流量
+
+    db.session.commit()
+
+
+        db.session.commit()
+
+        return jsonify({'message': 'Traffic data saved successfully'}), 200
+
+    except Exception as e:
+        logging.error(f"Error saving traffic data: {str(e)}")
+        db.session.rollback()  # 回滚事务
+        return jsonify({'error': 'Internal server error'}), 500
 
 # 从容器名称提取 IP 地址
 def extract_ip_from_container_name(container_name):
