@@ -331,40 +331,12 @@ def get_traffic_stats():
                 for record in user_traffic
             ]
 
-            # 更新用户流量统计
+            # 计算用户流量统计
             total_traffic = sum(r.upload_traffic + r.download_traffic for r in user_traffic)
             remaining_traffic = sum(r.remaining_traffic for r in user_traffic)
             traffic_limit = max(r.traffic_limit for r in user_traffic)
 
-            user_record = UserTraffic.query.filter_by(user_id=user_id).first()
-            if user_record:
-                user_record.upload_traffic = sum(r.upload_traffic for r in user_traffic)
-                user_record.download_traffic = sum(r.download_traffic for r in user_traffic)
-                user_record.total_traffic = total_traffic
-                user_record.remaining_traffic = remaining_traffic
-                user_record.traffic_limit = traffic_limit
-                user_record.updated_at = datetime.utcnow()
-            else:
-                user_record = UserTraffic(
-                    user_id=user_id,
-                    upload_traffic=sum(r.upload_traffic for r in user_traffic),
-                    download_traffic=sum(r.download_traffic for r in user_traffic),
-                    total_traffic=total_traffic,
-                    remaining_traffic=remaining_traffic,
-                    traffic_limit=traffic_limit,
-                    updated_at=datetime.utcnow()
-                )
-
-            UserTraffic.query.session.add(user_record)
-            UserTraffic.query.session.commit()
-
-            # 更新租赁表的 traffic_usage
-            rental_record = Rentals.query.filter_by(user_id=user_id).first()
-            if rental_record:
-                rental_record.traffic_usage = total_traffic
-                rental_record.updated_at = datetime.utcnow()
-                Rentals.query.session.commit()
-
+            # 仅读取用户流量数据，不进行数据库写入
             return jsonify({"success": True, "user_traffic": response_data, "user_summary": {
                 "total_traffic": total_traffic,
                 "remaining_traffic": remaining_traffic,
@@ -384,33 +356,12 @@ def get_traffic_stats():
                 for record in server_traffic
             ]
 
-            # 更新服务器流量统计
+            # 计算服务器流量统计
             total_traffic = sum(r.upload_traffic + r.download_traffic for r in server_traffic)
             remaining_traffic = sum(r.remaining_traffic for r in server_traffic)
             traffic_limit = max(r.traffic_limit for r in server_traffic)
 
-            server_record = ServerTraffic.query.filter_by(server_id=server_id).first()
-            if server_record:
-                server_record.total_traffic = total_traffic
-                server_record.remaining_traffic = remaining_traffic
-                server_record.traffic_limit = traffic_limit
-                server_record.traffic_used = total_traffic - remaining_traffic
-                server_record.updated_at = datetime.utcnow()
-            else:
-                server_record = ServerTraffic(
-                    server_id=server_id,
-                    total_traffic=total_traffic,
-                    remaining_traffic=remaining_traffic,
-                    traffic_limit=traffic_limit,
-                    traffic_used=total_traffic - remaining_traffic,
-                    traffic_reset_date=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
-                    created_at=datetime.utcnow()
-                )
-
-            ServerTraffic.query.session.add(server_record)
-            ServerTraffic.query.session.commit()
-
+            # 仅读取服务器流量数据，不进行数据库写入
             return jsonify({"success": True, "server_traffic": response_data, "server_summary": {
                 "total_traffic": total_traffic,
                 "remaining_traffic": remaining_traffic,
