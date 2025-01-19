@@ -159,12 +159,21 @@ def save_traffic():
 
         db.session.commit()
 
+        # 更新 `Rentals` 表中的 traffic_usage 和 traffic_reset_date
+        rental_record = Rentals.query.filter_by(user_id=user_id).first()
+        if rental_record:
+            rental_record.traffic_usage = sum([container.max_upload_traffic for container in DockerContainer.query.filter_by(user_id=user_id).all()])
+            rental_record.traffic_reset_date = next_month_first_day  # 设置为下个月1日
+            rental_record.updated_at = datetime.utcnow()
+            db.session.commit()
+
         return jsonify({'message': 'Traffic data saved successfully'}), 200
 
     except Exception as e:
         logging.error(f"Error saving traffic data: {str(e)}")
         db.session.rollback()  # 回滚事务
         return jsonify({'error': 'Internal server error'}), 500
+
 
 
 # 从容器名称提取 IP 地址
