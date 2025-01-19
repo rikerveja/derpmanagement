@@ -43,11 +43,17 @@ def save_traffic():
         container_id = data.get('container_id')
         upload_traffic = data.get('upload_traffic')  # 上传流量（字节）
         download_traffic = data.get('download_traffic')  # 下载流量（字节）
-        traffic_limit = data.get('traffic_limit', 0)  # 流量限制，默认为0
         remaining_traffic = data.get('remaining_traffic', 0)  # 剩余流量，默认为0
 
         if not container_id or upload_traffic is None or download_traffic is None:
             return jsonify({'error': 'Missing container_id, upload_traffic or download_traffic'}), 400
+
+        # 查询容器的流量限制，获取 `max_upload_traffic`
+        container = DockerContainer.query.filter_by(container_id=container_id).first()
+        if not container:
+            return jsonify({'error': 'Container not found'}), 404
+
+        max_upload_traffic = container.max_upload_traffic  # 获取容器流量限制
 
         # 转换字节为GB
         upload_traffic_gb = bytes_to_gb(upload_traffic)
@@ -62,7 +68,7 @@ def save_traffic():
             container_id=container_id,
             upload_traffic=upload_traffic_gb,
             download_traffic=download_traffic_gb,
-            traffic_limit=traffic_limit,
+            traffic_limit=max_upload_traffic,  # 使用容器的流量限制
             remaining_traffic=remaining_traffic,
             timestamp=timestamp,
             created_at=datetime.utcnow(),
@@ -71,7 +77,7 @@ def save_traffic():
         db.session.add(traffic_entry)
 
         # 2. 更新服务器流量监控数据到 `ServerTrafficMonitoring`
-        server_id = DockerContainer.query.filter_by(container_id=container_id).first().server_id
+        server_id = container.server_id
         server_traffic_monitoring_entry = ServerTrafficMonitoring(
             server_id=server_id,
             total_traffic=upload_traffic + download_traffic,  # 总流量（字节）
@@ -84,17 +90,28 @@ def save_traffic():
         # 3. 更新 `ServerTraffic` 表
         server_traffic = ServerTraffic.query.filter_by(server_id=server_id).first()
         if server_traffic:
-            server_traffic.total_traffic += (upload_traffic + download_traffic)
-            server_traffic.remaining_traffic = remaining_traffic
-            server_traffic.traffic_used = server_traffic.total_traffic - server_traffic.remaining_traffic
-            server_traffic.traffic_reset_date = next_month_first_day  # 设置为下个月1日
+            # 计算服务器流量限制和剩余流量
+            total_server_limit = sum([container.max_upload_traffic for container in DockerContainer.query.filter_by(server_id=server_id).all()])
+            total_server_remaining = sum([container.remaining_traffic for container in DockerContainer.query.filter_by(server_id=server_id).all()])
+
+            # 只有当是每月1日第一次保存流量数据时，才重置流量
+            if server_traffic.traffic_reset_date != next_month_first_day:
+                # 只有在每月1日才会重置流量
+                server_traffic.remaining_traffic = total_server_limit  # 重置为服务器流量限制
+                server_traffic.total_traffic = total_server_limit  # 总流量重置为流量限制
+                server_traffic.traffic_used = 0  # 已用流量清零
+                server_traffic.traffic_reset_date = next_month_first_day  # 设置为下个月1日
+            else:
+                # 否则，更新剩余流量
+                server_traffic.remaining_traffic = total_server_remaining
             server_traffic.updated_at = datetime.utcnow()
         else:
+            total_server_limit = sum([container.max_upload_traffic for container in DockerContainer.query.filter_by(server_id=server_id).all()])
             server_traffic = ServerTraffic(
                 server_id=server_id,
-                total_traffic=upload_traffic + download_traffic,
+                total_traffic=total_server_limit,
                 remaining_traffic=remaining_traffic,
-                traffic_limit=traffic_limit,
+                traffic_limit=total_server_limit,
                 traffic_used=upload_traffic + download_traffic,
                 traffic_reset_date=next_month_first_day,
                 updated_at=datetime.utcnow(),
@@ -103,7 +120,7 @@ def save_traffic():
             db.session.add(server_traffic)
 
         # 4. 更新 `UserTraffic` 表
-        user_id = DockerContainer.query.filter_by(container_id=container_id).first().user_id
+        user_id = container.user_id
         user_traffic = UserTraffic.query.filter_by(user_id=user_id).first()
         if user_traffic:
             user_traffic.upload_traffic += upload_traffic_gb
@@ -122,26 +139,23 @@ def save_traffic():
             )
             db.session.add(user_traffic)
 
-# 5. 更新 `docker_containers` 表
-container = DockerContainer.query.filter_by(container_id=container_id).first()
-if container:
-    # 根据POST参数来更新指定的字段
-    if upload_traffic is not None:
-        container.upload_traffic = upload_traffic_gb  # 精准更新上传流量
-    if download_traffic is not None:
-        container.download_traffic = download_traffic_gb  # 精准更新下载流量
+        # 5. 更新 `docker_containers` 表
+        if container:
+            # 根据POST参数来更新指定的字段
+            if upload_traffic is not None:
+                container.upload_traffic = upload_traffic_gb  # 精准更新上传流量
+            if download_traffic is not None:
+                container.download_traffic = download_traffic_gb  # 精准更新下载流量
 
-    db.session.commit()
+            db.session.commit()
 
-# 6. 更新 `servers` 表中的剩余流量
-server = Server.query.filter_by(server_id=server_id).first()
-if server:
-    # 根据传入的参数更新剩余流量
-    if remaining_traffic is not None:
-        server.remaining_traffic = remaining_traffic  # 精准更新剩余流量
+        # 6. 更新 `servers` 表中的剩余流量
+        server = Server.query.filter_by(server_id=server_id).first()
+        if server:
+            if remaining_traffic is not None:
+                server.remaining_traffic = remaining_traffic  # 精准更新剩余流量
 
-    db.session.commit()
-
+            db.session.commit()
 
         db.session.commit()
 
@@ -151,6 +165,7 @@ if server:
         logging.error(f"Error saving traffic data: {str(e)}")
         db.session.rollback()  # 回滚事务
         return jsonify({'error': 'Internal server error'}), 500
+
 
 # 从容器名称提取 IP 地址
 def extract_ip_from_container_name(container_name):
