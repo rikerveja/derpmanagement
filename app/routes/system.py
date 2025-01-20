@@ -29,7 +29,7 @@ def get_system_overview():
         error_servers = len([s for s in servers if s.status == 'error'])
 
         # 获取容器统计
-        containers = Container.query.all()
+        containers = DockerContainer.query.all()  # 修改为 DockerContainer
         total_containers = len(containers)
         running_containers = len([c for c in containers if c.status == 'running'])
         stopped_containers = len([c for c in containers if c.status == 'stopped'])
