@@ -6,9 +6,6 @@ from datetime import datetime, timedelta
 import logging
 from decimal import Decimal
 
-# 设置日志级别为 DEBUG
-logging.basicConfig(level=logging.DEBUG)
-
 # 定义蓝图
 traffic_bp = Blueprint('traffic', __name__)
 
@@ -49,8 +46,6 @@ def save_traffic():
         download_traffic = data.get('download_traffic')  # 下载流量（字节）
         remaining_traffic = data.get('remaining_traffic', 0)  # 剩余流量，默认为0（字节）
 
-        logging.debug(f"Received data: {data}")
-
         if not container_id or upload_traffic is None or download_traffic is None:
             return jsonify({'error': 'Missing container_id, upload_traffic or download_traffic'}), 400
 
@@ -89,73 +84,69 @@ def save_traffic():
             updated_at=datetime.utcnow()
         )
         db.session.add(traffic_entry)
-        logging.debug(f"Added traffic entry for container {container_id_db}")
 
-        # 3. 更新服务器流量监控数据到 `ServerTrafficMonitoring`
-        server_id = container.server_id  # 获取 server_id
-        server_traffic_monitoring_entry = ServerTrafficMonitoring(
-            server_id=server_id,
-            total_traffic=upload_traffic_gb + download_traffic_gb,  # 使用GB单位
-            used_traffic=upload_traffic_gb + download_traffic_gb,  # 使用GB单位
-            remaining_traffic=remaining_traffic_gb,  # 使用GB单位
-            timestamp=timestamp
-        )
-        db.session.add(server_traffic_monitoring_entry)
-        logging.debug(f"Added server traffic monitoring entry for server {server_id}")
+# 3. 更新服务器流量数据到 `ServerTraffic` 表，并记录流量监控快照
+server_id = container.server_id  # 获取 server_id
+timestamp = datetime.utcnow()  # 获取当前时间戳
 
-        # 4. 更新 `ServerTraffic` 表（累加所有容器的流量）
-        server_traffic = ServerTraffic.query.filter_by(id=server_id).first()  # 修改了这里的查询条件，改为根据自增的 id 查询
+# 计算所有容器的总流量
+total_server_limit = sum([Decimal(container.max_upload_traffic) for container in DockerContainer.query.filter_by(server_id=server_id).all()])
+total_server_used = sum([Decimal(c.upload_traffic) for c in DockerContainer.query.filter_by(server_id=server_id).all()])
 
-        if server_traffic:
-            # 计算所有容器的总流量
-            total_server_limit = sum([Decimal(container.max_upload_traffic) for container in DockerContainer.query.filter_by(server_id=server_id).all()])
-            total_server_used = sum([Decimal(c.upload_traffic) + Decimal(c.download_traffic) for c in DockerContainer.query.filter_by(server_id=server_id).all()])
-            
-            # 确保所有的计算结果都是 Decimal 类型
-            total_server_remaining = total_server_limit - total_server_used  # 总流量使用后剩余流量
+# 确保所有的计算结果都是 Decimal 类型
+total_server_remaining = total_server_limit - total_server_used  # 总流量使用后剩余流量
 
-            logging.debug(f"Total server limit: {total_server_limit}, total used: {total_server_used}, total remaining: {total_server_remaining}")
+# 创建流量监控快照，记录当前时间戳
+server_traffic_monitoring_entry = ServerTrafficMonitoring(
+    server_id=server_id,
+    total_traffic=total_server_limit,  # 使用GB单位
+    used_traffic=total_server_used,  # 使用GB单位
+    remaining_traffic=total_server_remaining,  # 使用GB单位
+    timestamp=timestamp
+)
+db.session.add(server_traffic_monitoring_entry)
 
-            # 只有当是每月1日第一次保存流量数据时，才重置流量
-            if server_traffic.traffic_reset_date != next_month_first_day:
-                # 重置流量
-                server_traffic.remaining_traffic = total_server_remaining  # 重置为服务器流量限制
-                server_traffic.total_traffic = total_server_limit  # 总流量重置为流量限制
-                server_traffic.traffic_used = total_server_used  # 已用流量
-                server_traffic.traffic_reset_date = next_month_first_day  # 设置为下个月1日
-                logging.debug(f"Reset server traffic for server {server_id}")
-            else:
-                # 否则，更新剩余流量
-                server_traffic.remaining_traffic = total_server_remaining
-                server_traffic.traffic_used = total_server_used
-                logging.debug(f"Updated remaining traffic for server {server_id}")
+# 更新 `ServerTraffic` 表（累加所有容器的流量）
+server_traffic = ServerTraffic.query.filter_by(id=server_id).first()  # 根据自增的 id 查询
 
-            server_traffic.updated_at = datetime.utcnow()
-        else:
-            total_server_limit = sum([Decimal(container.max_upload_traffic) for container in DockerContainer.query.filter_by(server_id=server_id).all()])
-            server_traffic = ServerTraffic(
-                id=server_id,  # 修改了这里的id为自增的主键
-                total_traffic=total_server_limit,
-                remaining_traffic=remaining_traffic_gb,  # 使用GB单位
-                traffic_limit=total_server_limit,
-                traffic_used=upload_traffic_gb + download_traffic_gb,  # 确保是GB单位
-                traffic_reset_date=next_month_first_day,
-                updated_at=datetime.utcnow(),
-                created_at=datetime.utcnow()
-            )
-            db.session.add(server_traffic)
-            logging.debug(f"Added new server traffic entry for server {server_id}")
+if server_traffic:
+    # 只有当是每月1日第一次保存流量数据时，才重置流量
+    if server_traffic.traffic_reset_date != get_next_month_first_day():
+        # 重置流量
+        server_traffic.remaining_traffic = total_server_remaining  # 重置为服务器流量限制
+        server_traffic.total_traffic = total_server_limit  # 总流量重置为流量限制
+        server_traffic.traffic_used = total_server_used  # 已用流量
+        server_traffic.traffic_reset_date = get_next_month_first_day()  # 设置为下个月1日
+        logging.debug(f"Reset server traffic for server {server_id}")
+    else:
+        # 否则，更新剩余流量
+        server_traffic.remaining_traffic = total_server_remaining
+        server_traffic.traffic_used = total_server_used
+        logging.debug(f"Updated remaining traffic for server {server_id}")
 
-        # 5. 更新 `UserTraffic` 表 
+    server_traffic.updated_at = timestamp  # 更新时间戳
+else:
+    # 如果没有找到服务器流量记录，则创建新记录
+    server_traffic = ServerTraffic(
+        id=server_id,  # 修改了这里的id为自增的主键
+        total_traffic=total_server_limit,  # 使用GB单位
+        remaining_traffic=total_server_remaining,  # 使用GB单位
+        traffic_limit=total_server_limit,
+        traffic_used=total_server_used,  # 使用GB单位
+        traffic_reset_date=get_next_month_first_day(),  # 设置为下个月1日
+        updated_at=timestamp,
+        created_at=timestamp
+    )
+    db.session.add(server_traffic)
+
+# 提交所有更改到数据库
+db.session.commit()
+
+        # 4. 更新 `UserTraffic` 表 
         user_id = container.user_id
         user_traffic = UserTraffic.query.filter_by(user_id=user_id).first()
 
         if user_traffic:
-            # 打印当前字段的类型和值，进行调试
-            logging.debug(f"Before update: user_traffic.upload_traffic (type: {type(user_traffic.upload_traffic)}, value: {user_traffic.upload_traffic})")
-            logging.debug(f"Before update: user_traffic.download_traffic (type: {type(user_traffic.download_traffic)}, value: {user_traffic.download_traffic})")
-            logging.debug(f"Before update: user_traffic.total_traffic (type: {type(user_traffic.total_traffic)}, value: {user_traffic.total_traffic})")
-            logging.debug(f"Before update: user_traffic.remaining_traffic (type: {type(user_traffic.remaining_traffic)}, value: {user_traffic.remaining_traffic})")
 
             # 显式将 Decimal 转换为 Decimal 再进行操作
             user_traffic.upload_traffic += upload_traffic_gb  # 使用GB单位
@@ -163,17 +154,10 @@ def save_traffic():
             user_traffic.total_traffic += upload_traffic_gb + download_traffic_gb  # 使用GB单位
             user_traffic.remaining_traffic = remaining_traffic_gb  # 使用GB单位
 
-            # 打印更新后的字段的类型和值，进行调试
-            logging.debug(f"After update: user_traffic.upload_traffic (type: {type(user_traffic.upload_traffic)}, value: {user_traffic.upload_traffic})")
-            logging.debug(f"After update: user_traffic.download_traffic (type: {type(user_traffic.download_traffic)}, value: {user_traffic.download_traffic})")
-            logging.debug(f"After update: user_traffic.total_traffic (type: {type(user_traffic.total_traffic)}, value: {user_traffic.total_traffic})")
-            logging.debug(f"After update: user_traffic.remaining_traffic (type: {type(user_traffic.remaining_traffic)}, value: {user_traffic.remaining_traffic})")
-
             user_traffic.updated_at = datetime.utcnow()
-            logging.debug(f"Updated user traffic for user {user_id}")
         else:
             # 显式将 Decimal 转换为 Decimal
-            logging.debug(f"Creating new user traffic for user {user_id}")
+
             user_traffic = UserTraffic(
                 user_id=user_id,
                 upload_traffic=upload_traffic_gb,  # 使用GB单位
@@ -183,7 +167,6 @@ def save_traffic():
                 updated_at=datetime.utcnow()
             )
             db.session.add(user_traffic)
-            logging.debug(f"Added new user traffic entry for user {user_id}")
 
         # 6. 更新 `docker_containers` 表
         if container:
@@ -194,7 +177,6 @@ def save_traffic():
                 container.download_traffic = download_traffic_gb  # 使用GB单位
 
             db.session.commit()
-            logging.debug(f"Committed changes to container {container_id}")
 
         # 7. 更新 `servers` 表中的剩余流量
         server = Server.query.filter_by(id=server_id).first()  # 修改了这里的查询条件，改为根据自增的 id 查询
@@ -203,7 +185,6 @@ def save_traffic():
                 server.remaining_traffic = remaining_traffic_gb  # 使用GB单位
 
             db.session.commit()
-            logging.debug(f"Committed changes to server {server_id}")
 
         db.session.commit()
 
@@ -214,7 +195,6 @@ def save_traffic():
             rental_record.traffic_reset_date = next_month_first_day  # 设置为下个月1日
             rental_record.updated_at = datetime.utcnow()
             db.session.commit()
-            logging.debug(f"Updated rental traffic for user {user_id}")
 
         return jsonify({'message': 'Traffic data saved successfully'}), 200
 
