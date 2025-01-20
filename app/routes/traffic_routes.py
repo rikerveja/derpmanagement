@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 import requests  # 正确导入 requests 库
 from app import db
-from app.models import DockerContainer, DockerContainerTraffic, ServerTraffic, ServerTrafficMonitoring, UserTraffic, Rental
+from app.models import Server, DockerContainer, DockerContainerTraffic, ServerTraffic, ServerTrafficMonitoring, UserTraffic, Rental
 from datetime import datetime, timedelta
 import logging
 from decimal import Decimal
