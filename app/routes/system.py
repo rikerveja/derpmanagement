@@ -16,8 +16,10 @@ def get_system_overview():
         # 获取用户统计
         users = User.query.all()
         total_users = len(users)
-        active_users = len([u for u in users if u.status == 'active'])
-        expired_users = len([u for u in users if u.status == 'expired'])
+
+        # 判断用户是否过期，根据 rental_expiry 来判断
+        active_users = len([u for u in users if u.rental_expiry and u.rental_expiry > datetime.now()])
+        expired_users = len([u for u in users if u.rental_expiry and u.rental_expiry <= datetime.now()])
 
         # 获取服务器统计
         servers = Server.query.all()
@@ -94,7 +96,6 @@ def get_system_overview():
             'success': False,
             'message': f'Error getting system overview: {str(e)}'
         }), 500
-
 
 # 获取服务器分类
 @system_bp.route('/servers/categories', methods=['GET'])
