@@ -274,6 +274,39 @@ const trafficApi = {
   }
 }
 
+/**
+ * 保存容器流量数据
+ * @param {Object} data - 流量数据对象
+ * @param {string} data.container_id - 容器ID（原始ID，不是自增ID）
+ * @param {number} data.upload_traffic - 上传流量（字节）
+ * @param {number} data.download_traffic - 下载流量（字节）
+ * @param {number} data.remaining_traffic - 剩余流量（字节）
+ * @returns {Promise} 返回保存结果
+ */
+const saveTrafficData = async (data) => {
+  try {
+    // 确保所有数值都是整数（字节）
+    const requestData = {
+      container_id: data.container_id,
+      upload_traffic: Math.floor(data.upload_traffic || 0),
+      download_traffic: Math.floor(data.download_traffic || 0),
+      remaining_traffic: Math.floor(data.remaining_traffic || 0)
+    }
+
+    console.log('发送流量数据:', requestData)
+    const response = await api.post('/traffic/save_traffic', requestData)
+    
+    if (response.message === 'Traffic data saved successfully') {
+      return response
+    } else {
+      throw new Error(response.error || '保存失败')
+    }
+  } catch (error) {
+    console.error('保存流量数据失败:', error)
+    throw new Error(error.response?.error || '保存流量数据失败')
+  }
+}
+
 export default {
   ...dashboardApi,
   trafficApi,  // 直接导出 trafficApi 对象
@@ -550,4 +583,5 @@ export default {
   },
 
   //getTrafficData
+  saveTrafficData
 } 
