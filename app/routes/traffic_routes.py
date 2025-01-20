@@ -105,29 +105,31 @@ def save_traffic():
         # 4. 更新 `ServerTraffic` 表（累加所有容器的流量）
         server_traffic = ServerTraffic.query.filter_by(server_id=server_id).first()
 
-        if server_traffic:
-            # 计算所有容器的总流量
-            total_server_limit = sum([container.max_upload_traffic for container in DockerContainer.query.filter_by(server_id=server_id).all()])
-            total_server_used = sum([float(c.upload_traffic) + float(c.download_traffic) for c in DockerContainer.query.filter_by(server_id=server_id).all()])
-            total_server_remaining = total_server_limit - total_server_used
+  if server_traffic:
+    # 计算所有容器的总流量
+    total_server_limit = sum([float(container.max_upload_traffic) for container in DockerContainer.query.filter_by(server_id=server_id).all()])
+    total_server_used = sum([float(c.upload_traffic) + float(c.download_traffic) for c in DockerContainer.query.filter_by(server_id=server_id).all()])
+    
+    # 确保所有的计算结果都是 float 类型
+    total_server_remaining = total_server_limit - total_server_used  # total_server_used 是 float 类型
 
-            logging.debug(f"Total server limit: {total_server_limit}, total used: {total_server_used}, total remaining: {total_server_remaining}")
+    logging.debug(f"Total server limit: {total_server_limit}, total used: {total_server_used}, total remaining: {total_server_remaining}")
 
-            # 只有当是每月1日第一次保存流量数据时，才重置流量
-            if server_traffic.traffic_reset_date != next_month_first_day:
-                # 重置流量
-                server_traffic.remaining_traffic = total_server_remaining  # 重置为服务器流量限制
-                server_traffic.total_traffic = total_server_limit  # 总流量重置为流量限制
-                server_traffic.traffic_used = total_server_used  # 已用流量
-                server_traffic.traffic_reset_date = next_month_first_day  # 设置为下个月1日
-                logging.debug(f"Reset server traffic for server {server_id}")
-            else:
-                # 否则，更新剩余流量
-                server_traffic.remaining_traffic = total_server_remaining
-                server_traffic.traffic_used = total_server_used
-                logging.debug(f"Updated remaining traffic for server {server_id}")
+    # 只有当是每月1日第一次保存流量数据时，才重置流量
+    if server_traffic.traffic_reset_date != next_month_first_day:
+        # 重置流量
+        server_traffic.remaining_traffic = total_server_remaining  # 重置为服务器流量限制
+        server_traffic.total_traffic = total_server_limit  # 总流量重置为流量限制
+        server_traffic.traffic_used = total_server_used  # 已用流量
+        server_traffic.traffic_reset_date = next_month_first_day  # 设置为下个月1日
+        logging.debug(f"Reset server traffic for server {server_id}")
+    else:
+        # 否则，更新剩余流量
+        server_traffic.remaining_traffic = total_server_remaining
+        server_traffic.traffic_used = total_server_used
+        logging.debug(f"Updated remaining traffic for server {server_id}")
 
-            server_traffic.updated_at = datetime.utcnow()
+    server_traffic.updated_at = datetime.utcnow()
         else:
             total_server_limit = sum([container.max_upload_traffic for container in DockerContainer.query.filter_by(server_id=server_id).all()])
             server_traffic = ServerTraffic(
