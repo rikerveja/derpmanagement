@@ -91,7 +91,7 @@ def save_traffic():
 
         # 计算所有容器的总流量
         total_server_limit = sum([Decimal(container.max_upload_traffic) for container in DockerContainer.query.filter_by(server_id=server_id).all()])
-        total_server_used = sum([Decimal(c.upload_traffic) + Decimal(c.download_traffic) for c in DockerContainer.query.filter_by(server_id=server_id).all()])
+        total_server_used = sum([Decimal(c.upload_traffic) for c in DockerContainer.query.filter_by(server_id=server_id).all()])
 
         # 确保所有的计算结果都是 Decimal 类型
         total_server_remaining = total_server_limit - total_server_used  # 总流量使用后剩余流量
