@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request  
 import requests  # 正确导入 requests 库
 from app import db
 from app.models import DockerContainer, DockerContainerTraffic, ServerTraffic, ServerTrafficMonitoring, UserTraffic, Rental
@@ -94,9 +94,9 @@ def save_traffic():
         server_id = container.server_id
         server_traffic_monitoring_entry = ServerTrafficMonitoring(
             server_id=server_id,
-            total_traffic=upload_traffic + download_traffic,  # 总流量（字节）
-            used_traffic=upload_traffic + download_traffic,
-            remaining_traffic=remaining_traffic,
+            total_traffic=float(upload_traffic + download_traffic),  # 转为float类型
+            used_traffic=float(upload_traffic + download_traffic),  # 转为float类型
+            remaining_traffic=float(remaining_traffic),  # 转为float类型
             timestamp=timestamp
         )
         db.session.add(server_traffic_monitoring_entry)
@@ -105,39 +105,39 @@ def save_traffic():
         # 4. 更新 `ServerTraffic` 表（累加所有容器的流量）
         server_traffic = ServerTraffic.query.filter_by(server_id=server_id).first()
 
-  if server_traffic:
-    # 计算所有容器的总流量
-    total_server_limit = sum([float(container.max_upload_traffic) for container in DockerContainer.query.filter_by(server_id=server_id).all()])
-    total_server_used = sum([float(c.upload_traffic) + float(c.download_traffic) for c in DockerContainer.query.filter_by(server_id=server_id).all()])
-    
-    # 确保所有的计算结果都是 float 类型
-    total_server_remaining = total_server_limit - total_server_used  # total_server_used 是 float 类型
+        if server_traffic:
+            # 计算所有容器的总流量
+            total_server_limit = sum([float(container.max_upload_traffic) for container in DockerContainer.query.filter_by(server_id=server_id).all()])
+            total_server_used = sum([float(c.upload_traffic) + float(c.download_traffic) for c in DockerContainer.query.filter_by(server_id=server_id).all()])
+            
+            # 确保所有的计算结果都是 float 类型
+            total_server_remaining = float(total_server_limit) - float(total_server_used)  # 总流量使用后剩余流量
 
-    logging.debug(f"Total server limit: {total_server_limit}, total used: {total_server_used}, total remaining: {total_server_remaining}")
+            logging.debug(f"Total server limit: {total_server_limit}, total used: {total_server_used}, total remaining: {total_server_remaining}")
 
-    # 只有当是每月1日第一次保存流量数据时，才重置流量
-    if server_traffic.traffic_reset_date != next_month_first_day:
-        # 重置流量
-        server_traffic.remaining_traffic = total_server_remaining  # 重置为服务器流量限制
-        server_traffic.total_traffic = total_server_limit  # 总流量重置为流量限制
-        server_traffic.traffic_used = total_server_used  # 已用流量
-        server_traffic.traffic_reset_date = next_month_first_day  # 设置为下个月1日
-        logging.debug(f"Reset server traffic for server {server_id}")
-    else:
-        # 否则，更新剩余流量
-        server_traffic.remaining_traffic = total_server_remaining
-        server_traffic.traffic_used = total_server_used
-        logging.debug(f"Updated remaining traffic for server {server_id}")
+            # 只有当是每月1日第一次保存流量数据时，才重置流量
+            if server_traffic.traffic_reset_date != next_month_first_day:
+                # 重置流量
+                server_traffic.remaining_traffic = total_server_remaining  # 重置为服务器流量限制
+                server_traffic.total_traffic = total_server_limit  # 总流量重置为流量限制
+                server_traffic.traffic_used = total_server_used  # 已用流量
+                server_traffic.traffic_reset_date = next_month_first_day  # 设置为下个月1日
+                logging.debug(f"Reset server traffic for server {server_id}")
+            else:
+                # 否则，更新剩余流量
+                server_traffic.remaining_traffic = total_server_remaining
+                server_traffic.traffic_used = total_server_used
+                logging.debug(f"Updated remaining traffic for server {server_id}")
 
-    server_traffic.updated_at = datetime.utcnow()
+            server_traffic.updated_at = datetime.utcnow()
         else:
-            total_server_limit = sum([container.max_upload_traffic for container in DockerContainer.query.filter_by(server_id=server_id).all()])
+            total_server_limit = sum([float(container.max_upload_traffic) for container in DockerContainer.query.filter_by(server_id=server_id).all()])
             server_traffic = ServerTraffic(
                 server_id=server_id,
                 total_traffic=total_server_limit,
                 remaining_traffic=remaining_traffic,
                 traffic_limit=total_server_limit,
-                traffic_used=upload_traffic + download_traffic,
+                traffic_used=float(upload_traffic + download_traffic),  # 确保是float类型
                 traffic_reset_date=next_month_first_day,
                 updated_at=datetime.utcnow(),
                 created_at=datetime.utcnow()
@@ -171,9 +171,9 @@ def save_traffic():
         if container:
             # 根据POST参数来更新指定的字段
             if upload_traffic is not None:
-                container.upload_traffic = upload_traffic_gb  # 精准更新上传流量
+                container.upload_traffic = float(upload_traffic_gb)  # 确保是float类型
             if download_traffic is not None:
-                container.download_traffic = download_traffic_gb  # 精准更新下载流量
+                container.download_traffic = float(download_traffic_gb)  # 确保是float类型
 
             db.session.commit()
             logging.debug(f"Committed changes to container {container_id}")
@@ -182,7 +182,7 @@ def save_traffic():
         server = Server.query.filter_by(server_id=server_id).first()
         if server:
             if remaining_traffic is not None:
-                server.remaining_traffic = remaining_traffic  # 精准更新剩余流量
+                server.remaining_traffic = float(remaining_traffic)  # 确保是float类型
 
             db.session.commit()
             logging.debug(f"Committed changes to server {server_id}")
@@ -204,7 +204,6 @@ def save_traffic():
         logging.error(f"Error saving traffic data: {str(e)}")
         db.session.rollback()  # 回滚事务
         return jsonify({'error': 'Internal server error'}), 500
-
 
 # 从容器名称提取 IP 地址
 def extract_ip_from_container_name(container_name):
