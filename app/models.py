@@ -103,8 +103,8 @@ class Rental(db.Model):
     expired_at = db.Column(db.DateTime)  # 到期时间
     server_ids = db.Column(db.JSON, default=dict)  # 服务器ID列表
     container_ids = db.Column(db.JSON, default=dict)  # 容器ID列表
-    traffic_limit = db.Column(db.Integer, default=0)  # 流量限制
-    traffic_usage = db.Column(db.Integer, default=0)  # 已使用流量
+    traffic_limit = db.Column(DECIMAL(10, 2))  # 流量限制
+    traffic_usage = db.Column(DECIMAL(10, 2))  # 已使用流量
     traffic_reset_date = db.Column(db.Date)  # 流量重置日期
     serial_number_id = db.Column(db.Integer, db.ForeignKey('serial_numbers.id'))
     serial_number_expiry = db.Column(db.Date)  # 序列号有效期
