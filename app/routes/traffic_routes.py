@@ -6,11 +6,11 @@ from datetime import datetime, timedelta
 import logging
 from decimal import Decimal
 
-# 定义蓝图
-traffic_bp = Blueprint('traffic', __name__)
-
 # 设置日志级别为 DEBUG
 logging.basicConfig(level=logging.DEBUG)
+
+# 定义蓝图
+traffic_bp = Blueprint('traffic', __name__)
 
 # 字节转GB并保留2位小数
 def bytes_to_gb(byte_value):
@@ -147,9 +147,9 @@ def save_traffic():
         user_id = container.user_id
         user_traffic = UserTraffic.query.filter_by(user_id=user_id).first()
         if user_traffic:
-            user_traffic.upload_traffic += upload_traffic_gb
-            user_traffic.download_traffic += download_traffic_gb
-            user_traffic.total_traffic += (upload_traffic_gb + download_traffic_gb)
+            user_traffic.upload_traffic += float(upload_traffic_gb)  # Convert to float explicitly
+            user_traffic.download_traffic += float(download_traffic_gb)  # Convert to float explicitly
+            user_traffic.total_traffic += float(upload_traffic_gb + download_traffic_gb)  # Convert to float explicitly
             user_traffic.remaining_traffic = remaining_traffic
             user_traffic.updated_at = datetime.utcnow()
             logging.debug(f"Updated user traffic for user {user_id}")
