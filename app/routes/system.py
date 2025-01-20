@@ -35,23 +35,11 @@ def get_system_overview():
         stopped_containers = len([c for c in containers if c.status == 'stopped'])
         error_containers = len([c for c in containers if c.status == 'error'])
 
-        # 获取流量统计
-        traffic = Traffic.query.first()  # 假设有一个总流量记录
-        traffic_stats = {
-            'used': traffic.used_traffic if traffic else 0,
-            'total': traffic.total_traffic if traffic else 0
-        }
-
         # 获取租赁统计
         rentals = Rental.query.all()
         total_rentals = len(rentals)
         active_rentals = len([r for r in rentals if r.status == 'active'])
         expired_rentals = len([r for r in rentals if r.status == 'expired'])
-
-        # 获取告警统计
-        alerts = Alert.query.all()
-        total_alerts = len(alerts)
-        critical_alerts = len([a for a in alerts if a.level == 'critical'])
 
         # 构建响应数据
         response_data = {
@@ -74,15 +62,10 @@ def get_system_overview():
                     'stopped': stopped_containers,
                     'error': error_containers
                 },
-                'traffic': traffic_stats,
                 'rentals': {
                     'total': total_rentals,
                     'active': active_rentals,
                     'expired': expired_rentals
-                },
-                'alerts': {
-                    'total': total_alerts,
-                    'critical': critical_alerts
                 }
             },
             'message': 'System overview retrieved successfully'
