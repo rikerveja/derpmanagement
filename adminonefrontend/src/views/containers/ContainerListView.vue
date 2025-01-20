@@ -244,6 +244,16 @@ const formatDateTime = (dateStr) => {
   }
 }
 
+// 从容器名称中提取 IP 地址
+const extractIpFromContainerName = (containerName) => {
+  if (!containerName) return '-'
+  const parts = containerName.split('_')
+  if (parts.length >= 4) {
+    return parts.slice(0, 4).join('.')
+  }
+  return '-'
+}
+
 onMounted(async () => {
   await fetchContainers()
 })
@@ -294,10 +304,14 @@ onMounted(async () => {
         <!-- 容器列表表格 -->
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200">
-            <thead>
+            <thead class="bg-gray-50">
               <tr>
-                <th class="px-4 py-3 text-left">容器名称</th>
-                <th class="px-4 py-3 text-left">所在服务器</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  容器名称
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  服务器IP
+                </th>
                 <th class="px-4 py-3 text-left">端口信息</th>
                 <th class="px-4 py-3 text-left">状态</th>
                 <th class="px-4 py-3 text-left">流量限制(GB)</th>
@@ -306,7 +320,7 @@ onMounted(async () => {
                 <th class="px-4 py-3 text-left">操作</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-100">
+            <tbody class="bg-white divide-y divide-gray-200">
               <tr v-for="container in paginatedContainers" :key="container.id" 
                   class="hover:bg-gray-50">
                 <td class="px-4 py-3">
@@ -315,11 +329,8 @@ onMounted(async () => {
                     <span class="text-xs text-gray-500">{{ container.container_id }}</span>
                   </div>
                 </td>
-                <td class="px-4 py-3">
-                  <div class="flex flex-col space-y-1">
-                    <span class="text-sm">{{ getServerInfo(container.server_id).name }}</span>
-                    <span class="text-xs text-gray-500">{{ getServerInfo(container.server_id).ip }}</span>
-                  </div>
+                <td class="px-4 py-3 font-mono text-sm">
+                  {{ extractIpFromContainerName(container.container_name) }}
                 </td>
                 <td class="px-4 py-3">
                   <div class="flex flex-col space-y-1 text-sm">
@@ -338,13 +349,10 @@ onMounted(async () => {
                   </div>
                 </td>
                 <td class="px-4 py-3">
-                  <span :class="{
-                    'text-red-600': container.status === 'stopped',
-                    'text-yellow-600': container.status === 'paused'
-                  }">
+                  <span :class="getStatusClass(container.status)">
                     <template v-if="container.status === 'running'">
                       <a 
-                        :href="`https://${getServerInfo(container.server_id).ip}:${container.port}`"
+                        :href="`http://${extractIpFromContainerName(container.container_name)}:${container.node_exporter_port}`"
                         target="_blank"
                         class="text-green-600 hover:text-green-800 hover:underline inline-flex items-center"
                       >
