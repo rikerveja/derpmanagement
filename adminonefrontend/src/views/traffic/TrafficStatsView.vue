@@ -1,205 +1,376 @@
 <template>
   <div class="grid gap-6">
-    <!-- 统计类型选择 -->
+    <!-- 控制栏 -->
     <CardBox>
-      <div class="flex items-center space-x-4">
-        <label class="text-gray-700 dark:text-gray-300">统计类型:</label>
-        <select 
-          v-model="statsType"
-          class="form-select rounded-md border-gray-300 shadow-sm"
-        >
-          <option value="user">按用户统计</option>
-          <option value="server">按服务器统计</option>
-        </select>
-
-        <template v-if="statsType === 'user'">
-          <label class="text-gray-700 dark:text-gray-300">选择用户:</label>
-          <select v-model="selectedId" class="form-select">
-            <option v-for="user in users" :key="user.id" :value="user.id">
-              {{ user.username }}
-            </option>
-          </select>
-        </template>
-
-        <template v-else>
+      <div class="flex justify-between items-center">
+        <div class="flex items-center space-x-4">
           <label class="text-gray-700 dark:text-gray-300">选择服务器:</label>
-          <select v-model="selectedId" class="form-select">
-            <option v-for="server in servers" :key="server.id" :value="server.id">
-              {{ server.name }}
+          <select 
+            v-model="selectedServer"
+            class="form-select rounded-md border-gray-300 shadow-sm"
+            :disabled="loading"
+          >
+            <option value="">请选择服务器</option>
+            <option 
+              v-for="server in servers" 
+              :key="server.id" 
+              :value="server.id"
+              :disabled="server.status === 'unreachable'"
+            >
+              {{ server.name }} ({{ server.ip_address }})
+              {{ server.status === 'unreachable' ? '(不可达)' : '' }}
             </option>
           </select>
-        </template>
-      </div>
-    </CardBox>
 
-    <!-- 统计图表 -->
-    <CardBox class="h-96">
-      <!-- 图表组件 -->
-    </CardBox>
-
-    <!-- 统计数据表格 -->
-    <CardBox>
-      <!-- 数据表格 -->
-    </CardBox>
-
-    <!-- 超流量用户警告 -->
-    <CardBox v-if="overlimitUsers.length > 0" class="bg-red-50">
-      <h3 class="text-red-700 font-medium mb-4">超流量用户警告</h3>
-      <div class="space-y-2">
-        <div v-for="user in overlimitUsers" :key="user.container_id" class="flex justify-between items-center">
-          <span>容器 ID: {{ user.container_id }}</span>
-          <span class="text-red-600">超出: {{ formatTraffic(-user.remaining_traffic) }}</span>
+          <!-- 容器选择 -->
+          <template v-if="selectedServer">
+            <label class="text-gray-700 dark:text-gray-300">选择容器:</label>
+            <select
+              v-model="selectedContainer"
+              class="form-select rounded-md border-gray-300 shadow-sm"
+              :disabled="loading || loadingContainers"
+            >
+              <option value="">请选择容器</option>
+              <option
+                v-for="container in serverContainers"
+                :key="container.id"
+                :value="container.id"
+              >
+                {{ container.container_name || container.id }}
+              </option>
+            </select>
+          </template>
+        </div>
+        <div class="flex space-x-2">
+          <BaseButton
+            color="success"
+            label="保存流量数据"
+            :icon="mdiContentSave"
+            :loading="saving"
+            @click="saveTrafficData"
+            :disabled="!selectedContainer"
+          />
+          <BaseButton
+            color="info"
+            label="刷新"
+            :icon="mdiRefresh"
+            :loading="loading"
+            @click="fetchTrafficData"
+            :disabled="!selectedContainer"
+          />
         </div>
       </div>
     </CardBox>
+
+    <!-- 错误提示 -->
+    <div v-if="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+      <span class="block sm:inline">{{ error }}</span>
+    </div>
+
+    <!-- 流量数据卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <CardBox class="hover:shadow-lg transition-shadow">
+        <div class="flex items-center">
+          <div class="p-3 rounded-full bg-green-100 dark:bg-green-800">
+            <BaseIcon :path="mdiUpload" class="w-6 h-6 text-green-500"/>
+          </div>
+          <div class="ml-4">
+            <h3 class="text-gray-500 text-sm">上传流量</h3>
+            <p class="text-2xl font-semibold">
+              {{ formatTraffic(trafficData.upload_traffic || 0) }}
+            </p>
+          </div>
+        </div>
+      </CardBox>
+
+      <CardBox class="hover:shadow-lg transition-shadow">
+        <div class="flex items-center">
+          <div class="p-3 rounded-full bg-blue-100 dark:bg-blue-800">
+            <BaseIcon :path="mdiDownload" class="w-6 h-6 text-blue-500"/>
+          </div>
+          <div class="ml-4">
+            <h3 class="text-gray-500 text-sm">下载流量</h3>
+            <p class="text-2xl font-semibold">
+              {{ formatTraffic(trafficData.download_traffic || 0) }}
+            </p>
+          </div>
+        </div>
+      </CardBox>
+
+      <CardBox class="hover:shadow-lg transition-shadow">
+        <div class="flex items-center">
+          <div class="p-3 rounded-full bg-purple-100 dark:bg-purple-800">
+            <BaseIcon :path="mdiChartLine" class="w-6 h-6 text-purple-500"/>
+          </div>
+          <div class="ml-4">
+            <h3 class="text-gray-500 text-sm">剩余流量</h3>
+            <p class="text-2xl font-semibold">
+              {{ formatTraffic(remainingTraffic) }}
+            </p>
+          </div>
+        </div>
+      </CardBox>
+
+      <CardBox class="hover:shadow-lg transition-shadow">
+        <div class="flex items-center">
+          <div class="p-3 rounded-full bg-yellow-100 dark:bg-yellow-800">
+            <BaseIcon :path="mdiGauge" class="w-6 h-6 text-yellow-500"/>
+          </div>
+          <div class="ml-4">
+            <h3 class="text-gray-500 text-sm">流量限制</h3>
+            <p class="text-2xl font-semibold">
+              {{ formatTraffic(trafficLimit) }}
+            </p>
+          </div>
+        </div>
+      </CardBox>
+    </div>
+
+    <!-- 在流量数据卡片后面添加 -->
+    <div class="mt-6">
+      <CardBox>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead>
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  字段
+                </th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  原始值 (字节)
+                </th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  转换值 (MB)
+                </th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  容器ID
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" colspan="2">
+                  {{ selectedContainer ? getContainerName(selectedContainer) : '-' }}
+                </td>
+              </tr>
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  上传流量
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {{ trafficData.upload_traffic || 0 }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {{ formatTraffic(trafficData.upload_traffic || 0) }}
+                </td>
+              </tr>
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  下载流量
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {{ trafficData.download_traffic || 0 }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {{ formatTraffic(trafficData.download_traffic || 0) }}
+                </td>
+              </tr>
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  流量限制
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {{ trafficLimit }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {{ formatTraffic(trafficLimit) }}
+                </td>
+              </tr>
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  剩余流量
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {{ remainingTraffic }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {{ formatTraffic(remainingTraffic) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </CardBox>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
-import { Line } from 'vue-chartjs'
+import { ref, onMounted, watch } from 'vue'
+import { 
+  mdiUpload, 
+  mdiDownload, 
+  mdiChartLine,
+  mdiRefresh,
+  mdiContentSave,
+  mdiGauge
+} from '@mdi/js'
 import CardBox from '@/components/CardBox.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseIcon from '@/components/BaseIcon.vue'
-import { mdiChartLine, mdiRefresh, mdiAlert, mdiMagnify } from '@mdi/js'
 import api from '@/services/api'
 
-const statsType = ref('user')
-const selectedId = ref('')
-const users = ref([])
-const servers = ref([])
-const statsData = ref([])
-const summary = ref(null)
+// 状态变量
 const loading = ref(false)
-const error = ref(null)
-const overlimitUsers = ref([])
+const saving = ref(false)
+const error = ref('')
+const servers = ref([])
+const selectedServer = ref('')
+const selectedContainer = ref(null)
+const serverContainers = ref([])
+const loadingContainers = ref(false)
+const trafficData = ref({})
+const trafficLimit = ref(0)
+const remainingTraffic = ref(0)
 
-// 获取用户和服务器列表
-const fetchOptions = async () => {
+// 获取服务器列表
+const fetchServers = async () => {
   try {
-    const [usersResponse, serversResponse] = await Promise.all([
-      api.getUsers(),
-      api.getServers()
-    ])
-    
-    if (usersResponse.success) {
-      users.value = usersResponse.users
-    }
-    if (serversResponse.success) {
-      servers.value = serversResponse.servers
+    const response = await api.getServers()
+    if (response.success) {
+      servers.value = response.servers
     }
   } catch (err) {
-    error.value = '获取选项数据失败: ' + err.message
+    error.value = '获取服务器列表失败'
   }
 }
 
-// 获取统计数据
-const fetchStats = async () => {
-  const id = statsType.value === 'user' ? selectedId.value : selectedId.value
-  if (!id) {
-    error.value = `请选择${statsType.value === 'user' ? '用户' : '服务器'}`
-    return
-  }
-
-  loading.value = true
-  error.value = null
-
+// 获取容器列表
+const fetchContainers = async (serverId) => {
   try {
-    const response = await api.getTrafficStats({
-      user_id: statsType.value === 'user' ? id : undefined,
-      server_id: statsType.value === 'server' ? id : undefined
-    })
-
+    loadingContainers.value = true
+    const response = await api.getServerContainers(serverId)
     if (response.success) {
-      statsData.value = statsType.value === 'user' ? response.user_traffic : response.server_traffic
-      summary.value = statsType.value === 'user' ? response.user_summary : response.server_summary
-    } else {
-      throw new Error(response.message || '获取统计数据失败')
+      serverContainers.value = response.containers
     }
   } catch (err) {
-    error.value = err.message
-    statsData.value = []
-    summary.value = null
+    error.value = '获取容器列表失败'
+  } finally {
+    loadingContainers.value = false
+  }
+}
+
+// 获取流量数据
+const fetchTrafficData = async () => {
+  if (!selectedContainer.value) return
+  
+  try {
+    loading.value = true
+    error.value = ''
+    
+    const response = await api.getContainerTraffic(selectedContainer.value)
+    if (response.success) {
+      trafficData.value = response.traffic
+      
+      // 获取容器信息以计算剩余流量
+      const container = serverContainers.value.find(c => c.id === selectedContainer.value)
+      if (container) {
+        // 将GB转换为字节进行计算
+        const maxTrafficBytes = container.max_upload_traffic * 1024 * 1024 * 1024
+        trafficLimit.value = maxTrafficBytes
+        remainingTraffic.value = Math.max(0, maxTrafficBytes - (trafficData.value.upload_traffic || 0))
+      }
+    }
+  } catch (err) {
+    error.value = '获取流量数据失败'
   } finally {
     loading.value = false
   }
 }
 
-// 监听统计类型变化
-watch(statsType, () => {
-  selectedId.value = ''
-  statsData.value = []
-  summary.value = null
-  error.value = null
-})
-
-// 图表配置
-const chartData = computed(() => ({
-  labels: statsData.value.map(d => formatTime(d.timestamp)),
-  datasets: [
-    {
-      label: '上传流量',
-      data: statsData.value.map(d => d.upload_traffic / 1024 / 1024),
-      borderColor: '#10B981',
-      tension: 0.1
-    },
-    {
-      label: '下载流量',
-      data: statsData.value.map(d => d.download_traffic / 1024 / 1024),
-      borderColor: '#3B82F6',
-      tension: 0.1
-    }
-  ]
-}))
-
-const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  interaction: {
-    intersect: false,
-    mode: 'index'
-  },
-  scales: {
-    y: {
-      beginAtZero: true,
-      title: {
-        display: true,
-        text: '流量 (MB)'
-      }
-    }
-  }
-}
-
-// 格式化函数
-const formatTraffic = (bytes) => {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB'
-  if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(2) + ' MB'
-  return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB'
-}
-
-const formatTime = (timestamp) => {
-  return new Date(timestamp).toLocaleString()
-}
-
-// 获取超流量用户
-const fetchOverlimitUsers = async () => {
+// 保存流量数据
+const saveTrafficData = async () => {
+  if (!selectedContainer.value || !trafficData.value) return
+  
   try {
-    const response = await api.getOverLimitUsers()
+    saving.value = true
+    error.value = ''
     
-    if (response.success) {
-      overlimitUsers.value = response.users
-    } else {
-      throw new Error(response.message || '获取超流量用户失败')
+    // 获取容器信息以计算剩余流量
+    const container = serverContainers.value.find(c => c.id === selectedContainer.value)
+    if (!container) {
+      throw new Error('容器信息不存在')
     }
+
+    // 将GB转换为字节进行计算
+    const maxTrafficBytes = container.max_upload_traffic * 1024 * 1024 * 1024 // GB转字节
+    const uploadTrafficBytes = Math.floor(trafficData.value.upload_traffic || 0)
+    const downloadTrafficBytes = Math.floor(trafficData.value.download_traffic || 0)
+    const remainingBytes = Math.max(0, maxTrafficBytes - uploadTrafficBytes)
+    
+    const data = {
+      container_id: container.container_id, // 使用原始的container_id
+      upload_traffic: uploadTrafficBytes,
+      download_traffic: downloadTrafficBytes,
+      remaining_traffic: remainingBytes
+    }
+    
+    console.log('准备保存的流量数据:', {
+      原始数据: data,
+      单位转换: {
+        上传: `${(uploadTrafficBytes / (1024 * 1024)).toFixed(2)} MB`,
+        下载: `${(downloadTrafficBytes / (1024 * 1024)).toFixed(2)} MB`,
+        剩余: `${(remainingBytes / (1024 * 1024)).toFixed(2)} MB`,
+        限制: `${container.max_upload_traffic} GB`
+      }
+    })
+    
+    const response = await api.saveTrafficData(data)
+    // 成功保存
+    error.value = '保存成功'
+    // 刷新数据
+    await fetchTrafficData()
   } catch (err) {
-    error.value = err.message
-    overlimitUsers.value = []
+    error.value = err.message || '保存流量数据失败'
+    console.error('保存失败:', err)
+  } finally {
+    saving.value = false
   }
 }
 
-onMounted(() => {
-  fetchOptions()
-  fetchOverlimitUsers()
+// 格式化流量显示
+const formatTraffic = (bytes) => {
+  if (typeof bytes !== 'number') return '0.00 MB'
+  const mb = bytes / (1024 * 1024)
+  return `${mb.toFixed(2)} MB`
+}
+
+// 监听服务器选择变化
+watch(selectedServer, async (newServerId) => {
+  selectedContainer.value = null
+  trafficData.value = {}
+  if (newServerId) {
+    await fetchContainers(newServerId)
+  }
 })
+
+// 监听容器选择变化
+watch(selectedContainer, async (newContainerId) => {
+  if (newContainerId) {
+    await fetchTrafficData()
+  } else {
+    trafficData.value = {}
+  }
+})
+
+// 组件初始化
+onMounted(async () => {
+  await fetchServers()
+})
+
+// 在 script setup 中添加
+const getContainerName = (containerId) => {
+  const container = serverContainers.value.find(c => c.id === containerId)
+  return container ? container.container_name : containerId
+}
 </script> 
