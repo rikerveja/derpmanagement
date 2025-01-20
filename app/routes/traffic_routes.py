@@ -139,7 +139,59 @@ def save_traffic():
             )
             db.session.add(server_traffic)
 
-        db.session.commit()  # 提交所有更改
+        db.session.commit()  # 提交所有更改到数据库
+
+        # 4. 更新 `UserTraffic` 表
+        user_id = container.user_id
+        user_traffic = UserTraffic.query.filter_by(user_id=user_id).first()
+
+        if user_traffic:
+            # 显式将 Decimal 转换为 Decimal 再进行操作
+            user_traffic.upload_traffic += upload_traffic_gb  # 使用GB单位
+            user_traffic.download_traffic += download_traffic_gb  # 使用GB单位
+            user_traffic.total_traffic += upload_traffic_gb + download_traffic_gb  # 使用GB单位
+            user_traffic.remaining_traffic = remaining_traffic_gb  # 使用GB单位
+
+            user_traffic.updated_at = datetime.utcnow()
+        else:
+            # 显式将 Decimal 转换为 Decimal
+            user_traffic = UserTraffic(
+                user_id=user_id,
+                upload_traffic=upload_traffic_gb,  # 使用GB单位
+                download_traffic=download_traffic_gb,  # 使用GB单位
+                total_traffic=upload_traffic_gb + download_traffic_gb,  # 使用GB单位
+                remaining_traffic=remaining_traffic_gb,  # 使用GB单位
+                updated_at=datetime.utcnow()
+            )
+            db.session.add(user_traffic)
+
+        # 6. 更新 `docker_containers` 表
+        if container:
+            # 根据POST参数来更新指定的字段
+            if upload_traffic is not None:
+                container.upload_traffic = upload_traffic_gb  # 使用GB单位
+            if download_traffic is not None:
+                container.download_traffic = download_traffic_gb  # 使用GB单位
+
+            db.session.commit()
+
+        # 7. 更新 `servers` 表中的剩余流量
+        server = Server.query.filter_by(id=server_id).first()  # 修改了这里的查询条件，改为根据自增的 id 查询
+        if server:
+            if remaining_traffic is not None:
+                server.remaining_traffic = remaining_traffic_gb  # 使用GB单位
+
+            db.session.commit()
+
+        db.session.commit()
+
+        # 更新 `Rental` 表中的 traffic_usage 和 traffic_reset_date
+        rental_record = Rental.query.filter_by(user_id=user_id).first()
+        if rental_record:
+            rental_record.traffic_usage = sum([Decimal(container.max_upload_traffic) for container in DockerContainer.query.filter_by(user_id=user_id).all()])
+            rental_record.traffic_reset_date = next_month_first_day  # 设置为下个月1日
+            rental_record.updated_at = datetime.utcnow()
+            db.session.commit()
 
         return jsonify({'message': 'Traffic data saved successfully'}), 200
 
