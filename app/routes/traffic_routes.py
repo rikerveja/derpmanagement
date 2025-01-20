@@ -1,8 +1,7 @@
 from flask import Blueprint, request, jsonify
 from app import db
-from app.models import DockerContainer, DockerContainerTraffic, ServerTraffic, ServerTrafficMonitoring, UserTraffic, Rentals
+from app.models import DockerContainer, DockerContainerTraffic, ServerTraffic, ServerTrafficMonitoring, UserTraffic, Rental  # 修改这里
 from datetime import datetime, timedelta
-import requests
 import logging
 
 # 定义蓝图
@@ -87,23 +86,27 @@ def save_traffic():
         )
         db.session.add(server_traffic_monitoring_entry)
 
-        # 3. 更新 `ServerTraffic` 表
+        # 3. 更新 `ServerTraffic` 表（累加所有容器的流量）
         server_traffic = ServerTraffic.query.filter_by(server_id=server_id).first()
+
         if server_traffic:
-            # 计算服务器流量限制和剩余流量
+            # 计算所有容器的总流量
             total_server_limit = sum([container.max_upload_traffic for container in DockerContainer.query.filter_by(server_id=server_id).all()])
-            total_server_remaining = sum([container.remaining_traffic for container in DockerContainer.query.filter_by(server_id=server_id).all()])
+            total_server_used = sum([c.upload_traffic + c.download_traffic for c in DockerContainer.query.filter_by(server_id=server_id).all()])
+            total_server_remaining = total_server_limit - total_server_used
 
             # 只有当是每月1日第一次保存流量数据时，才重置流量
             if server_traffic.traffic_reset_date != next_month_first_day:
-                # 只有在每月1日才会重置流量
-                server_traffic.remaining_traffic = total_server_limit  # 重置为服务器流量限制
+                # 重置流量
+                server_traffic.remaining_traffic = total_server_remaining  # 重置为服务器流量限制
                 server_traffic.total_traffic = total_server_limit  # 总流量重置为流量限制
-                server_traffic.traffic_used = 0  # 已用流量清零
+                server_traffic.traffic_used = total_server_used  # 已用流量
                 server_traffic.traffic_reset_date = next_month_first_day  # 设置为下个月1日
             else:
                 # 否则，更新剩余流量
                 server_traffic.remaining_traffic = total_server_remaining
+                server_traffic.traffic_used = total_server_used
+
             server_traffic.updated_at = datetime.utcnow()
         else:
             total_server_limit = sum([container.max_upload_traffic for container in DockerContainer.query.filter_by(server_id=server_id).all()])
@@ -159,8 +162,8 @@ def save_traffic():
 
         db.session.commit()
 
-        # 更新 `Rentals` 表中的 traffic_usage 和 traffic_reset_date
-        rental_record = Rentals.query.filter_by(user_id=user_id).first()
+        # 更新 `Rental` 表中的 traffic_usage 和 traffic_reset_date
+        rental_record = Rental.query.filter_by(user_id=user_id).first()  # 修改这里 Rentals -> Rental
         if rental_record:
             rental_record.traffic_usage = sum([container.max_upload_traffic for container in DockerContainer.query.filter_by(user_id=user_id).all()])
             rental_record.traffic_reset_date = next_month_first_day  # 设置为下个月1日
@@ -173,7 +176,6 @@ def save_traffic():
         logging.error(f"Error saving traffic data: {str(e)}")
         db.session.rollback()  # 回滚事务
         return jsonify({'error': 'Internal server error'}), 500
-
 
 
 # 从容器名称提取 IP 地址
