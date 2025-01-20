@@ -6,11 +6,11 @@ from datetime import datetime, timedelta
 import logging
 from decimal import Decimal
 
-# 设置日志级别为 DEBUG
-logging.basicConfig(level=logging.DEBUG)
-
 # 定义蓝图
 traffic_bp = Blueprint('traffic', __name__)
+
+# 设置日志级别为 DEBUG
+logging.basicConfig(level=logging.DEBUG)
 
 # 字节转GB并保留2位小数
 def bytes_to_gb(byte_value):
