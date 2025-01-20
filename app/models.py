@@ -331,9 +331,9 @@ class ServerTrafficMonitoring(db.Model):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     server_id = Column(Integer, ForeignKey('servers.id', ondelete='CASCADE'))
-    total_traffic = Column(Integer)
-    used_traffic = Column(Integer)
-    remaining_traffic = Column(Integer)
+    total_traffic = Column(DECIMAL(10, 2))
+    used_traffic = Column(DECIMAL(10, 2))
+    remaining_traffic = Column(DECIMAL(10, 2))
     timestamp = Column(DateTime, default=datetime.utcnow)
 
     server = relationship("Server")
