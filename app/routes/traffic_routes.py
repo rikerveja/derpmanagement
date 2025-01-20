@@ -106,10 +106,12 @@ def save_traffic():
         server_traffic = ServerTraffic.query.filter_by(server_id=server_id).first()
 
         if server_traffic:
-            # 计算所有容器的总流量
-            total_server_limit = sum([container.max_upload_traffic for container in DockerContainer.query.filter_by(server_id=server_id).all()])
-            total_server_used = sum([float(c.upload_traffic) + float(c.download_traffic) for c in DockerContainer.query.filter_by(server_id=server_id).all()])
-            total_server_remaining = total_server_limit - total_server_used
+# 计算所有容器的总流量
+total_server_limit = sum([container.max_upload_traffic for container in DockerContainer.query.filter_by(server_id=server_id).all()])
+total_server_used = sum([float(c.upload_traffic) + float(c.download_traffic) for c in DockerContainer.query.filter_by(server_id=server_id).all()])
+
+# 显式将 total_server_used 转换为 float 类型，确保不出现类型冲突
+total_server_remaining = total_server_limit - float(total_server_used)
 
             logging.debug(f"Total server limit: {total_server_limit}, total used: {total_server_used}, total remaining: {total_server_remaining}")
 
