@@ -273,67 +273,89 @@ onMounted(async () => {
 
       <CardBox>
         <!-- 筛选工具栏 -->
-        <div class="flex flex-wrap gap-4 mb-4">
+        <div class="flex flex-wrap gap-3 mb-3">
           <div class="flex-1 min-w-[200px]">
             <input
               v-model="searchQuery"
               type="text"
               placeholder="搜索容器名称、ID或服务器..."
-              class="w-full px-3 py-2 border rounded-md"
+              class="w-full px-2 py-1 border rounded-md text-sm"
             >
           </div>
           <select
             v-model="selectedStatus"
-            class="px-3 py-2 border rounded-md"
+            class="px-2 py-1 border rounded-md text-sm"
           >
             <option value="all">全部状态</option>
             <option value="running">运行中</option>
-            <option value="stopped">已停止</option>
-            <option value="paused">已暂停</option>
-            <option value="restarting">重启中</option>
-            <option value="exited">已退出</option>
           </select>
           <BaseButton
             :icon="mdiRefresh"
             color="info"
+            small
             @click="fetchContainers"
             title="刷新列表"
           />
         </div>
 
         <!-- 容器列表表格 -->
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+        <div class="overflow-hidden">
+          <table class="w-full divide-y divide-gray-200">
+            <thead>
               <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">
                   容器名称
                 </th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-36">
                   服务器IP
                 </th>
-                <th class="px-4 py-3 text-left">端口信息</th>
-                <th class="px-4 py-3 text-left">状态</th>
-                <th class="px-4 py-3 text-left">流量限制(GB)</th>
-                <th class="px-4 py-3 text-left">已用流量</th>
-                <th class="px-4 py-3 text-left">创建时间</th>
-                <th class="px-4 py-3 text-left">操作</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">
+                  端口信息
+                </th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                  状态
+                </th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+                  流量限制
+                </th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+                  已用流量
+                </th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-36">
+                  创建时间
+                </th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                  操作
+                </th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
               <tr v-for="container in paginatedContainers" :key="container.id" 
                   class="hover:bg-gray-50">
-                <td class="px-4 py-3">
-                  <div class="flex flex-col space-y-1">
-                    <span class="font-medium text-sm">{{ container.container_name }}</span>
-                    <span class="text-xs text-gray-500">{{ container.container_id }}</span>
+                <td class="px-4 py-2 whitespace-nowrap">
+                  <div class="flex items-center">
+                    <BaseIcon :path="mdiDocker" class="flex-shrink-0 h-4 w-4 text-gray-400 mr-2"/>
+                    <div class="text-sm font-medium text-gray-900 truncate max-w-[180px]" :title="container.container_name">
+                      {{ container.container_name }}
+                    </div>
                   </div>
                 </td>
-                <td class="px-4 py-3 font-mono text-sm">
-                  {{ extractIpFromContainerName(container.container_name) }}
+                <td class="px-4 py-2 whitespace-nowrap font-mono text-sm text-gray-600">
+                  <a 
+                    :href="`https://${extractIpFromContainerName(container.container_name)}:${container.port}`"
+                    target="_blank"
+                    class="text-blue-600 hover:text-blue-800 hover:underline"
+                    :title="'打开 Node Exporter 页面'"
+                  >
+                    {{ extractIpFromContainerName(container.container_name) }}
+                    <BaseIcon 
+                      :path="mdiOpenInNew" 
+                      class="inline-block w-4 h-4 ml-1" 
+                    />
+                  </a>
                 </td>
-                <td class="px-4 py-3">
-                  <div class="flex flex-col space-y-1 text-sm">
+                <td class="px-4 py-2 whitespace-nowrap">
+                  <div class="flex flex-col space-y-0.5 text-sm">
                     <div class="grid grid-cols-[60px,1fr]">
                       <span class="text-gray-500">DERP:</span>
                       <span>{{ container.port }}</span>
@@ -348,7 +370,7 @@ onMounted(async () => {
                     </div>
                   </div>
                 </td>
-                <td class="px-4 py-3">
+                <td class="px-4 py-2 whitespace-nowrap">
                   <span :class="getStatusClass(container.status)">
                     <template v-if="container.status === 'running'">
                       <a 
@@ -369,7 +391,7 @@ onMounted(async () => {
                     </template>
                   </span>
                 </td>
-                <td class="px-4 py-3">
+                <td class="px-4 py-2 whitespace-nowrap">
                   <div class="flex flex-col space-y-1 text-sm">
                     <div class="grid grid-cols-[60px,1fr]">
                       <span class="text-gray-500">上传:</span>
@@ -381,7 +403,7 @@ onMounted(async () => {
                     </div>
                   </div>
                 </td>
-                <td class="px-4 py-3">
+                <td class="px-4 py-2 whitespace-nowrap">
                   <div class="flex flex-col space-y-2">
                     <span class="text-sm">{{ container.upload_traffic || '0' }} GB</span>
                     <div class="w-full bg-gray-200 rounded h-2">
@@ -398,8 +420,10 @@ onMounted(async () => {
                     </div>
                   </div>
                 </td>
-                <td class="px-4 py-3 text-sm">{{ formatDateTime(container.created_at) }}</td>
-                <td class="px-4 py-3">
+                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
+                  {{ formatDateTime(container.created_at) }}
+                </td>
+                <td class="px-4 py-2 whitespace-nowrap text-sm font-medium">
                   <div class="flex space-x-2">
                     <BaseButton
                       :icon="container.status === 'running' ? mdiStop : mdiPlay"
@@ -437,8 +461,8 @@ onMounted(async () => {
         </div>
 
         <!-- 分页控件 -->
-        <div class="mt-4 flex items-center justify-between">
-          <div class="text-sm text-gray-700">
+        <div class="mt-3 flex items-center justify-between text-sm">
+          <div class="text-gray-700">
             显示 {{ (currentPage - 1) * itemsPerPage + 1 }} 到 
             {{ Math.min(currentPage * itemsPerPage, filteredContainers.length) }} 条，
             共 {{ filteredContainers.length }} 条
