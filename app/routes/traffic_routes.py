@@ -82,7 +82,7 @@ def save_traffic():
             upload_traffic=upload_traffic_gb,
             download_traffic=download_traffic_gb,
             traffic_limit=max_upload_traffic,  # 使用容器的流量限制
-            remaining_traffic=Decimal(remaining_traffic),
+            remaining_traffic=remaining_traffic,
             timestamp=timestamp,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
