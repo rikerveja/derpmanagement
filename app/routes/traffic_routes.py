@@ -103,7 +103,7 @@ def save_traffic():
         logging.debug(f"Added server traffic monitoring entry for server {server_id}")
 
         # 4. 更新 `ServerTraffic` 表（累加所有容器的流量）
-        server_traffic = ServerTraffic.query.filter_by(id=server_id).first()  # 修改了这里的查询条件，改为根据自增的 id 查询
+        server_traffic = ServerTraffic.query.filter_by(server_id=server_id).first()  # 修改了这里的查询条件，改为根据自增的 id 查询
 
         if server_traffic:
             # 计算所有容器的总流量
