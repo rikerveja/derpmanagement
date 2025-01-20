@@ -21,7 +21,7 @@ def bytes_to_gb(byte_value):
     """
     if byte_value is None:
         return Decimal(0.00)
-    gb_value = Decimal(byte_value) / (1024 ** 3)
+    gb_value = Decimal(byte_value) / (1024 ** 3)  # 转换为GB
     return round(gb_value, 2)
 
 # 获取下个月1日的日期
@@ -47,7 +47,7 @@ def save_traffic():
         container_id = data.get('container_id')
         upload_traffic = data.get('upload_traffic')  # 上传流量（字节）
         download_traffic = data.get('download_traffic')  # 下载流量（字节）
-        remaining_traffic = data.get('remaining_traffic', 0)  # 剩余流量，默认为0
+        remaining_traffic = data.get('remaining_traffic', 0)  # 剩余流量，默认为0（字节）
 
         logging.debug(f"Received data: {data}")
 
@@ -64,8 +64,9 @@ def save_traffic():
         logging.debug(f"Container {container_id} max upload traffic: {max_upload_traffic}")
 
         # 转换字节为GB
-        upload_traffic_gb = bytes_to_gb(upload_traffic)
-        download_traffic_gb = bytes_to_gb(download_traffic)
+        upload_traffic_gb = bytes_to_gb(upload_traffic)  # 字节转GB
+        download_traffic_gb = bytes_to_gb(download_traffic)  # 字节转GB
+        remaining_traffic_gb = bytes_to_gb(remaining_traffic)  # 字节转GB
         logging.debug(f"Converted upload traffic: {upload_traffic_gb} GB, download traffic: {download_traffic_gb} GB")
 
         # 获取当前时间戳
@@ -79,10 +80,10 @@ def save_traffic():
         # 2. 保存容器流量数据到 `DockerContainerTraffic`
         traffic_entry = DockerContainerTraffic(
             container_id=container_id_db,  # 存储的是自增的 id
-            upload_traffic=upload_traffic_gb,
-            download_traffic=download_traffic_gb,
+            upload_traffic=upload_traffic_gb,  # GB单位
+            download_traffic=download_traffic_gb,  # GB单位
             traffic_limit=max_upload_traffic,  # 使用容器的流量限制
-            remaining_traffic=remaining_traffic,
+            remaining_traffic=remaining_traffic_gb,  # GB单位
             timestamp=timestamp,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
@@ -94,16 +95,16 @@ def save_traffic():
         server_id = container.server_id  # 获取 server_id
         server_traffic_monitoring_entry = ServerTrafficMonitoring(
             server_id=server_id,
-            total_traffic=Decimal(upload_traffic + download_traffic),  # 转为Decimal类型
-            used_traffic=Decimal(upload_traffic + download_traffic),  # 转为Decimal类型
-            remaining_traffic=Decimal(remaining_traffic),  # 转为Decimal类型
+            total_traffic=upload_traffic_gb + download_traffic_gb,  # 使用GB单位
+            used_traffic=upload_traffic_gb + download_traffic_gb,  # 使用GB单位
+            remaining_traffic=remaining_traffic_gb,  # 使用GB单位
             timestamp=timestamp
         )
         db.session.add(server_traffic_monitoring_entry)
         logging.debug(f"Added server traffic monitoring entry for server {server_id}")
 
         # 4. 更新 `ServerTraffic` 表（累加所有容器的流量）
-        server_traffic = ServerTraffic.query.filter_by(server_id=server_id).first()  # 修改了这里的查询条件，改为根据自增的 id 查询
+        server_traffic = ServerTraffic.query.filter_by(id=server_id).first()  # 修改了这里的查询条件，改为根据自增的 id 查询
 
         if server_traffic:
             # 计算所有容器的总流量
@@ -135,9 +136,9 @@ def save_traffic():
             server_traffic = ServerTraffic(
                 id=server_id,  # 修改了这里的id为自增的主键
                 total_traffic=total_server_limit,
-                remaining_traffic=Decimal(remaining_traffic),
+                remaining_traffic=remaining_traffic_gb,  # 使用GB单位
                 traffic_limit=total_server_limit,
-                traffic_used=Decimal(upload_traffic + download_traffic),  # 确保是Decimal类型
+                traffic_used=upload_traffic_gb + download_traffic_gb,  # 确保是GB单位
                 traffic_reset_date=next_month_first_day,
                 updated_at=datetime.utcnow(),
                 created_at=datetime.utcnow()
@@ -157,10 +158,10 @@ def save_traffic():
             logging.debug(f"Before update: user_traffic.remaining_traffic (type: {type(user_traffic.remaining_traffic)}, value: {user_traffic.remaining_traffic})")
 
             # 显式将 Decimal 转换为 Decimal 再进行操作
-            user_traffic.upload_traffic += Decimal(upload_traffic_gb)  # 转换为 Decimal
-            user_traffic.download_traffic += Decimal(download_traffic_gb)  # 转换为 Decimal
-            user_traffic.total_traffic += Decimal(upload_traffic_gb + download_traffic_gb)  # 转换为 Decimal
-            user_traffic.remaining_traffic = Decimal(remaining_traffic)  # 确保是 Decimal
+            user_traffic.upload_traffic += upload_traffic_gb  # 使用GB单位
+            user_traffic.download_traffic += download_traffic_gb  # 使用GB单位
+            user_traffic.total_traffic += upload_traffic_gb + download_traffic_gb  # 使用GB单位
+            user_traffic.remaining_traffic = remaining_traffic_gb  # 使用GB单位
 
             # 打印更新后的字段的类型和值，进行调试
             logging.debug(f"After update: user_traffic.upload_traffic (type: {type(user_traffic.upload_traffic)}, value: {user_traffic.upload_traffic})")
@@ -175,10 +176,10 @@ def save_traffic():
             logging.debug(f"Creating new user traffic for user {user_id}")
             user_traffic = UserTraffic(
                 user_id=user_id,
-                upload_traffic=Decimal(upload_traffic_gb),  # 转换为 Decimal
-                download_traffic=Decimal(download_traffic_gb),  # 转换为 Decimal
-                total_traffic=Decimal(upload_traffic_gb + download_traffic_gb),  # 转换为 Decimal
-                remaining_traffic=Decimal(remaining_traffic),  # 确保是 Decimal
+                upload_traffic=upload_traffic_gb,  # 使用GB单位
+                download_traffic=download_traffic_gb,  # 使用GB单位
+                total_traffic=upload_traffic_gb + download_traffic_gb,  # 使用GB单位
+                remaining_traffic=remaining_traffic_gb,  # 使用GB单位
                 updated_at=datetime.utcnow()
             )
             db.session.add(user_traffic)
@@ -188,9 +189,9 @@ def save_traffic():
         if container:
             # 根据POST参数来更新指定的字段
             if upload_traffic is not None:
-                container.upload_traffic = Decimal(upload_traffic_gb)  # 转为 Decimal 类型
+                container.upload_traffic = upload_traffic_gb  # 使用GB单位
             if download_traffic is not None:
-                container.download_traffic = Decimal(download_traffic_gb)  # 转为 Decimal 类型
+                container.download_traffic = download_traffic_gb  # 使用GB单位
 
             db.session.commit()
             logging.debug(f"Committed changes to container {container_id}")
@@ -199,7 +200,7 @@ def save_traffic():
         server = Server.query.filter_by(id=server_id).first()  # 修改了这里的查询条件，改为根据自增的 id 查询
         if server:
             if remaining_traffic is not None:
-                server.remaining_traffic = Decimal(remaining_traffic)  # 确保是 Decimal 类型
+                server.remaining_traffic = remaining_traffic_gb  # 使用GB单位
 
             db.session.commit()
             logging.debug(f"Committed changes to server {server_id}")
