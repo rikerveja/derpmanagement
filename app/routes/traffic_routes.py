@@ -128,7 +128,7 @@ def save_traffic():
         else:
             # 如果没有找到服务器流量记录，则创建新记录
             server_traffic = ServerTraffic(
-                id=server_id,  # 修改了这里的id为自增的主键
+                server_id=server_id,  # 修改了这里的id为server_id
                 total_traffic=total_server_limit,  # 使用GB单位
                 remaining_traffic=total_server_remaining,  # 使用GB单位
                 traffic_limit=total_server_limit,
