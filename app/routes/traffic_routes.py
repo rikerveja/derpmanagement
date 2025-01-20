@@ -188,7 +188,7 @@ def save_traffic():
         # 更新 `Rental` 表中的 traffic_usage 和 traffic_reset_date
         rental_record = Rental.query.filter_by(user_id=user_id).first()
         if rental_record:
-            rental_record.traffic_usage = sum([Decimal(container.max_upload_traffic) for container in DockerContainer.query.filter_by(user_id=user_id).all()])
+            rental_record.traffic_usage = sum([Decimal(container.upload_traffic) for container in DockerContainer.query.filter_by(user_id=user_id).all()])
             rental_record.traffic_reset_date = next_month_first_day  # 设置为下个月1日
             rental_record.updated_at = datetime.utcnow()
             db.session.commit()
