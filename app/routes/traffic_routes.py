@@ -24,6 +24,12 @@ def bytes_to_gb(byte_value):
     gb_value = byte_value / (1024 ** 3)
     return round(gb_value, 2)
 
+# 获取下个月1日的日期
+def get_next_month_first_day():
+    today = datetime.utcnow()
+    next_month = today.replace(day=28) + timedelta(days=4)  # 通过28号加4天来跳到下个月
+    return next_month.replace(day=1)
+
 # 保存流量数据接口
 @traffic_bp.route('/api/traffic/save_traffic', methods=['POST'])
 def save_traffic():
