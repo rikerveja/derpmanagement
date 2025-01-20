@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request 
+from flask import Blueprint, jsonify, request
 import requests  # 正确导入 requests 库
 from app import db
 from app.models import Server, DockerContainer, DockerContainerTraffic, ServerTraffic, ServerTrafficMonitoring, UserTraffic, Rental
