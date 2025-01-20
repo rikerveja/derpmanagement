@@ -147,9 +147,9 @@ def save_traffic():
 
         if user_traffic:
             # 显式将 Decimal 转换为 Decimal 再进行操作
-            user_traffic.upload_traffic += upload_traffic_gb  # 使用GB单位
-            user_traffic.download_traffic += download_traffic_gb  # 使用GB单位
-            user_traffic.total_traffic += upload_traffic_gb + download_traffic_gb  # 使用GB单位
+            user_traffic.upload_traffic = upload_traffic_gb  # 使用GB单位
+            user_traffic.download_traffic = download_traffic_gb  # 使用GB单位
+            user_traffic.total_traffic = upload_traffic_gb + download_traffic_gb  # 使用GB单位
             user_traffic.remaining_traffic = remaining_traffic_gb  # 使用GB单位
 
             user_traffic.updated_at = datetime.utcnow()
@@ -179,7 +179,7 @@ def save_traffic():
         server = Server.query.filter_by(id=server_id).first()  # 修改了这里的查询条件，改为根据自增的 id 查询
         if server:
             if remaining_traffic is not None:
-                server.remaining_traffic = remaining_traffic_gb  # 使用GB单位
+                server.remaining_traffic = total_server_remaining  # 使用GB单位
 
             db.session.commit()
 
