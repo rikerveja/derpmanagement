@@ -4,6 +4,7 @@ from app import db
 from app.models import DockerContainer, DockerContainerTraffic, ServerTraffic, ServerTrafficMonitoring, UserTraffic, Rental
 from datetime import datetime, timedelta
 import logging
+from decimal import Decimal
 
 # 设置日志级别为 DEBUG
 logging.basicConfig(level=logging.DEBUG)
@@ -22,12 +23,6 @@ def bytes_to_gb(byte_value):
         return 0.00
     gb_value = byte_value / (1024 ** 3)
     return round(gb_value, 2)
-
-# 获取下个月1日的日期
-def get_next_month_first_day():
-    today = datetime.utcnow()
-    next_month = today.replace(day=28) + timedelta(days=4)  # 通过28号加4天来跳到下个月
-    return next_month.replace(day=1)
 
 # 保存流量数据接口
 @traffic_bp.route('/api/traffic/save_traffic', methods=['POST'])
@@ -107,7 +102,7 @@ def save_traffic():
         if server_traffic:
             # 计算所有容器的总流量
             total_server_limit = sum([container.max_upload_traffic for container in DockerContainer.query.filter_by(server_id=server_id).all()])
-            total_server_used = sum([c.upload_traffic + c.download_traffic for c in DockerContainer.query.filter_by(server_id=server_id).all()])
+            total_server_used = sum([float(c.upload_traffic) + float(c.download_traffic) for c in DockerContainer.query.filter_by(server_id=server_id).all()])
             total_server_remaining = total_server_limit - total_server_used
 
             logging.debug(f"Total server limit: {total_server_limit}, total used: {total_server_used}, total remaining: {total_server_remaining}")
