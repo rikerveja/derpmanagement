@@ -20,8 +20,8 @@ def bytes_to_gb(byte_value):
     :return: 转换后的GB数
     """
     if byte_value is None:
-        return 0.00
-    gb_value = byte_value / (1024 ** 3)
+        return Decimal(0.00)
+    gb_value = Decimal(byte_value) / (1024 ** 3)
     return round(gb_value, 2)
 
 # 获取下个月1日的日期
@@ -60,7 +60,7 @@ def save_traffic():
             logging.error(f"Container with ID {container_id} not found.")
             return jsonify({'error': 'Container not found'}), 404
 
-        max_upload_traffic = container.max_upload_traffic  # 获取容器流量限制
+        max_upload_traffic = Decimal(container.max_upload_traffic)  # 获取容器流量限制
         logging.debug(f"Container {container_id} max upload traffic: {max_upload_traffic}")
 
         # 转换字节为GB
@@ -82,7 +82,7 @@ def save_traffic():
             upload_traffic=upload_traffic_gb,
             download_traffic=download_traffic_gb,
             traffic_limit=max_upload_traffic,  # 使用容器的流量限制
-            remaining_traffic=remaining_traffic,
+            remaining_traffic=Decimal(remaining_traffic),
             timestamp=timestamp,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
@@ -94,9 +94,9 @@ def save_traffic():
         server_id = container.server_id
         server_traffic_monitoring_entry = ServerTrafficMonitoring(
             server_id=server_id,
-            total_traffic=float(upload_traffic + download_traffic),  # 转为float类型
-            used_traffic=float(upload_traffic + download_traffic),  # 转为float类型
-            remaining_traffic=float(remaining_traffic),  # 转为float类型
+            total_traffic=Decimal(upload_traffic + download_traffic),  # 转为Decimal类型
+            used_traffic=Decimal(upload_traffic + download_traffic),  # 转为Decimal类型
+            remaining_traffic=Decimal(remaining_traffic),  # 转为Decimal类型
             timestamp=timestamp
         )
         db.session.add(server_traffic_monitoring_entry)
@@ -107,11 +107,11 @@ def save_traffic():
 
         if server_traffic:
             # 计算所有容器的总流量
-            total_server_limit = sum([float(container.max_upload_traffic) for container in DockerContainer.query.filter_by(server_id=server_id).all()])
-            total_server_used = sum([float(c.upload_traffic) + float(c.download_traffic) for c in DockerContainer.query.filter_by(server_id=server_id).all()])
+            total_server_limit = sum([Decimal(container.max_upload_traffic) for container in DockerContainer.query.filter_by(server_id=server_id).all()])
+            total_server_used = sum([Decimal(c.upload_traffic) + Decimal(c.download_traffic) for c in DockerContainer.query.filter_by(server_id=server_id).all()])
             
-            # 确保所有的计算结果都是 float 类型
-            total_server_remaining = float(total_server_limit) - float(total_server_used)  # 总流量使用后剩余流量
+            # 确保所有的计算结果都是 Decimal 类型
+            total_server_remaining = total_server_limit - total_server_used  # 总流量使用后剩余流量
 
             logging.debug(f"Total server limit: {total_server_limit}, total used: {total_server_used}, total remaining: {total_server_remaining}")
 
@@ -131,13 +131,13 @@ def save_traffic():
 
             server_traffic.updated_at = datetime.utcnow()
         else:
-            total_server_limit = sum([float(container.max_upload_traffic) for container in DockerContainer.query.filter_by(server_id=server_id).all()])
+            total_server_limit = sum([Decimal(container.max_upload_traffic) for container in DockerContainer.query.filter_by(server_id=server_id).all()])
             server_traffic = ServerTraffic(
                 server_id=server_id,
                 total_traffic=total_server_limit,
-                remaining_traffic=remaining_traffic,
+                remaining_traffic=Decimal(remaining_traffic),
                 traffic_limit=total_server_limit,
-                traffic_used=float(upload_traffic + download_traffic),  # 确保是float类型
+                traffic_used=Decimal(upload_traffic + download_traffic),  # 确保是Decimal类型
                 traffic_reset_date=next_month_first_day,
                 updated_at=datetime.utcnow(),
                 created_at=datetime.utcnow()
@@ -156,11 +156,11 @@ def save_traffic():
             logging.debug(f"Before update: user_traffic.total_traffic (type: {type(user_traffic.total_traffic)}, value: {user_traffic.total_traffic})")
             logging.debug(f"Before update: user_traffic.remaining_traffic (type: {type(user_traffic.remaining_traffic)}, value: {user_traffic.remaining_traffic})")
 
-            # 显式将 Decimal 转换为 float 再进行操作
-            user_traffic.upload_traffic += float(upload_traffic_gb)  # Convert to float explicitly
-            user_traffic.download_traffic += float(download_traffic_gb)  # Convert to float explicitly
-            user_traffic.total_traffic += float(upload_traffic_gb + download_traffic_gb)  # Convert to float explicitly
-            user_traffic.remaining_traffic = float(remaining_traffic)  # Ensure remaining_traffic is float
+            # 显式将 Decimal 转换为 Decimal 再进行操作
+            user_traffic.upload_traffic += Decimal(upload_traffic_gb)  # 转换为 Decimal
+            user_traffic.download_traffic += Decimal(download_traffic_gb)  # 转换为 Decimal
+            user_traffic.total_traffic += Decimal(upload_traffic_gb + download_traffic_gb)  # 转换为 Decimal
+            user_traffic.remaining_traffic = Decimal(remaining_traffic)  # 确保是 Decimal
 
             # 打印更新后的字段的类型和值，进行调试
             logging.debug(f"After update: user_traffic.upload_traffic (type: {type(user_traffic.upload_traffic)}, value: {user_traffic.upload_traffic})")
@@ -171,14 +171,14 @@ def save_traffic():
             user_traffic.updated_at = datetime.utcnow()
             logging.debug(f"Updated user traffic for user {user_id}")
         else:
-            # 显式将 Decimal 转换为 float
+            # 显式将 Decimal 转换为 Decimal
             logging.debug(f"Creating new user traffic for user {user_id}")
             user_traffic = UserTraffic(
                 user_id=user_id,
-                upload_traffic=float(upload_traffic_gb),  # Convert to float explicitly
-                download_traffic=float(download_traffic_gb),  # Convert to float explicitly
-                total_traffic=float(upload_traffic_gb + download_traffic_gb),  # Convert to float explicitly
-                remaining_traffic=float(remaining_traffic),  # Ensure remaining_traffic is float
+                upload_traffic=Decimal(upload_traffic_gb),  # 转换为 Decimal
+                download_traffic=Decimal(download_traffic_gb),  # 转换为 Decimal
+                total_traffic=Decimal(upload_traffic_gb + download_traffic_gb),  # 转换为 Decimal
+                remaining_traffic=Decimal(remaining_traffic),  # 确保是 Decimal
                 updated_at=datetime.utcnow()
             )
             db.session.add(user_traffic)
@@ -188,9 +188,9 @@ def save_traffic():
         if container:
             # 根据POST参数来更新指定的字段
             if upload_traffic is not None:
-                container.upload_traffic = float(upload_traffic_gb)  # 确保是float类型
+                container.upload_traffic = Decimal(upload_traffic_gb)  # 转为 Decimal 类型
             if download_traffic is not None:
-                container.download_traffic = float(download_traffic_gb)  # 确保是float类型
+                container.download_traffic = Decimal(download_traffic_gb)  # 转为 Decimal 类型
 
             db.session.commit()
             logging.debug(f"Committed changes to container {container_id}")
@@ -199,7 +199,7 @@ def save_traffic():
         server = Server.query.filter_by(server_id=server_id).first()
         if server:
             if remaining_traffic is not None:
-                server.remaining_traffic = float(remaining_traffic)  # 确保是float类型
+                server.remaining_traffic = Decimal(remaining_traffic)  # 确保是 Decimal 类型
 
             db.session.commit()
             logging.debug(f"Committed changes to server {server_id}")
@@ -207,9 +207,9 @@ def save_traffic():
         db.session.commit()
 
         # 更新 `Rental` 表中的 traffic_usage 和 traffic_reset_date
-        rental_record = Rental.query.filter_by(user_id=user_id).first()  # 修改这里 Rentals -> Rental
+        rental_record = Rental.query.filter_by(user_id=user_id).first()
         if rental_record:
-            rental_record.traffic_usage = sum([container.max_upload_traffic for container in DockerContainer.query.filter_by(user_id=user_id).all()])
+            rental_record.traffic_usage = sum([Decimal(container.max_upload_traffic) for container in DockerContainer.query.filter_by(user_id=user_id).all()])
             rental_record.traffic_reset_date = next_month_first_day  # 设置为下个月1日
             rental_record.updated_at = datetime.utcnow()
             db.session.commit()
