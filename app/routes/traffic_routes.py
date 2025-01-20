@@ -5,6 +5,9 @@ from app.models import DockerContainer, DockerContainerTraffic, ServerTraffic, S
 from datetime import datetime, timedelta
 import logging
 
+# 设置日志级别为 DEBUG
+logging.basicConfig(level=logging.DEBUG)
+
 # 定义蓝图
 traffic_bp = Blueprint('traffic', __name__)
 
