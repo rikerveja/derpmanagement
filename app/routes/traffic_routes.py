@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 import requests  # 正确导入 requests 库
 from app import db
-from app.models import Server, DockerContainer, DockerContainerTraffic, ServerTraffic, ServerTrafficMonitoring, UserTraffic, Rental
+from app.models import DockerContainer, DockerContainerTraffic, ServerTraffic, ServerTrafficMonitoring, UserTraffic, Rental
 from datetime import datetime, timedelta
 import logging
 from decimal import Decimal
@@ -91,7 +91,7 @@ def save_traffic():
         logging.debug(f"Added traffic entry for container {container_id_db}")
 
         # 3. 更新服务器流量监控数据到 `ServerTrafficMonitoring`
-        server_id = container.server_id
+        server_id = container.server_id  # 获取 server_id
         server_traffic_monitoring_entry = ServerTrafficMonitoring(
             server_id=server_id,
             total_traffic=Decimal(upload_traffic + download_traffic),  # 转为Decimal类型
@@ -103,7 +103,7 @@ def save_traffic():
         logging.debug(f"Added server traffic monitoring entry for server {server_id}")
 
         # 4. 更新 `ServerTraffic` 表（累加所有容器的流量）
-        server_traffic = ServerTraffic.query.filter_by(server_id=server_id).first()
+        server_traffic = ServerTraffic.query.filter_by(id=server_id).first()  # 修改了这里的查询条件，改为根据自增的 id 查询
 
         if server_traffic:
             # 计算所有容器的总流量
@@ -133,7 +133,7 @@ def save_traffic():
         else:
             total_server_limit = sum([Decimal(container.max_upload_traffic) for container in DockerContainer.query.filter_by(server_id=server_id).all()])
             server_traffic = ServerTraffic(
-                server_id=server_id,
+                id=server_id,  # 修改了这里的id为自增的主键
                 total_traffic=total_server_limit,
                 remaining_traffic=Decimal(remaining_traffic),
                 traffic_limit=total_server_limit,
@@ -196,7 +196,7 @@ def save_traffic():
             logging.debug(f"Committed changes to container {container_id}")
 
         # 7. 更新 `servers` 表中的剩余流量
-        server = Server.query.filter_by(server_id=server_id).first()
+        server = Server.query.filter_by(id=server_id).first()  # 修改了这里的查询条件，改为根据自增的 id 查询
         if server:
             if remaining_traffic is not None:
                 server.remaining_traffic = Decimal(remaining_traffic)  # 确保是 Decimal 类型
