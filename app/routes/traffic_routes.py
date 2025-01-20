@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request  
+from flask import Blueprint, jsonify, request
 import requests  # 正确导入 requests 库
 from app import db
 from app.models import DockerContainer, DockerContainerTraffic, ServerTraffic, ServerTrafficMonitoring, UserTraffic, Rental
@@ -145,29 +145,29 @@ def save_traffic():
             db.session.add(server_traffic)
             logging.debug(f"Added new server traffic entry for server {server_id}")
 
-# 5. 更新 `UserTraffic` 表 
-user_id = container.user_id
-user_traffic = UserTraffic.query.filter_by(user_id=user_id).first()
-if user_traffic:
-    # 显式将 Decimal 转换为 float 再进行操作
-    user_traffic.upload_traffic += float(upload_traffic_gb)  # Convert to float explicitly
-    user_traffic.download_traffic += float(download_traffic_gb)  # Convert to float explicitly
-    user_traffic.total_traffic += float(upload_traffic_gb + download_traffic_gb)  # Convert to float explicitly
-    user_traffic.remaining_traffic = float(remaining_traffic)  # Ensure remaining_traffic is float
-    user_traffic.updated_at = datetime.utcnow()
-    logging.debug(f"Updated user traffic for user {user_id}")
-else:
-    # 显式将 Decimal 转换为 float
-    user_traffic = UserTraffic(
-        user_id=user_id,
-        upload_traffic=float(upload_traffic_gb),  # Convert to float explicitly
-        download_traffic=float(download_traffic_gb),  # Convert to float explicitly
-        total_traffic=float(upload_traffic_gb + download_traffic_gb),  # Convert to float explicitly
-        remaining_traffic=float(remaining_traffic),  # Ensure remaining_traffic is float
-        updated_at=datetime.utcnow()
-    )
-    db.session.add(user_traffic)
-    logging.debug(f"Added new user traffic entry for user {user_id}")
+        # 5. 更新 `UserTraffic` 表
+        user_id = container.user_id
+        user_traffic = UserTraffic.query.filter_by(user_id=user_id).first()
+        if user_traffic:
+            # 显式将 Decimal 转换为 float 再进行操作
+            user_traffic.upload_traffic += float(upload_traffic_gb)  # Convert to float explicitly
+            user_traffic.download_traffic += float(download_traffic_gb)  # Convert to float explicitly
+            user_traffic.total_traffic += float(upload_traffic_gb + download_traffic_gb)  # Convert to float explicitly
+            user_traffic.remaining_traffic = float(remaining_traffic)  # Ensure remaining_traffic is float
+            user_traffic.updated_at = datetime.utcnow()
+            logging.debug(f"Updated user traffic for user {user_id}")
+        else:
+            # 显式将 Decimal 转换为 float
+            user_traffic = UserTraffic(
+                user_id=user_id,
+                upload_traffic=float(upload_traffic_gb),  # Convert to float explicitly
+                download_traffic=float(download_traffic_gb),  # Convert to float explicitly
+                total_traffic=float(upload_traffic_gb + download_traffic_gb),  # Convert to float explicitly
+                remaining_traffic=float(remaining_traffic),  # Ensure remaining_traffic is float
+                updated_at=datetime.utcnow()
+            )
+            db.session.add(user_traffic)
+            logging.debug(f"Added new user traffic entry for user {user_id}")
 
         # 6. 更新 `docker_containers` 表
         if container:
@@ -206,6 +206,7 @@ else:
         logging.error(f"Error saving traffic data: {str(e)}")
         db.session.rollback()  # 回滚事务
         return jsonify({'error': 'Internal server error'}), 500
+
 
 # 从容器名称提取 IP 地址
 def extract_ip_from_container_name(container_name):
