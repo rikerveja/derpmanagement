@@ -1,7 +1,7 @@
-from flask import Blueprint, jsonify, request  # 导入request模块
+from flask import Blueprint, jsonify, request
 import requests  # 正确导入 requests 库
 from app import db
-from app.models import DockerContainer, DockerContainerTraffic, ServerTraffic, ServerTrafficMonitoring, UserTraffic, Rental  # 修改这里
+from app.models import DockerContainer, DockerContainerTraffic, ServerTraffic, ServerTrafficMonitoring, UserTraffic, Rental
 from datetime import datetime, timedelta
 import logging
 
@@ -72,9 +72,12 @@ def save_traffic():
         next_month_first_day = get_next_month_first_day()
         logging.debug(f"Next month's first day: {next_month_first_day}")
 
-        # 1. 保存容器流量数据到 `DockerContainerTraffic`
+        # 1. 获取 docker_containers 中的 id（自增主键）
+        container_id_db = container.id  # 这里获取到的是自增的 id，而不是原始的 container_id
+
+        # 2. 保存容器流量数据到 `DockerContainerTraffic`
         traffic_entry = DockerContainerTraffic(
-            container_id=container_id,
+            container_id=container_id_db,  # 存储的是自增的 id
             upload_traffic=upload_traffic_gb,
             download_traffic=download_traffic_gb,
             traffic_limit=max_upload_traffic,  # 使用容器的流量限制
@@ -84,9 +87,9 @@ def save_traffic():
             updated_at=datetime.utcnow()
         )
         db.session.add(traffic_entry)
-        logging.debug(f"Added traffic entry for container {container_id}")
+        logging.debug(f"Added traffic entry for container {container_id_db}")
 
-        # 2. 更新服务器流量监控数据到 `ServerTrafficMonitoring`
+        # 3. 更新服务器流量监控数据到 `ServerTrafficMonitoring`
         server_id = container.server_id
         server_traffic_monitoring_entry = ServerTrafficMonitoring(
             server_id=server_id,
@@ -98,7 +101,7 @@ def save_traffic():
         db.session.add(server_traffic_monitoring_entry)
         logging.debug(f"Added server traffic monitoring entry for server {server_id}")
 
-        # 3. 更新 `ServerTraffic` 表（累加所有容器的流量）
+        # 4. 更新 `ServerTraffic` 表（累加所有容器的流量）
         server_traffic = ServerTraffic.query.filter_by(server_id=server_id).first()
 
         if server_traffic:
@@ -139,7 +142,7 @@ def save_traffic():
             db.session.add(server_traffic)
             logging.debug(f"Added new server traffic entry for server {server_id}")
 
-        # 4. 更新 `UserTraffic` 表
+        # 5. 更新 `UserTraffic` 表
         user_id = container.user_id
         user_traffic = UserTraffic.query.filter_by(user_id=user_id).first()
         if user_traffic:
@@ -161,7 +164,7 @@ def save_traffic():
             db.session.add(user_traffic)
             logging.debug(f"Added new user traffic entry for user {user_id}")
 
-        # 5. 更新 `docker_containers` 表
+        # 6. 更新 `docker_containers` 表
         if container:
             # 根据POST参数来更新指定的字段
             if upload_traffic is not None:
@@ -172,7 +175,7 @@ def save_traffic():
             db.session.commit()
             logging.debug(f"Committed changes to container {container_id}")
 
-        # 6. 更新 `servers` 表中的剩余流量
+        # 7. 更新 `servers` 表中的剩余流量
         server = Server.query.filter_by(server_id=server_id).first()
         if server:
             if remaining_traffic is not None:
