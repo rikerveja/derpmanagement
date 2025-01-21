@@ -361,18 +361,6 @@ def get_acl_logs():
         if not logs:
             return jsonify({"success": False, "message": "No ACL logs found"}), 404
 
-        log_data = []
-        for log in logs:
-            # 获取用户信息
-            user = User.query.filter_by(id=log.user_id).first()
-            if user:
-                # 格式化 acl_version 和 details
-                acl_version = f"{log.acl_version} - ACL generated for user {user.username}"
-                details = f"acl_version: {acl_version}"
-            else:
-                acl_version = log.acl_version  # 如果没有找到用户，直接使用原始的 acl_version
-                details = f"acl_version: {acl_version}"  # 还是加上原始的 acl_version 信息
-
             # 添加日志数据
             log_data.append({
                 "user_id": log.user_id,
