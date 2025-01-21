@@ -4,16 +4,33 @@
     <CardBox>
       <div class="flex items-center space-x-4">
         <label class="text-gray-700 dark:text-gray-300">选择用户:</label>
+        <div class="relative flex-1 max-w-md">
+          <input
+            v-model="userSearchQuery"
+            type="text"
+            class="w-full px-3 py-2 border rounded-md pr-10"
+            placeholder="搜索用户名或邮箱..."
+            @input="handleSearch"
+          />
+          <BaseIcon
+            :path="mdiMagnify"
+            class="absolute right-3 top-2.5 text-gray-400"
+            size="20"
+          />
+        </div>
         <select 
           v-model="selectedUserId"
-          class="form-select rounded-md border-gray-300 shadow-sm"
+          class="form-select rounded-md border-gray-300 shadow-sm min-w-[200px]"
+          @change="handleUserSelect"
+          :disabled="loadingUsers"
         >
-          <option value="">请选择用户</option>
-          <option v-for="user in users" 
-                  :key="user.id" 
-                  :value="user.id"
+          <option value="">{{ loadingUsers ? '加载中...' : '请选择用户' }}</option>
+          <option 
+            v-for="user in filteredUsers" 
+            :key="user.id" 
+            :value="user.id"
           >
-            {{ user.username }}
+            {{ user.username }} ({{ user.email }})
           </option>
         </select>
       </div>
@@ -27,7 +44,7 @@
         :options="chartOptions"
       />
       <div v-else class="h-full flex items-center justify-center text-gray-500">
-        请选择用户查看历史数据
+        {{ loading ? '加载中...' : '请选择用户查看历史数据' }}
       </div>
     </CardBox>
 
@@ -41,6 +58,9 @@
                 时间
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                容器ID
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 上传流量
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -52,11 +72,36 @@
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-for="item in historyData" :key="item.timestamp">
-              <td class="px-6 py-4 whitespace-nowrap">{{ formatTime(item.timestamp) }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">{{ formatTraffic(item.upload_traffic) }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">{{ formatTraffic(item.download_traffic) }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">{{ formatTraffic(item.remaining_traffic) }}</td>
+            <tr v-if="loading">
+              <td colspan="5" class="px-6 py-4 text-center">
+                <div class="flex justify-center">
+                  <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                </div>
+              </td>
+            </tr>
+            <tr v-else-if="historyData.length === 0">
+              <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                暂无数据
+              </td>
+            </tr>
+            <tr v-for="(record, index) in historyData" 
+                :key="index"
+                class="hover:bg-gray-50">
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {{ formatTime(record.timestamp) }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {{ record.container_id }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {{ formatTraffic(record.upload_traffic) }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {{ formatTraffic(record.download_traffic) }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {{ formatTraffic(record.remaining_traffic) }}
+              </td>
             </tr>
           </tbody>
         </table>
@@ -66,55 +111,66 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { Line } from 'vue-chartjs'
 import CardBox from '@/components/CardBox.vue'
-import BaseButton from '@/components/BaseButton.vue'
 import BaseIcon from '@/components/BaseIcon.vue'
-import { mdiChartLine, mdiRefresh, mdiAlert, mdiLoading } from '@mdi/js'
+import { mdiMagnify } from '@mdi/js'
 import api from '@/services/api'
 
+// 状态变量
 const users = ref([])
 const selectedUserId = ref('')
+const userSearchQuery = ref('')
 const historyData = ref([])
 const loading = ref(false)
-const error = ref(null)
+const loadingUsers = ref(false)
 
 // 获取用户列表
 const fetchUsers = async () => {
   try {
-    const response = await api.getUsers()
+    loadingUsers.value = true
+    const response = await api.getAllUsers()
+    console.log('用户列表响应:', response) // 调试用
+    
     if (response.success) {
-      users.value = response.users
+      // 直接使用返回的用户数据
+      users.value = response.users || []
+    } else {
+      console.error('获取用户列表失败:', response.message)
+      users.value = []
     }
-  } catch (err) {
-    error.value = '获取用户列表失败: ' + err.message
+  } catch (error) {
+    console.error('获取用户列表失败:', error)
+    users.value = []
+  } finally {
+    loadingUsers.value = false
   }
 }
 
-// 获取历史数据
-const fetchHistory = async () => {
-  if (!selectedUserId.value) {
-    error.value = '请选择用户'
-    return
-  }
+// 过滤用户列表
+const filteredUsers = computed(() => {
+  if (!userSearchQuery.value) return users.value
+  const query = userSearchQuery.value.toLowerCase()
+  return users.value.filter(user => {
+    const username = user.username?.toLowerCase() || ''
+    const email = user.email?.toLowerCase() || ''
+    return username.includes(query) || email.includes(query)
+  })
+})
 
-  loading.value = true
-  error.value = null
-
+// 获取流量历史数据
+const fetchTrafficHistory = async () => {
+  if (!selectedUserId.value) return
+  
   try {
+    loading.value = true
     const response = await api.getTrafficHistory(selectedUserId.value)
     if (response.success) {
-      historyData.value = response.history_data
-      if (historyData.value.length === 0) {
-        error.value = '该用户暂无流量记录'
-      }
-    } else {
-      throw new Error(response.message || '获取历史数据失败')
+      historyData.value = response.history_data || []
     }
-  } catch (err) {
-    error.value = err.message
-    historyData.value = []
+  } catch (error) {
+    console.error('获取流量历史失败:', error)
   } finally {
     loading.value = false
   }
@@ -126,7 +182,7 @@ const chartData = computed(() => ({
   datasets: [
     {
       label: '上传流量',
-      data: historyData.value.map(d => d.upload_traffic / 1024 / 1024),
+      data: historyData.value.map(d => d.upload_traffic / 1024 / 1024), // 转换为 MB
       borderColor: '#10B981',
       tension: 0.1
     },
@@ -145,6 +201,7 @@ const chartData = computed(() => ({
   ]
 }))
 
+// 图表配置
 const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
@@ -175,7 +232,56 @@ const formatTime = (timestamp) => {
   return new Date(timestamp).toLocaleString()
 }
 
+// 处理用户选择
+const handleUserSelect = () => {
+  if (selectedUserId.value) {
+    const selectedUser = users.value.find(u => u.id === selectedUserId.value)
+    if (selectedUser) {
+      userSearchQuery.value = selectedUser.username || selectedUser.email
+      fetchTrafficHistory()
+    }
+  } else {
+    userSearchQuery.value = ''
+    historyData.value = []
+  }
+}
+
+// 处理搜索输入
+const handleSearch = () => {
+  // 如果搜索框有内容，尝试匹配用户
+  if (userSearchQuery.value) {
+    const matchedUser = filteredUsers.value[0]
+    if (matchedUser) {
+      selectedUserId.value = matchedUser.id
+      fetchTrafficHistory()
+    }
+  } else {
+    // 如果搜索框清空，重置选择
+    selectedUserId.value = ''
+    historyData.value = []
+  }
+}
+
+// 监听搜索查询变化
+watch(userSearchQuery, (newVal) => {
+  if (!newVal) {
+    selectedUserId.value = ''
+  }
+})
+
+// 组件挂载时获取用户列表
 onMounted(() => {
   fetchUsers()
 })
-</script> 
+</script>
+
+<style scoped>
+.form-select {
+  @apply bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
+         focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-500 dark:focus:border-blue-500;
+}
+
+.form-select:disabled {
+  @apply bg-gray-100 dark:bg-gray-700 cursor-not-allowed;
+}
+</style> 
