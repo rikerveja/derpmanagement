@@ -378,7 +378,6 @@ def get_acl_logs():
                 "user_id": log.user_id,
                 "ip_address": log.ip_address,
                 "location": log.location,
-                "acl_version": acl_version,  # 格式化后的 acl_version
                 "details": details,  # 新增的 details 字段
                 "created_at": log.created_at  # 返回日志的创建时间
             })
