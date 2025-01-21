@@ -350,7 +350,7 @@ def update_acl():
 
     return jsonify({"success": True, "message": "Tailscale ACL updated successfully", "acl": access_control_code}), 200
 
-# 查询所有 ACL 配置历史 
+# 查询所有 ACL 配置历史
 @acl_bp.route('/api/acl/logs', methods=['GET'])
 def get_acl_logs():
     """
@@ -360,6 +360,17 @@ def get_acl_logs():
         logs = ACLLog.query.all()  # 查询 acl_logs 表中的所有记录
         if not logs:
             return jsonify({"success": False, "message": "No ACL logs found"}), 404
+
+        log_data = []  # 初始化 log_data 列表
+
+        for log in logs:
+            # 获取用户信息
+            user = User.query.filter_by(id=log.user_id).first()
+            if user:
+                # 格式化 details，假设这里没有 acl_version 字段
+                details = f"ACL generated for user {user.username}"
+            else:
+                details = "ACL generated for unknown user"  # 如果没有找到用户，默认消息
 
             # 添加日志数据
             log_data.append({
@@ -376,6 +387,7 @@ def get_acl_logs():
         # 处理查询过程中可能出现的异常
         logging.error(f"Error retrieving ACL logs: {str(e)}")
         return jsonify({"success": False, "message": f"Error retrieving ACL logs: {str(e)}"}), 500
+
 
 # 提供 ACL 配置数据接口
 @acl_bp.route('/api/acl/download/<user_id>', methods=['GET'])
