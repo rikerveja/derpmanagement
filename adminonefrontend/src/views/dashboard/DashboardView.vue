@@ -19,13 +19,15 @@ import {
   mdiHistory,
   mdiDownload,
   mdiBellRing,
-  mdiRefresh
+  mdiRefresh,
+  mdiClipboardList
 } from '@mdi/js'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
 import api from '@/services/api'
 import BaseIcon from '@/components/BaseIcon.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseLevel from '@/components/BaseLevel.vue'
+import axios from 'axios'
 
 // 核心状态数据
 const stats = ref({
@@ -34,6 +36,7 @@ const stats = ref({
   users: { total: 0, active: 0, expired: 0 },
   alerts: { total: 0, critical: 0 },
   traffic: { used: 0, total: 0 },
+  rentals: { total: 0, active: 0, expired: 0 },
   expiring: { in5days: 0, in10days: 0 },
   income: { total: 0, direct: 0, distributor: 0, unpaid: 0 },
   serials: { total: 0, used: 0, unused: 0, deleted: 0 }
@@ -120,7 +123,7 @@ const fetchDetailData = async (type) => {
       case 'finance':
         const [transactions, revenue, distributors] = await Promise.all([
           api.getIncomeStats(),
-          api.getTrafficStats(), // 假设这个API也返回收入数据
+          api.getTrafficStats(),
           api.getAllUsers()
         ])
         
@@ -143,51 +146,34 @@ const fetchDetailData = async (type) => {
 }
 
 // 获取仪表盘数据
-const fetchDashboardData = async () => {
+const fetchStats = async () => {
   try {
-    console.log('开始获取仪表盘数据...')
+    // 使用 axios 直接发起请求
+    const response = await axios.get('/api/system/overview')
+    console.log('Dashboard data response:', response)
     
-    // 获取系统概览数据
-    const [overview, alerts, traffic, users, income] = await Promise.all([
-      api.getSystemOverview(),
-      api.getAlerts(),
-      api.getRealTimeTraffic(),
-      api.getAllUsers(),
-      api.getIncomeStats()
-    ])
-
-    if (overview && overview.data) {
-      stats.value = {
-        containers: overview.data.containers || { total: 0, running: 0, stopped: 0, error: 0 },
-        servers: overview.data.servers || { total: 0, running: 0, stopped: 0, error: 0 },
-        users: {
-          total: users?.data?.length || 0,
-          active: users?.data?.filter(u => !u.expired)?.length || 0,
-          expired: users?.data?.filter(u => u.expired)?.length || 0
-        },
-        alerts: {
-          total: alerts?.data?.length || 0,
-          critical: alerts?.data?.filter(a => a.level === 'critical')?.length || 0
-        },
-        traffic: traffic?.data || { used: 0, total: 0 },
-        income: income?.data || { total: 0, direct: 0, distributor: 0, unpaid: 0 }
-      }
+    if (response.data && response.data.success) {
+      const { data } = response.data
+      console.log('Overview data:', data)
+      
+      // 直接更新状态数据
+      stats.value.containers = data.containers
+      stats.value.servers = data.servers
+      stats.value.users = data.users
+      stats.value.rentals = data.rentals
     }
-
-    // 获取详细数据
-    await fetchDetailData(selectedView.value)
-
   } catch (error) {
     console.error('获取仪表盘数据失败:', error)
   }
 }
 
-// 修改 onMounted
+// 组件挂载时获取数据
 onMounted(() => {
-  fetchDashboardData()
-  fetchDetailData('traffic')  // 默认加载流量详情
-  const timer = setInterval(fetchDashboardData, 30000)
+  fetchStats()
+  // 每60秒刷新一次数据
+  const timer = setInterval(fetchStats, 60000)
   
+  // 组件卸载时清除定时器
   onUnmounted(() => {
     clearInterval(timer)
   })
@@ -197,15 +183,97 @@ onMounted(() => {
 <template>
   <LayoutAuthenticated>
     <SectionMain>
-      <SectionTitleLineWithButton :icon="mdiAccountMultiple" title="系统概览" main>
+      <SectionTitleLineWithButton
+        :icon="mdiChartTimelineVariant"
+        title="系统概览"
+        main
+      >
         <BaseButton
           :icon="mdiRefresh"
           color="info"
-          outline
-          label="刷新数据"
-          @click="refreshData"
+          @click="fetchStats"
+          small
+          title="刷新数据"
         />
       </SectionTitleLineWithButton>
+
+      <!-- 核心指标卡片 -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <!-- 容器状态卡片 -->
+        <router-link to="/containers" class="block">
+          <CardBox class="cursor-pointer hover:shadow-lg transition-shadow duration-300">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-gray-500 dark:text-gray-400">容器状态</div>
+                <div class="flex items-center mt-2">
+                  <BaseIcon :path="mdiDocker" class="mr-2 text-blue-500" size="24" />
+                  <div class="stats-number">{{ stats.containers.total }}</div>
+                </div>
+              </div>
+              <div class="grid grid-cols-1 gap-2 text-right">
+                <div class="stat-item">
+                  <span class="text-green-500 font-bold text-xl">{{ stats.containers.running }}</span>
+                  <span class="text-sm text-gray-600">运行中</span>
+                </div>
+                <div class="stat-item">
+                  <span class="text-red-500 font-bold text-xl">{{ stats.containers.stopped }}</span>
+                  <span class="text-sm text-gray-600">已停止</span>
+                </div>
+              </div>
+            </div>
+          </CardBox>
+        </router-link>
+
+        <!-- 用户状态卡片 -->
+        <router-link to="/users" class="block">
+          <CardBox class="cursor-pointer hover:shadow-lg transition-shadow duration-300">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-gray-500 dark:text-gray-400">用户状态</div>
+                <div class="flex items-center mt-2">
+                  <BaseIcon :path="mdiAccountMultiple" class="mr-2 text-purple-500" size="24" />
+                  <div class="stats-number">{{ stats.users.total }}</div>
+                </div>
+              </div>
+              <div class="grid grid-cols-1 gap-2 text-right">
+                <div class="stat-item">
+                  <span class="text-green-500 font-bold text-xl">{{ stats.users.active }}</span>
+                  <span class="text-sm text-gray-600">活跃</span>
+                </div>
+                <div class="stat-item">
+                  <span class="text-red-500 font-bold text-xl">{{ stats.users.expired }}</span>
+                  <span class="text-sm text-gray-600">过期</span>
+                </div>
+              </div>
+            </div>
+          </CardBox>
+        </router-link>
+
+        <!-- 租约状态卡片 -->
+        <router-link to="/rental" class="block">
+          <CardBox class="cursor-pointer hover:shadow-lg transition-shadow duration-300">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-gray-500 dark:text-gray-400">租约状态</div>
+                <div class="flex items-center mt-2">
+                  <BaseIcon :path="mdiKey" class="mr-2 text-yellow-500" size="24" />
+                  <div class="stats-number">{{ stats.rentals.total }}</div>
+                </div>
+              </div>
+              <div class="grid grid-cols-1 gap-2 text-right">
+                <div class="stat-item">
+                  <span class="text-green-500 font-bold text-xl">{{ stats.rentals.active }}</span>
+                  <span class="text-sm text-gray-600">生效中</span>
+                </div>
+                <div class="stat-item">
+                  <span class="text-red-500 font-bold text-xl">{{ stats.rentals.expired }}</span>
+                  <span class="text-sm text-gray-600">已过期</span>
+                </div>
+              </div>
+            </div>
+          </CardBox>
+        </router-link>
+      </div>
 
       <!-- 第一行：用户和租约状态 -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -271,7 +339,7 @@ onMounted(() => {
         >
           <div class="flex flex-col">
             <div class="flex items-center mb-4">
-              <div class="flex-shrink-0 p-4">
+            <div class="flex-shrink-0 p-4">
                 <div class="rounded-full bg-blue-500 p-3">
                   <BaseIcon :path="mdiServer" class="text-white" />
                 </div>
@@ -305,9 +373,9 @@ onMounted(() => {
         >
           <div class="flex flex-col">
             <div class="flex items-center mb-4">
-              <div class="flex-shrink-0 p-4">
+            <div class="flex-shrink-0 p-4">
                 <div class="rounded-full bg-blue-500 p-3">
-                  <BaseIcon :path="mdiChartLine" class="text-white" />
+                <BaseIcon :path="mdiChartLine" class="text-white" />
                 </div>
               </div>
               <div>
@@ -372,7 +440,7 @@ onMounted(() => {
             :icon="mdiChartLine"
             @click="switchView('traffic')"
           />
-          <BaseButton
+          <BaseButton 
             :color="selectedView === 'finance' ? 'info' : 'white dark:gray'"
             :label="'财务概况'"
             :icon="mdiCurrencyUsd"
@@ -437,8 +505,8 @@ onMounted(() => {
                    class="mb-2 p-2 bg-white dark:bg-gray-800 rounded shadow">
                 <p class="text-sm dark:text-gray-300">{{ user.username }}</p>
                 <p class="text-xs text-gray-500 dark:text-gray-400">注册时间: {{ new Date(user.created_at).toLocaleString() }}</p>
-              </div>
-            </div>
+                </div>
+                </div>
             
             <!-- 即将到期 -->
             <div class="p-4 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg">
@@ -460,13 +528,13 @@ onMounted(() => {
               </div>
             </div>
           </div>
-        </div>
+      </div>
 
         <!-- 财务概况 -->
         <div v-if="selectedView === 'finance'">
-          <BaseLevel class="mb-4">
+        <BaseLevel class="mb-4">
             <h3 class="text-lg font-bold dark:text-white">财务概况</h3>
-          </BaseLevel>
+        </BaseLevel>
           
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <!-- 最近交易 -->
@@ -476,8 +544,8 @@ onMounted(() => {
                    class="mb-2 p-2 bg-white rounded shadow">
                 <p class="text-sm">¥{{ transaction.amount }}</p>
                 <p class="text-xs text-gray-500">{{ new Date(transaction.time).toLocaleString() }}</p>
-              </div>
-            </div>
+                    </div>
+                  </div>
             
             <!-- 月度收入 -->
             <div class="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
@@ -486,7 +554,7 @@ onMounted(() => {
                 <p class="text-sm">本月收入: ¥{{ detailData.finance.monthlyRevenue.current }}</p>
                 <p class="text-sm">环比: {{ detailData.finance.monthlyRevenue.growth }}%</p>
               </div>
-            </div>
+        </div>
             
             <!-- 分销商统计 -->
             <div class="p-4 bg-purple-50 dark:bg-purple-900/30 rounded-lg">
@@ -552,4 +620,27 @@ button:hover::after {
 .card-box-highlight:hover {
   @apply shadow-xl transform -translate-y-1;
 }
-</style>
+
+/* 添加醒目的数字样式 */
+.stats-number {
+  @apply text-4xl font-bold text-gray-800 dark:text-white;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.stat-item {
+  @apply flex flex-col items-end;
+}
+
+.stat-item span:first-child {
+  @apply transition-all duration-300;
+}
+
+.stat-item:hover span:first-child {
+  @apply transform scale-110;
+}
+
+/* 暗色模式适配 */
+:deep(.dark) .stats-number {
+  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+</style> 
