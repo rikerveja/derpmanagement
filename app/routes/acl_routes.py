@@ -350,34 +350,45 @@ def update_acl():
 
     return jsonify({"success": True, "message": "Tailscale ACL updated successfully", "acl": access_control_code}), 200
 
-
-# 查询用户 ACL 配置历史
-@acl_bp.route('/api/acl/logs/<int:user_id>', methods=['GET'])
-def get_acl_logs(user_id):
+# 查询所有 ACL 配置历史 
+@acl_bp.route('/api/acl/logs', methods=['GET'])
+def get_acl_logs():
     """
-    获取用户的 Tailscale ACL 配置历史
+    获取所有用户的 Tailscale ACL 配置历史
     """
     try:
-        logs = ACLLog.query.filter_by(user_id=user_id).all()  # 查询该用户的所有 ACL 日志
+        logs = ACLLog.query.all()  # 查询 acl_logs 表中的所有记录
         if not logs:
             return jsonify({"success": False, "message": "No ACL logs found"}), 404
 
-        log_data = [
-            {
+        log_data = []
+        for log in logs:
+            # 获取用户信息
+            user = User.query.filter_by(id=log.user_id).first()
+            if user:
+                # 格式化 acl_version 和 details
+                acl_version = f"{log.acl_version} - ACL generated for user {user.username}"
+                details = f"acl_version: {acl_version}"
+            else:
+                acl_version = log.acl_version  # 如果没有找到用户，直接使用原始的 acl_version
+                details = f"acl_version: {acl_version}"  # 还是加上原始的 acl_version 信息
+
+            # 添加日志数据
+            log_data.append({
+                "user_id": log.user_id,
                 "ip_address": log.ip_address,
                 "location": log.location,
-                "acl_version": log.acl_version,
+                "acl_version": acl_version,  # 格式化后的 acl_version
+                "details": details,  # 新增的 details 字段
                 "created_at": log.created_at  # 返回日志的创建时间
-            } for log in logs
-        ]
+            })
 
         return jsonify({"success": True, "logs": log_data}), 200  # 返回成功的响应和日志数据
 
     except Exception as e:
         # 处理查询过程中可能出现的异常
-        logging.error(f"Error retrieving ACL logs for user {user_id}: {str(e)}")
+        logging.error(f"Error retrieving ACL logs: {str(e)}")
         return jsonify({"success": False, "message": f"Error retrieving ACL logs: {str(e)}"}), 500
-
 
 # 提供 ACL 配置数据接口
 @acl_bp.route('/api/acl/download/<user_id>', methods=['GET'])
