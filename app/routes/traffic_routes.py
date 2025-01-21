@@ -315,28 +315,36 @@ def fetch_traffic_metrics(url):
         logging.error(f"Error fetching metrics from {url}: {str(e)}")
         return None
 
-# 用户流量历史统计
 @traffic_bp.route('/api/traffic/history/<int:user_id>', methods=['GET'])
 def traffic_history(user_id):
     """
     获取用户的流量历史统计
     """
     try:
+        # 查询用户流量历史数据
         history_data = DockerContainerTraffic.query.filter_by(user_id=user_id).limit(100).all()
         
+        if not history_data:
+            # 如果没有数据，返回提示信息
+            return jsonify({"success": False, "message": "No traffic history found for this user."}), 404
+        
+        # 构造返回的流量历史数据
         response_data = [
             {
                 "container_id": record.container_id,
                 "upload_traffic": record.upload_traffic,
                 "download_traffic": record.download_traffic,
                 "remaining_traffic": record.remaining_traffic,
-                "timestamp": record.timestamp.isoformat()
+                "timestamp": record.timestamp.isoformat() if record.timestamp else None
             }
             for record in history_data
         ]
-
+        
+        # 返回成功响应
         return jsonify({"success": True, "user_id": user_id, "history_data": response_data}), 200
+
     except Exception as e:
+        # 捕获所有异常并记录详细错误信息
         logging.error(f"Error fetching traffic history for user {user_id}: {str(e)}")
         return jsonify({"success": False, "message": f"Error fetching traffic history: {str(e)}"}), 500
 
