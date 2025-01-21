@@ -24,7 +24,7 @@ def get_system_overview():
         # 获取服务器统计
         servers = Server.query.all()
         total_servers = len(servers)
-        running_servers = len([s for s in servers if s.status == 'running'])
+        running_servers = len([s for s in servers if s.status == 'healthy'])
         stopped_servers = len([s for s in servers if s.status == 'stopped'])
         error_servers = len([s for s in servers if s.status == 'error'])
 
