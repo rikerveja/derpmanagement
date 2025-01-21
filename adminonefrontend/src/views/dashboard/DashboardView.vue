@@ -199,6 +199,31 @@ onMounted(() => {
 
       <!-- 核心指标卡片 -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <!-- 服务器状态卡片 -->
+        <router-link to="/servers/list" class="block">
+          <CardBox class="cursor-pointer hover:shadow-lg transition-shadow duration-300">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-gray-500 dark:text-gray-400">服务器状态</div>
+                <div class="flex items-center mt-2">
+                  <BaseIcon :path="mdiServer" class="mr-2 text-blue-500" size="24" />
+                  <div class="stats-number">{{ stats.servers.total }}</div>
+                </div>
+              </div>
+              <div class="grid grid-cols-1 gap-2 text-right">
+                <div class="stat-item">
+                  <span class="text-green-500 font-bold text-xl">{{ stats.servers.total }}</span>
+                  <span class="text-sm text-gray-600">运行中</span>
+                </div>
+                <div class="stat-item">
+                  <span class="text-red-500 font-bold text-xl">{{ stats.servers.error }}</span>
+                  <span class="text-sm text-gray-600">异常</span>
+                </div>
+              </div>
+            </div>
+          </CardBox>
+        </router-link>
+
         <!-- 容器状态卡片 -->
         <router-link to="/containers" class="block">
           <CardBox class="cursor-pointer hover:shadow-lg transition-shadow duration-300">
@@ -216,45 +241,20 @@ onMounted(() => {
                   <span class="text-sm text-gray-600">运行中</span>
                 </div>
                 <div class="stat-item">
-                  <span class="text-red-500 font-bold text-xl">{{ stats.containers.stopped }}</span>
-                  <span class="text-sm text-gray-600">已停止</span>
+                  <span class="text-red-500 font-bold text-xl">{{ stats.containers.error }}</span>
+                  <span class="text-sm text-gray-600">异常</span>
                 </div>
               </div>
             </div>
           </CardBox>
         </router-link>
 
-        <!-- 用户状态卡片 -->
-        <router-link to="/users" class="block">
-          <CardBox class="cursor-pointer hover:shadow-lg transition-shadow duration-300">
-            <div class="flex items-center justify-between">
-              <div>
-                <div class="text-gray-500 dark:text-gray-400">用户状态</div>
-                <div class="flex items-center mt-2">
-                  <BaseIcon :path="mdiAccountMultiple" class="mr-2 text-purple-500" size="24" />
-                  <div class="stats-number">{{ stats.users.total }}</div>
-                </div>
-              </div>
-              <div class="grid grid-cols-1 gap-2 text-right">
-                <div class="stat-item">
-                  <span class="text-green-500 font-bold text-xl">{{ stats.users.active }}</span>
-                  <span class="text-sm text-gray-600">活跃</span>
-                </div>
-                <div class="stat-item">
-                  <span class="text-red-500 font-bold text-xl">{{ stats.users.expired }}</span>
-                  <span class="text-sm text-gray-600">过期</span>
-                </div>
-              </div>
-            </div>
-          </CardBox>
-        </router-link>
-
-        <!-- 租约状态卡片 -->
+        <!-- 租赁状态卡片 -->
         <router-link to="/rental" class="block">
           <CardBox class="cursor-pointer hover:shadow-lg transition-shadow duration-300">
             <div class="flex items-center justify-between">
               <div>
-                <div class="text-gray-500 dark:text-gray-400">租约状态</div>
+                <div class="text-gray-500 dark:text-gray-400">租赁状态</div>
                 <div class="flex items-center mt-2">
                   <BaseIcon :path="mdiKey" class="mr-2 text-yellow-500" size="24" />
                   <div class="stats-number">{{ stats.rentals.total }}</div>
