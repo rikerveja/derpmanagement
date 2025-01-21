@@ -193,7 +193,22 @@ const dashboardApi = {
 
   // 获取所有用户
   getAllUsers() {
-    return api.get('/users')
+    return api.get('/users').then(response => {
+      if (response.data) {
+        return {
+          success: true,
+          users: response.data.users || []
+        }
+      }
+      throw new Error('Invalid response format')
+    }).catch(error => {
+      console.error('Get users error:', error)
+      return {
+        success: false,
+        message: error.message,
+        users: []
+      }
+    })
   },
 
   // 获取所有服务器
