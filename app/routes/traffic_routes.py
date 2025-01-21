@@ -318,15 +318,24 @@ def fetch_traffic_metrics(url):
 @traffic_bp.route('/api/traffic/history/<int:user_id>', methods=['GET'])
 def traffic_history(user_id):
     """
-    获取用户的流量历史统计
+    获取指定用户的容器流量历史统计
     """
     try:
-        # 查询用户流量历史数据
-        history_data = DockerContainerTraffic.query.filter_by(user_id=user_id).limit(100).all()
+        # 获取指定用户的容器 ID（DockerContainer 表中的 id）
+        container = DockerContainer.query.filter_by(user_id=user_id).first()
+        
+        if not container:
+            # 如果没有找到容器信息，返回提示信息
+            return jsonify({"success": False, "message": "No container found for this user."}), 404
+        
+        container_id = container.id  # 获取 DockerContainer 表中的自增 ID
+        
+        # 根据容器 ID 查询流量历史数据
+        history_data = DockerContainerTraffic.query.filter_by(container_id=container_id).limit(100).all()
         
         if not history_data:
-            # 如果没有数据，返回提示信息
-            return jsonify({"success": False, "message": "No traffic history found for this user."}), 404
+            # 如果没有流量历史数据，返回提示信息
+            return jsonify({"success": False, "message": "No traffic history found for this container."}), 404
         
         # 构造返回的流量历史数据
         response_data = [
@@ -335,13 +344,16 @@ def traffic_history(user_id):
                 "upload_traffic": record.upload_traffic,
                 "download_traffic": record.download_traffic,
                 "remaining_traffic": record.remaining_traffic,
-                "timestamp": record.timestamp.isoformat() if record.timestamp else None
+                "timestamp": record.timestamp.isoformat() if record.timestamp else None,
+                "traffic_limit": record.traffic_limit,
+                "created_at": record.created_at.isoformat() if record.created_at else None,
+                "updated_at": record.updated_at.isoformat() if record.updated_at else None
             }
             for record in history_data
         ]
         
         # 返回成功响应
-        return jsonify({"success": True, "user_id": user_id, "history_data": response_data}), 200
+        return jsonify({"success": True, "user_id": user_id, "container_id": container_id, "history_data": response_data}), 200
 
     except Exception as e:
         # 捕获所有异常并记录详细错误信息
