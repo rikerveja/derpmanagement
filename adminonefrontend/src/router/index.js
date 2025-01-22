@@ -4,6 +4,7 @@ import DashboardView from '@/views/dashboard/DashboardView.vue'
 import ProfileView from '@/views/ProfileView.vue'
 import SerialManageView from '@/views/serial/SerialManageView.vue'
 import ServerHealthView from '@/views/servers/ServerHealthView.vue'
+import AclLogsView from '@/views/acl/AclLogsView.vue'
 
 const routes = [
   {
@@ -46,6 +47,15 @@ const routes = [
     component: SerialManageView,
     meta: {
       requiresAuth: true
+    }
+  },
+  {
+    path: '/serials/stats',
+    name: 'SerialStats',
+    component: () => import('@/views/serial/SerialStatsView.vue'),
+    meta: {
+      requiresAuth: true,
+      title: '序列号统计'
     }
   },
   {
@@ -109,6 +119,14 @@ const routes = [
     meta: { 
       requiresAuth: true,
       layout: 'authenticated'
+    }
+  },
+  {
+    path: '/acl/logs',
+    name: 'acl-logs',
+    component: AclLogsView,
+    meta: {
+      requiresAuth: true
     }
   },
   {
