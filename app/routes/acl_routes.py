@@ -410,4 +410,3 @@ def download_acl(user_id):
     except Exception as e:
         logging.error(f"Error downloading Tailscale ACL for user {user_id}: {str(e)}")
         return jsonify({"success": False, "message": f"Error downloading Tailscale ACL: {str(e)}"}), 500
-
