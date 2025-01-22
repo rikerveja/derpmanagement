@@ -598,5 +598,27 @@ export default {
   },
 
   //getTrafficData
-  saveTrafficData
+  saveTrafficData,
+
+  // 获取ACL日志
+  getAclLogs() {
+    return api.get('/acl/logs').then(response => {
+      console.log('Raw response:', response)
+      
+      // 检查响应数据结构
+      if (!response || !response.logs) {
+        console.warn('No logs data in response')
+        return { logs: [], success: false }
+      }
+
+      // 返回标准化的响应格式
+      return {
+        logs: response.logs || [],
+        success: !!response.success
+      }
+    }).catch(error => {
+      console.error('获取ACL日志失败:', error)
+      return { logs: [], success: false }
+    })
+  }
 } 
