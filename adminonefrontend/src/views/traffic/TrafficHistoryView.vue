@@ -94,13 +94,19 @@
                 {{ record.container_id }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {{ formatTraffic(record.upload_traffic) }}
+                <span :title="JSON.stringify(record.upload_traffic)">
+                  {{ formatTraffic(record.upload_traffic) }}
+                </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {{ formatTraffic(record.download_traffic) }}
+                <span :title="JSON.stringify(record.download_traffic)">
+                  {{ formatTraffic(record.download_traffic) }}
+                </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {{ formatTraffic(record.remaining_traffic) }}
+                <span :title="JSON.stringify(record.remaining_traffic)">
+                  {{ formatTraffic(record.remaining_traffic) }}
+                </span>
               </td>
             </tr>
           </tbody>
@@ -112,11 +118,32 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js'
 import { Line } from 'vue-chartjs'
 import CardBox from '@/components/CardBox.vue'
 import BaseIcon from '@/components/BaseIcon.vue'
 import { mdiMagnify } from '@mdi/js'
 import api from '@/services/api'
+
+// 注册 Chart.js 组件
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+)
 
 // 状态变量
 const users = ref([])
@@ -166,35 +193,56 @@ const fetchTrafficHistory = async () => {
   try {
     loading.value = true
     const response = await api.getTrafficHistory(selectedUserId.value)
+    console.log('获取到的历史数据:', response)
+    
     if (response.success) {
-      historyData.value = response.history_data || []
+      // 修正：使用 history_data 而不是 data
+      historyData.value = response.history_data.map(record => ({
+        timestamp: record.timestamp,
+        container_id: record.container_id,
+        upload_traffic: Number(record.upload_traffic),
+        download_traffic: Number(record.download_traffic),
+        remaining_traffic: Number(record.remaining_traffic)
+      }))
+      console.log('处理后的历史数据:', historyData.value)
     }
   } catch (error) {
     console.error('获取流量历史失败:', error)
+    historyData.value = []
   } finally {
     loading.value = false
   }
 }
 
-// 图表数据
+// 格式化函数 - 因为数据已经是 GB 单位，所以直接格式化
+const formatTraffic = (value) => {
+  if (value === undefined || value === null || isNaN(value)) return '0.00 GB'
+  return `${Number(value).toFixed(2)} GB`
+}
+
+const formatTime = (timestamp) => {
+  return new Date(timestamp).toLocaleString()
+}
+
+// 图表数据 - 直接使用数值，不需要额外转换
 const chartData = computed(() => ({
   labels: historyData.value.map(d => formatTime(d.timestamp)),
   datasets: [
     {
       label: '上传流量',
-      data: historyData.value.map(d => d.upload_traffic / 1024 / 1024), // 转换为 MB
+      data: historyData.value.map(d => Number(d.upload_traffic)),
       borderColor: '#10B981',
       tension: 0.1
     },
     {
       label: '下载流量',
-      data: historyData.value.map(d => d.download_traffic / 1024 / 1024),
+      data: historyData.value.map(d => Number(d.download_traffic)),
       borderColor: '#3B82F6',
       tension: 0.1
     },
     {
       label: '剩余流量',
-      data: historyData.value.map(d => d.remaining_traffic / 1024 / 1024),
+      data: historyData.value.map(d => Number(d.remaining_traffic)),
       borderColor: '#8B5CF6',
       tension: 0.1
     }
@@ -209,27 +257,26 @@ const chartOptions = {
     intersect: false,
     mode: 'index'
   },
+  plugins: {
+    legend: {
+      display: true
+    }
+  },
   scales: {
+    x: {
+      type: 'category',
+      display: true
+    },
     y: {
+      type: 'linear',
+      display: true,
       beginAtZero: true,
       title: {
         display: true,
-        text: '流量 (MB)'
+        text: '流量 (GB)'
       }
     }
   }
-}
-
-// 格式化函数
-const formatTraffic = (bytes) => {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB'
-  if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(2) + ' MB'
-  return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB'
-}
-
-const formatTime = (timestamp) => {
-  return new Date(timestamp).toLocaleString()
 }
 
 // 处理用户选择
