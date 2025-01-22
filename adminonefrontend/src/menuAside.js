@@ -24,7 +24,8 @@ import {
   mdiTextBoxOutline,
   mdiServerSecurity,
   mdiAccountCircle,
-  mdiReceipt
+  mdiReceipt,
+  mdiChartBox
 } from '@mdi/js'
 
 export default [
@@ -134,8 +135,8 @@ export default [
       },
       {
         to: '/serials/stats',
-        label: '序列号统计',
-        icon: mdiChartBar
+        label: '统计分析',
+        icon: mdiChartBox
       }
     ]
   },
