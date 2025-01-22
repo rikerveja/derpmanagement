@@ -4,41 +4,62 @@
     <CardBox>
       <div class="flex justify-between items-center">
         <div class="flex items-center space-x-4">
-          <label class="text-gray-700 dark:text-gray-300">选择服务器:</label>
-          <select 
-            v-model="selectedServer"
-            class="form-select rounded-md border-gray-300 shadow-sm"
-            :disabled="loading"
-          >
-            <option value="">请选择服务器</option>
-            <option 
-              v-for="server in servers" 
-              :key="server.id" 
-              :value="server.id"
-              :disabled="server.status === 'unreachable'"
-            >
-              {{ server.name }} ({{ server.ip_address }})
-              {{ server.status === 'unreachable' ? '(不可达)' : '' }}
-            </option>
-          </select>
+          <!-- 服务器选择 -->
+          <div class="flex flex-col space-y-1">
+            <label class="text-gray-700 dark:text-gray-300">选择服务器:</label>
+            <div class="relative">
+              <input
+                v-model="serverSearchQuery"
+                type="text"
+                class="form-input pr-10"
+                placeholder="搜索服务器..."
+              />
+              <select 
+                v-model="selectedServer"
+                class="form-select mt-1"
+                :disabled="loading"
+              >
+                <option value="">请选择服务器</option>
+                <option 
+                  v-for="server in filteredServers" 
+                  :key="server.id" 
+                  :value="server.id"
+                  :disabled="server.status === 'unreachable'"
+                >
+                  {{ server.name }} ({{ server.ip_address }})
+                  {{ server.status === 'unreachable' ? '(不可达)' : '' }}
+                </option>
+              </select>
+            </div>
+          </div>
 
           <!-- 容器选择 -->
           <template v-if="selectedServer">
-            <label class="text-gray-700 dark:text-gray-300">选择容器:</label>
-            <select
-              v-model="selectedContainer"
-              class="form-select rounded-md border-gray-300 shadow-sm"
-              :disabled="loading || loadingContainers"
-            >
-              <option value="">请选择容器</option>
-              <option
-                v-for="container in serverContainers"
-                :key="container.id"
-                :value="container.id"
-              >
-                {{ container.container_name || container.id }}
-              </option>
-            </select>
+            <div class="flex flex-col space-y-1">
+              <label class="text-gray-700 dark:text-gray-300">选择容器:</label>
+              <div class="relative">
+                <input
+                  v-model="containerSearchQuery"
+                  type="text"
+                  class="form-input pr-10"
+                  placeholder="搜索容器..."
+                />
+                <select
+                  v-model="selectedContainer"
+                  class="form-select mt-1"
+                  :disabled="loading || loadingContainers"
+                >
+                  <option value="">请选择容器</option>
+                  <option
+                    v-for="container in serverContainers"
+                    :key="container.id"
+                    :value="container.id"
+                  >
+                    {{ container.container_name || container.id }}
+                  </option>
+                </select>
+              </div>
+            </div>
           </template>
         </div>
         <div class="flex space-x-2">
@@ -206,7 +227,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { 
   mdiUpload, 
   mdiDownload, 
@@ -227,11 +248,46 @@ const error = ref('')
 const servers = ref([])
 const selectedServer = ref('')
 const selectedContainer = ref(null)
-const serverContainers = ref([])
+const containerList = ref([])
 const loadingContainers = ref(false)
 const trafficData = ref({})
 const trafficLimit = ref(0)
 const remainingTraffic = ref(0)
+
+// 添加搜索相关的 ref
+const serverSearchQuery = ref('')
+const containerSearchQuery = ref('')
+
+// 过滤后的服务器列表
+const filteredServers = computed(() => {
+  if (!serverSearchQuery.value) return servers.value
+  const query = serverSearchQuery.value.toLowerCase()
+  return servers.value.filter(server => 
+    server.name.toLowerCase().includes(query) ||
+    server.ip_address.toLowerCase().includes(query)
+  )
+})
+
+// 修改现有的 serverContainers 计算属性
+const serverContainers = computed(() => {
+  if (!selectedServer.value) return []
+  
+  // 先过滤出当前服务器的容器
+  let filteredContainers = containerList.value.filter(c => 
+    c.server_id === selectedServer.value
+  )
+  
+  // 如果有搜索关键词，继续过滤
+  if (containerSearchQuery.value) {
+    const query = containerSearchQuery.value.toLowerCase()
+    filteredContainers = filteredContainers.filter(container => 
+      (container.container_name || '').toLowerCase().includes(query) ||
+      container.id.toLowerCase().includes(query)
+    )
+  }
+  
+  return filteredContainers
+})
 
 // 获取服务器列表
 const fetchServers = async () => {
@@ -251,7 +307,7 @@ const fetchContainers = async (serverId) => {
     loadingContainers.value = true
     const response = await api.getServerContainers(serverId)
     if (response.success) {
-      serverContainers.value = response.containers
+      containerList.value = response.containers
     }
   } catch (err) {
     error.value = '获取容器列表失败'
@@ -373,4 +429,18 @@ const getContainerName = (containerId) => {
   const container = serverContainers.value.find(c => c.id === containerId)
   return container ? container.container_name : containerId
 }
-</script> 
+</script>
+
+<style scoped>
+.form-input {
+  @apply w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
+}
+
+.form-select {
+  @apply w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
+}
+
+.relative {
+  @apply w-64;
+}
+</style> 
