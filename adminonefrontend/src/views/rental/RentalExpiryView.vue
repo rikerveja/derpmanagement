@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionMain from '@/components/SectionMain.vue'
 import CardBox from '@/components/CardBox.vue'
@@ -9,87 +9,69 @@ import {
   mdiCalendarClock,
   mdiBellRing,
   mdiRefresh,
-  mdiDelete
+  mdiEmailOutline
 } from '@mdi/js'
 import api from '@/services/api'
 
-// 即将到期的租赁列表
-const expiringRentals = ref([])
-const daysToExpiry = ref(7)
+// 租赁列表数据
+const rentals = ref([])
 const loading = ref(false)
+const sendingEmail = ref(false)
 
-// 获取即将到期的租赁
-const fetchExpiringRentals = async () => {
+// 过滤5天内到期的租赁
+const expiringWithin5Days = computed(() => {
+  return rentals.value.filter(rental => {
+    const daysRemaining = Math.ceil((new Date(rental.end_date) - new Date()) / (1000 * 60 * 60 * 24))
+    return daysRemaining <= 5 && daysRemaining > 0
+  })
+})
+
+// 过滤5-10天内到期的租赁
+const expiringWithin10Days = computed(() => {
+  return rentals.value.filter(rental => {
+    const daysRemaining = Math.ceil((new Date(rental.end_date) - new Date()) / (1000 * 60 * 60 * 24))
+    return daysRemaining > 5 && daysRemaining <= 10
+  })
+})
+
+// 获取所有租赁
+const fetchRentals = async () => {
   try {
     loading.value = true
-    const response = await api.getExpiringRentals(daysToExpiry.value)
+    const response = await api.getRentals()
     if (response.success) {
-      expiringRentals.value = response.rentals
+      rentals.value = response.rentals
     }
   } catch (error) {
-    console.error('获取即将到期租赁失败:', error)
-    alert('获取数据失败: ' + error.message)
+    console.error('获取租赁列表失败:', error)
   } finally {
     loading.value = false
   }
 }
 
-// 发送到期通知
-const sendNotifications = async () => {
+// 发送续费提醒邮件
+const sendRenewalEmail = async (rental) => {
   try {
-    loading.value = true
-    const response = await api.sendExpiryNotifications({ days_to_expiry: daysToExpiry.value })
+    sendingEmail.value = true
+    const response = await api.sendRenewalReminder(rental.id)
     if (response.success) {
-      alert('通知发送成功!')
-      await fetchExpiringRentals()
+      alert(`已成功发送续费提醒邮件给用户 ${rental.user_email}`)
     }
   } catch (error) {
-    console.error('发送通知失败:', error)
-    alert('发送通知失败: ' + error.message)
+    console.error('发送续费提醒邮件失败:', error)
+    alert('发送邮件失败: ' + error.message)
   } finally {
-    loading.value = false
+    sendingEmail.value = false
   }
 }
 
-// 检查并处理到期租赁
-const checkExpiry = async () => {
-  try {
-    loading.value = true
-    const response = await api.checkRentalExpiry()
-    if (response.success) {
-      alert('已成功处理到期租赁!')
-      await fetchExpiringRentals()
-    }
-  } catch (error) {
-    console.error('处理到期租赁失败:', error)
-    alert('处理失败: ' + error.message)
-  } finally {
-    loading.value = false
-  }
+// 计算剩余天数
+const getRemainingDays = (endDate) => {
+  const days = Math.ceil((new Date(endDate) - new Date()) / (1000 * 60 * 60 * 24))
+  return days > 0 ? days : 0
 }
 
-// 释放资源
-const releaseResources = async (rentalId) => {
-  if (!confirm('确定要释放该租赁的所有资源吗？此操作不可恢复!')) {
-    return
-  }
-  
-  try {
-    loading.value = true
-    const response = await api.deleteRental(rentalId)
-    if (response.success) {
-      alert('资源释放成功!')
-      await fetchExpiringRentals()
-    }
-  } catch (error) {
-    console.error('释放资源失败:', error)
-    alert('释放失败: ' + error.message)
-  } finally {
-    loading.value = false
-  }
-}
-
-// 添加计算属性来格式化状态显示
+// 格式化状态
 const formatStatus = (status) => {
   const statusMap = {
     'active': '使用中',
@@ -99,80 +81,48 @@ const formatStatus = (status) => {
   return statusMap[status] || status
 }
 
-onMounted(fetchExpiringRentals)
+onMounted(fetchRentals)
 </script>
 
 <template>
   <LayoutAuthenticated>
     <SectionMain>
+      <!-- 5天内到期的租赁 -->
       <CardBox class="mb-6">
-        <!-- 标题栏 -->
         <div class="flex justify-between items-center mb-6">
-          <h1 class="text-2xl font-bold">到期检查</h1>
-          <div class="flex space-x-2">
-            <div class="flex items-center">
-              <span class="mr-2">提前天数:</span>
-              <input
-                v-model.number="daysToExpiry"
-                type="number"
-                min="1"
-                class="w-20 px-2 py-1 border rounded"
-              />
-            </div>
-            <BaseButton
-              :icon="mdiRefresh"
-              color="info"
-              :loading="loading"
-              @click="fetchExpiringRentals"
-              title="刷新"
-            />
-            <BaseButton
-              :icon="mdiBellRing"
-              color="warning"
-              :loading="loading"
-              @click="sendNotifications"
-              title="发送通知"
-            />
-            <BaseButton
-              :icon="mdiCalendarClock"
-              color="danger"
-              :loading="loading"
-              @click="checkExpiry"
-              title="处理到期"
-            />
-          </div>
+          <h1 class="text-xl font-bold text-red-600">
+            <BaseIcon :path="mdiCalendarClock" class="inline-block mr-2" />
+            5天内到期
+          </h1>
+          <BaseButton
+            :icon="mdiRefresh"
+            color="info"
+            :loading="loading"
+            @click="fetchRentals"
+          />
         </div>
 
-        <!-- 即将到期的租赁列表 -->
         <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
+          <table class="w-full">
             <thead>
               <tr>
-                <th class="px-4 py-3 text-left">用户ID</th>
-                <th class="px-4 py-3 text-left">序列号</th>
+                <th class="px-4 py-3 text-left">用户邮箱</th>
                 <th class="px-4 py-3 text-left">到期时间</th>
                 <th class="px-4 py-3 text-left">剩余天数</th>
-                <th class="px-4 py-3 text-left">续费次数</th>
                 <th class="px-4 py-3 text-left">状态</th>
+                <th class="px-4 py-3 text-left">流量使用</th>
                 <th class="px-4 py-3 text-left">操作</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200">
-              <tr v-for="rental in expiringRentals" :key="rental.id">
-                <td class="px-4 py-3">{{ rental.user_id }}</td>
-                <td class="px-4 py-3">{{ rental.serial_code }}</td>
+            <tbody>
+              <tr v-for="rental in expiringWithin5Days" :key="rental.id">
+                <td class="px-4 py-3">{{ rental.user_email }}</td>
                 <td class="px-4 py-3">{{ new Date(rental.end_date).toLocaleString() }}</td>
                 <td class="px-4 py-3">
-                  <span :class="{
-                    'px-2 py-1 rounded-full text-xs': true,
-                    'bg-red-100 text-red-800': rental.days_remaining <= 3,
-                    'bg-yellow-100 text-yellow-800': rental.days_remaining > 3 && rental.days_remaining <= daysToExpiry,
-                    'bg-green-100 text-green-800': rental.days_remaining > daysToExpiry
-                  }">
-                    {{ rental.days_remaining }}天
+                  <span class="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">
+                    {{ getRemainingDays(rental.end_date) }}天
                   </span>
                 </td>
-                <td class="px-4 py-3">{{ rental.renewal_count }}</td>
                 <td class="px-4 py-3">
                   <span :class="{
                     'px-2 py-1 rounded-full text-xs': true,
@@ -184,19 +134,86 @@ onMounted(fetchExpiringRentals)
                   </span>
                 </td>
                 <td class="px-4 py-3">
+                  {{ rental.total_traffic }}GB
+                </td>
+                <td class="px-4 py-3">
                   <BaseButton
-                    :icon="mdiDelete"
-                    color="danger"
+                    :icon="mdiEmailOutline"
+                    color="info"
                     small
-                    :loading="loading"
-                    @click="releaseResources(rental.id)"
-                    title="释放资源"
+                    :loading="sendingEmail"
+                    @click="sendRenewalEmail(rental)"
+                    title="发送续费提醒"
                   />
                 </td>
               </tr>
-              <tr v-if="expiringRentals.length === 0">
-                <td colspan="7" class="px-4 py-8 text-center text-gray-500">
-                  暂无即将到期的租赁
+              <tr v-if="expiringWithin5Days.length === 0">
+                <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                  暂无5天内到期的租赁
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </CardBox>
+
+      <!-- 5-10天内到期的租赁 -->
+      <CardBox>
+        <div class="flex justify-between items-center mb-6">
+          <h1 class="text-xl font-bold text-yellow-600">
+            <BaseIcon :path="mdiCalendarClock" class="inline-block mr-2" />
+            5-10天内到期
+          </h1>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead>
+              <tr>
+                <th class="px-4 py-3 text-left">用户邮箱</th>
+                <th class="px-4 py-3 text-left">到期时间</th>
+                <th class="px-4 py-3 text-left">剩余天数</th>
+                <th class="px-4 py-3 text-left">状态</th>
+                <th class="px-4 py-3 text-left">流量使用</th>
+                <th class="px-4 py-3 text-left">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="rental in expiringWithin10Days" :key="rental.id">
+                <td class="px-4 py-3">{{ rental.user_email }}</td>
+                <td class="px-4 py-3">{{ new Date(rental.end_date).toLocaleString() }}</td>
+                <td class="px-4 py-3">
+                  <span class="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
+                    {{ getRemainingDays(rental.end_date) }}天
+                  </span>
+                </td>
+                <td class="px-4 py-3">
+                  <span :class="{
+                    'px-2 py-1 rounded-full text-xs': true,
+                    'bg-green-100 text-green-800': rental.status === 'active',
+                    'bg-red-100 text-red-800': rental.status === 'expired',
+                    'bg-yellow-100 text-yellow-800': rental.status === 'pending'
+                  }">
+                    {{ formatStatus(rental.status) }}
+                  </span>
+                </td>
+                <td class="px-4 py-3">
+                  {{ rental.total_traffic }}GB
+                </td>
+                <td class="px-4 py-3">
+                  <BaseButton
+                    :icon="mdiEmailOutline"
+                    color="info"
+                    small
+                    :loading="sendingEmail"
+                    @click="sendRenewalEmail(rental)"
+                    title="发送续费提醒"
+                  />
+                </td>
+              </tr>
+              <tr v-if="expiringWithin10Days.length === 0">
+                <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                  暂无5-10天内到期的租赁
                 </td>
               </tr>
             </tbody>
@@ -208,12 +225,11 @@ onMounted(fetchExpiringRentals)
 </template>
 
 <style scoped>
-input[type="number"] {
-  @apply [appearance:textfield];
+.form-group {
+  @apply mb-4;
 }
 
-input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button {
-  @apply appearance-none m-0;
+input[type="text"] {
+  @apply focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
 }
 </style> 
