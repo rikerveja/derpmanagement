@@ -40,7 +40,10 @@ const fetchRentals = async () => {
     loading.value = true
     const response = await api.getRentals()
     if (response.success) {
-      rentals.value = response.rentals
+      rentals.value = response.rentals.map(rental => ({
+        ...rental,
+        user_email: rental.user_info?.email || rental.email || '邮箱未设置'
+      }))
     }
   } catch (error) {
     console.error('获取租赁列表失败:', error)
@@ -53,13 +56,25 @@ const fetchRentals = async () => {
 const sendRenewalEmail = async (rental) => {
   try {
     sendingEmail.value = true
-    const response = await api.sendRenewalReminder(rental.id)
+    if (!rental.user_email || rental.user_email === '邮箱未设置') {
+      throw new Error('用户邮箱未设置')
+    }
+    const response = await api.sendReminderNotification({
+      user_id: rental.user_id,
+      email: rental.user_email,
+      type: 'renewal',
+      data: {
+        expiry_date: rental.end_date,
+        days_remaining: getRemainingDays(rental.end_date)
+      }
+    })
+    
     if (response.success) {
       alert(`已成功发送续费提醒邮件给用户 ${rental.user_email}`)
     }
   } catch (error) {
     console.error('发送续费提醒邮件失败:', error)
-    alert('发送邮件失败: ' + error.message)
+    alert('发送邮件失败: ' + (error.message || '未知错误'))
   } finally {
     sendingEmail.value = false
   }
@@ -116,7 +131,11 @@ onMounted(fetchRentals)
             </thead>
             <tbody>
               <tr v-for="rental in expiringWithin5Days" :key="rental.id">
-                <td class="px-4 py-3">{{ rental.user_email }}</td>
+                <td class="px-4 py-3">
+                  <span :class="{'text-red-500': !rental.user_email || rental.user_email === '邮箱未设置'}">
+                    {{ rental.user_email }}
+                  </span>
+                </td>
                 <td class="px-4 py-3">{{ new Date(rental.end_date).toLocaleString() }}</td>
                 <td class="px-4 py-3">
                   <span class="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">
@@ -142,8 +161,9 @@ onMounted(fetchRentals)
                     color="info"
                     small
                     :loading="sendingEmail"
+                    :disabled="!rental.user_email || rental.user_email === '邮箱未设置'"
                     @click="sendRenewalEmail(rental)"
-                    title="发送续费提醒"
+                    :title="rental.user_email === '邮箱未设置' ? '用户邮箱未设置' : '发送续费提醒'"
                   />
                 </td>
               </tr>
