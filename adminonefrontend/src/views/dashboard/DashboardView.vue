@@ -28,6 +28,7 @@ import BaseIcon from '@/components/BaseIcon.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseLevel from '@/components/BaseLevel.vue'
 import axios from 'axios'
+import { useRouter } from 'vue-router'
 
 // 核心状态数据
 const stats = ref({
@@ -71,6 +72,8 @@ const detailData = ref({
     distributorStats: {}
   }
 })
+
+const router = useRouter()
 
 // 切换展示视图
 const switchView = async (type) => {
@@ -161,10 +164,21 @@ const fetchStats = async () => {
       stats.value.servers = data.servers
       stats.value.users = data.users
       stats.value.rentals = data.rentals
+      // 更新到期用户统计
+      stats.value.expiring = {
+        in5days: data.expiring?.in5days || 0,
+        in10days: data.expiring?.in10days || 0
+      }
+      console.log('到期用户统计:', stats.value.expiring)
     }
   } catch (error) {
     console.error('获取仪表盘数据失败:', error)
   }
+}
+
+// 添加跳转方法
+const goToRentalExpiry = () => {
+  router.push('/rental/expiry')
 }
 
 // 组件挂载时获取数据
@@ -306,7 +320,7 @@ onMounted(() => {
         <!-- 租约到期卡片 -->
         <CardBox 
           class="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/30 dark:to-red-900/30 hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
-          @click="switchView('users')"
+          @click="goToRentalExpiry"
         >
           <div class="flex items-center">
             <div class="flex-shrink-0 p-4">
@@ -509,12 +523,22 @@ onMounted(() => {
                 </div>
             
             <!-- 即将到期 -->
-            <div class="p-4 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg">
-              <h4 class="font-semibold mb-2 dark:text-gray-200">即将到期用户</h4>
-              <div v-for="user in detailData.users.expiringUsers" :key="user.id"
-                   class="mb-2 p-2 bg-white dark:bg-gray-800 rounded shadow">
-                <p class="text-sm dark:text-gray-300">{{ user.username }}</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400">到期时间: {{ new Date(user.expiry_date).toLocaleString() }}</p>
+            <div class="p-4 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg cursor-pointer" 
+                 @click="goToRentalExpiry">
+              <h4 class="font-semibold mb-2 dark:text-gray-200 flex items-center">
+                <BaseIcon :path="mdiClockAlert" class="mr-2" />
+                即将到期用户
+              </h4>
+              <div class="space-y-2">
+                <p class="text-sm dark:text-gray-300">
+                  5天内到期: {{ stats.expiring.in5days }} 个
+                </p>
+                <p class="text-sm dark:text-gray-300">
+                  5-10天内到期: {{ stats.expiring.in10days }} 个
+                </p>
+              </div>
+              <div class="mt-2 text-xs text-blue-600 dark:text-blue-400">
+                点击查看详情 →
               </div>
             </div>
             
