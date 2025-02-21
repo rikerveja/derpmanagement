@@ -339,7 +339,7 @@ export default {
   },
   
   getRentalInfo() {
-    return api.get('/user/rental_info')
+    return api.get('/rental/history/' + JSON.parse(localStorage.getItem('user'))?.id)
   },
   
   getUserHistory(userId) {
@@ -545,7 +545,10 @@ export default {
 
   // 通知相关 API
   sendReminderNotification(data) {
-    return api.post('/notifications/send_reminder', data)
+    return api.post('/rental/send_expiry_notifications', {
+      days_to_expiry: data.days_to_expiry,
+      user_id: data.user_id
+    })
   },
 
   // 监控相关 API
@@ -620,5 +623,10 @@ export default {
       console.error('获取ACL日志失败:', error)
       return { logs: [], success: false }
     })
+  },
+
+  // 更新个人资料
+  updateProfile(data) {
+    return api.post('/user/update_info', data)
   }
 } 
