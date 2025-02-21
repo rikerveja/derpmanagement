@@ -40,10 +40,12 @@ const fetchRentals = async () => {
     loading.value = true
     const response = await api.getRentals()
     if (response.success) {
+      console.log('获取到的租赁数据:', response.rentals)  // 调试用
       rentals.value = response.rentals.map(rental => ({
         ...rental,
-        user_email: rental.user_info?.email || rental.email || '邮箱未设置'
+        user_email: rental.user_info?.email || rental.email || '邮箱未设置',
       }))
+      console.log('处理后的租赁数据:', rentals.value)  // 调试用
     }
   } catch (error) {
     console.error('获取租赁列表失败:', error)
@@ -60,13 +62,8 @@ const sendRenewalEmail = async (rental) => {
       throw new Error('用户邮箱未设置')
     }
     const response = await api.sendReminderNotification({
-      user_id: rental.user_id,
-      email: rental.user_email,
-      type: 'renewal',
-      data: {
-        expiry_date: rental.end_date,
-        days_remaining: getRemainingDays(rental.end_date)
-      }
+      days_to_expiry: getRemainingDays(rental.end_date),
+      user_id: rental.user_id
     })
     
     if (response.success) {
@@ -94,6 +91,12 @@ const formatStatus = (status) => {
     'pending': '待激活'
   }
   return statusMap[status] || status
+}
+
+// 格式化流量显示
+const formatTraffic = (value) => {
+  if (value === undefined || value === null || isNaN(value)) return '0.00 GB'
+  return `${Number(value).toFixed(2)} GB`
 }
 
 onMounted(fetchRentals)
@@ -152,8 +155,8 @@ onMounted(fetchRentals)
                     {{ formatStatus(rental.status) }}
                   </span>
                 </td>
-                <td class="px-4 py-3">
-                  {{ rental.total_traffic }}GB
+                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
+                  {{ rental.traffic_usage }}/{{ rental.traffic_limit }}GB
                 </td>
                 <td class="px-4 py-3">
                   <BaseButton
@@ -217,8 +220,8 @@ onMounted(fetchRentals)
                     {{ formatStatus(rental.status) }}
                   </span>
                 </td>
-                <td class="px-4 py-3">
-                  {{ rental.total_traffic }}GB
+                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
+                  {{ rental.traffic_usage }}/{{ rental.traffic_limit }}GB
                 </td>
                 <td class="px-4 py-3">
                   <BaseButton
