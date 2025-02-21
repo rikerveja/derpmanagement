@@ -20,7 +20,8 @@ const routes = [
     name: 'dashboard',
     component: DashboardView,
     meta: {
-      requiresAuth: true
+      requiresAuth: true,
+      roles: ['admin', 'user', 'super_admin', 'distributor']
     }
   },
   {
@@ -67,6 +68,7 @@ const routes = [
         component: () => import('@/views/users/UserListView.vue'),
         meta: { 
           requiresAuth: true,
+          roles: ['admin', 'super_admin'],
           layout: 'authenticated'
         }
       },
@@ -203,6 +205,15 @@ const routes = [
         }
       }
     ]
+  },
+  {
+    path: '/rental/expiry',
+    name: 'rental-expiry',
+    component: () => import('@/views/rental/RentalExpiryView.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['admin', 'super_admin']
+    }
   }
 ]
 
@@ -214,10 +225,23 @@ const router = createRouter({
 // 添加路由守卫
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
+  const user = JSON.parse(localStorage.getItem('user'))
   
-  if (to.meta.requiresAuth && !token) {
-    // 需要认证但没有 token，重定向到登录页
-    next('/login')
+  if (to.meta.requiresAuth) {
+    if (!token) {
+      // 没有 token，重定向到登录页
+      next('/login')
+      return
+    }
+    
+    // 检查角色权限
+    if (to.meta.roles && !to.meta.roles.includes(user?.role)) {
+      console.warn('权限不足')
+      next('/dashboard') // 或者跳转到无权限页面
+      return
+    }
+    
+    next()
   } else if (to.path === '/login' && token) {
     // 已登录用户访问登录页，重定向到仪表盘
     next('/dashboard')
