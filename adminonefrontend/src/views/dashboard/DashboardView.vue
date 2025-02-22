@@ -155,6 +155,28 @@ const fetchStats = async () => {
     const response = await axios.get('/api/system/overview')
     console.log('Dashboard data response:', response)
     
+    // 获取租赁数据来计算到期用户
+    const rentalsResponse = await api.getRentals()
+    if (rentalsResponse.success) {
+      const now = new Date()
+      const rentals = rentalsResponse.rentals
+      
+      // 计算5天内到期和5-10天内到期的用户数量
+      const expiringStats = rentals.reduce((acc, rental) => {
+        const daysRemaining = Math.ceil((new Date(rental.end_date) - now) / (1000 * 60 * 60 * 24))
+        if (daysRemaining <= 5 && daysRemaining > 0) {
+          acc.in5days++
+        } else if (daysRemaining > 5 && daysRemaining <= 10) {
+          acc.in10days++
+        }
+        return acc
+      }, { in5days: 0, in10days: 0 })
+      
+      // 更新到期用户统计
+      stats.value.expiring = expiringStats
+      console.log('到期用户统计:', stats.value.expiring)
+    }
+    
     if (response.data && response.data.success) {
       const { data } = response.data
       console.log('Overview data:', data)
@@ -164,12 +186,6 @@ const fetchStats = async () => {
       stats.value.servers = data.servers
       stats.value.users = data.users
       stats.value.rentals = data.rentals
-      // 更新到期用户统计
-      stats.value.expiring = {
-        in5days: data.expiring?.in5days || 0,
-        in10days: data.expiring?.in10days || 0
-      }
-      console.log('到期用户统计:', stats.value.expiring)
     }
   } catch (error) {
     console.error('获取仪表盘数据失败:', error)
