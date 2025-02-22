@@ -228,7 +228,8 @@ const dashboardApi = {
 
   // 获取告警信息
   getAlerts() {
-    return api.get('/alerts')
+    return api.get('/alerts/all')
+      .then(response => response.data)
   },
 
   // 获取租赁信息
@@ -470,31 +471,40 @@ export default {
 
   // 告警相关 API
   getAlerts() {
-    return api.get('/alerts')
+    return api.get('/alerts/all')
+      .then(response => response.data)
   },
   
-  addAlert(alertData) {
-    return api.post('/alerts/add', alertData)
+  getRealtimeAlerts() {
+    return api.get('/alerts/realtime')
+      .then(response => response.data)
   },
   
-  checkMonthlyTraffic(month) {
-    return api.post('/alerts/traffic', { month })
-  },
-  
-  checkServerHealthStatus(serverId) {
-    return api.post('/alerts/server_health', { server_id: serverId })
-  },
-  
-  checkDockerTraffic(containerId) {
-    return api.post('/alerts/docker_traffic', { container_id: containerId })
-  },
-  
-  checkDockerContainer(containerId) {
-    return api.post('/alerts/docker_container', { container_id: containerId })
+  addAlert(data) {
+    return api.post('/alerts/add', data)
+      .then(response => response.data)
   },
   
   deleteAlert(id) {
     return api.delete(`/alerts/delete/${id}`)
+      .then(response => response.data)
+  },
+  
+  checkServerHealth(serverId) {
+    return api.post('/alerts/server_health', { server_id: serverId })
+      .then(response => response.data)
+  },
+  
+  checkDockerStatus(containerId) {
+    return api.post('/alerts/docker_container', { container_id: containerId })
+      .then(response => response.data)
+  },
+  
+  checkTrafficAlert(userId, limit) {
+    return api.post('/alerts/traffic', {
+      user_id: userId,
+      monthly_traffic_limit: limit
+    }).then(response => response.data)
   },
 
   // 序列号相关 API
@@ -628,5 +638,17 @@ export default {
   // 更新个人资料
   updateProfile(data) {
     return api.post('/user/update_info', data)
-  }
+  },
+
+  // 获取告警设置
+  getAlertSettings() {
+    return api.get('/alerts/settings')
+      .then(response => response.data)
+  },
+  
+  // 更新告警设置
+  updateAlertSettings(settings) {
+    return api.post('/alerts/settings/update', settings)
+      .then(response => response.data)
+  },
 } 
