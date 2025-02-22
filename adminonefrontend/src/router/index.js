@@ -214,6 +214,25 @@ const routes = [
       requiresAuth: true,
       roles: ['admin', 'super_admin']
     }
+  },
+  {
+    path: '/alerts',
+    component: () => import('@/views/alerts/AlertLayout.vue'),
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'alerts.list',
+        component: () => import('@/views/alerts/AlertListView.vue'),
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'settings',
+        name: 'alerts.settings',
+        component: () => import('@/views/alerts/AlertSettingsView.vue'),
+        meta: { requiresAuth: true }
+      }
+    ]
   }
 ]
 
