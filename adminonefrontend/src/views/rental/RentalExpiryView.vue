@@ -40,12 +40,10 @@ const fetchRentals = async () => {
     loading.value = true
     const response = await api.getRentals()
     if (response.success) {
-      console.log('获取到的租赁数据:', response.rentals)  // 调试用
       rentals.value = response.rentals.map(rental => ({
         ...rental,
         user_email: rental.user_info?.email || rental.email || '邮箱未设置',
       }))
-      console.log('处理后的租赁数据:', rentals.value)  // 调试用
     }
   } catch (error) {
     console.error('获取租赁列表失败:', error)
@@ -63,15 +61,23 @@ const sendRenewalEmail = async (rental) => {
     }
     const response = await api.sendReminderNotification({
       days_to_expiry: getRemainingDays(rental.end_date),
-      user_id: rental.user_id
+      user_id: rental.user_id,
+      expiry_date: new Date(rental.end_date).toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      }),
+      email: rental.user_email
     })
     
     if (response.success) {
-      alert(`已成功发送续费提醒邮件给用户 ${rental.user_email}`)
+      alert(`已成功发送续费提醒邮件到 ${rental.user_email}，请提醒用户查收`)
     }
   } catch (error) {
     console.error('发送续费提醒邮件失败:', error)
-    alert('发送邮件失败: ' + (error.message || '未知错误'))
+    alert('发送邮件失败: ' + (error.response?.data?.message || error.message || '未知错误'))
   } finally {
     sendingEmail.value = false
   }
