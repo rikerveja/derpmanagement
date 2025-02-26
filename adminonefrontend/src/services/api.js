@@ -557,7 +557,9 @@ export default {
   sendReminderNotification(data) {
     return api.post('/rental/send_expiry_notifications', {
       days_to_expiry: data.days_to_expiry,
-      user_id: data.user_id
+      user_id: data.user_id,
+      expiry_date: data.expiry_date,
+      email: data.email
     })
   },
 
