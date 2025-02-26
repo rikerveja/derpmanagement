@@ -6,6 +6,7 @@ from app import mail
 import os
 import redis
 import traceback
+from datetime import datetime
 
 # 初始化 Redis 连接
 redis_client = redis.StrictRedis(host=os.getenv('REDIS_HOST', 'localhost'), port=6379, db=0)
@@ -30,9 +31,8 @@ def generate_verification_code(length=6, use_letters=False):
         return code
     except Exception as e:
         logger.error(f"Error generating verification code: {e}")
-        logger.error(traceback.format_exc())  # 记录详细的异常信息
+        logger.error(traceback.format_exc())
         return None
-
 
 # 发送邮箱验证码
 def send_verification_email(email, use_letters=False):
@@ -47,8 +47,8 @@ def send_verification_email(email, use_letters=False):
         logger.error("Failed to generate verification code.")
         return False
 
-    # 将验证码存储到 Redis，设置过期时间（默认 5 分钟）
     try:
+        # 将验证码存储到 Redis，设置过期时间（默认 5 分钟）
         redis_client.setex(f"verification_code:{email}", 300, verification_code)
         logger.info(f"Verification code for {email} stored in Redis.")
 
@@ -64,14 +64,10 @@ def send_verification_email(email, use_letters=False):
         mail.send(msg)
         logger.info(f"Verification email sent to {email}")
         return True
-    except redis.RedisError as redis_error:
-        logger.error(f"Error interacting with Redis: {redis_error}")
-        logger.error(traceback.format_exc())  # 记录 Redis 错误信息
     except Exception as e:
         logger.error(f"Error sending verification email to {email}: {e}")
-        logger.error(traceback.format_exc())  # 记录详细的异常信息
-    return False
-
+        logger.error(traceback.format_exc())
+        return False
 
 # 验证邮箱验证码
 def validate_verification_code(email, code):
@@ -93,11 +89,48 @@ def validate_verification_code(email, code):
                 return False
         logger.warning(f"Verification code for {email} has expired or not found.")
         return False
-    except redis.RedisError as redis_error:
-        logger.error(f"Error interacting with Redis: {redis_error}")
-        logger.error(traceback.format_exc())  # 记录 Redis 错误信息
-        return False
     except Exception as e:
         logger.error(f"Error validating verification code for {email}: {e}")
-        logger.error(traceback.format_exc())  # 记录详细的异常信息
+        logger.error(traceback.format_exc())
+        return False
+
+# 发送续费提醒邮件
+def send_expiry_notification(email, days_to_expiry, expiry_date, **kwargs):
+    """
+    发送续费提醒邮件 - 纯通知功能，不需要验证码
+    :param email: 收件邮箱
+    :param days_to_expiry: 剩余天数
+    :param expiry_date: 到期时间
+    """
+    try:
+        subject = "您的服务即将到期"
+        body = f"""
+尊敬的用户：
+
+您好！我们注意到您的服务即将到期，为了确保您的服务不会中断，请及时续费。
+
+- 到期时间：{expiry_date}
+- 剩余天数：{days_to_expiry}天
+
+请登录管理面板或者联系管理员278557855@qq.com完成续费操作。
+如已续费请忽略此提醒。
+
+若有任何问题，请随时联系客服18057153331。
+        """
+
+        msg = Message(
+            subject=subject,
+            sender=os.getenv('MAIL_USERNAME'),
+            recipients=[email]
+        )
+        msg.body = body
+
+        # 直接发送邮件，不涉及验证码和 Redis
+        mail.send(msg)
+        logger.info(f"Expiry notification sent to {email}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Error sending expiry notification to {email}: {e}")
+        logger.error(traceback.format_exc())
         return False
