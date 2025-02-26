@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify 
 from app.models import SerialNumber, UserContainer, UserHistory, Rental, DockerContainer, UserTraffic, Server, User, user_server_association, RenewalRecord
-from app.utils.email_utils import send_verification_email
+from app.utils.email_utils import send_expiry_notification
 from app.utils.logging_utils import log_operation
 from app import db
 from datetime import datetime, timedelta
@@ -394,44 +394,50 @@ def send_expiry_notifications():
     """
     发送即将到期的租赁通知
     """
-    days_to_expiry = request.json.get('days_to_expiry', 7)
     try:
-        expiring_rentals = Rental.query.filter(
-            Rental.status == 'active',
-            Rental.end_date <= datetime.utcnow() + timedelta(days=days_to_expiry)
-        ).all()
+        data = request.json
+        email = data.get('email')
+        days_to_expiry = data.get('days_to_expiry')
+        expiry_date = data.get('expiry_date')
+        user_id = data.get('user_id')
 
-        if not expiring_rentals:
-            log_operation(user_id=None, operation="send_expiry_notification", status="info", details="No rentals expiring soon.")
-        
-        failed_emails = []
-        for rental in expiring_rentals:
-            user_email = rental.user.email
-            notification_type = 'first' if rental.renewal_count == 0 else 'last'
-            email_sent = send_verification_email(user_email, notification_type)  # 根据通知类型发送邮件
+        # 验证必要参数
+        if not all([email, days_to_expiry, expiry_date]):
+            return jsonify({
+                "success": False,
+                "message": "Missing required parameters"
+            }), 400
 
-            if not email_sent:
-                failed_emails.append(user_email)
+        # 直接发送邮件给指定用户
+        email_sent = send_expiry_notification(
+            email=email,
+            days_to_expiry=days_to_expiry,
+            expiry_date=expiry_date
+        )
 
+        if not email_sent:
             log_operation(
-                user_id=rental.user_id,
+                user_id=user_id,
                 operation="send_expiry_notification",
-                status="success",
-                details=f"Expiry notification sent to {user_email}"
+                details=f"Failed to send expiry notification to {email}"
             )
+            return jsonify({"success": False, "message": "Failed to send reminder"}), 500
 
-        if failed_emails:
-            return jsonify({"success": False, "message": f"Failed to send reminders to: {', '.join(failed_emails)}"}), 500
+        log_operation(
+            user_id=user_id,
+            operation="send_expiry_notification",
+            details=f"Expiry notification sent to {email}"
+        )
 
-        return jsonify({"success": True, "message": "Expiry notifications sent successfully"}), 200
+        return jsonify({"success": True, "message": "Expiry notification sent successfully"}), 200
+
     except Exception as e:
         log_operation(
             user_id=None,
             operation="send_expiry_notification",
-            status="failed",
-            details=f"Error sending expiry notifications: {str(e)}"
+            details=f"Error sending expiry notification: {str(e)}"
         )
-        return jsonify({"success": False, "message": f"Error sending notifications: {str(e)}"}), 500
+        return jsonify({"success": False, "message": f"Error sending notification: {str(e)}"}), 500
 
 
 # 检查并处理到期租赁
@@ -441,17 +447,16 @@ def check_expiry():
     检测租赁到期的用户并释放资源
     """
     try:
-        # 查找所有已到期的租赁
         expired_rentals = Rental.query.filter(
             Rental.status == 'active',
             Rental.end_date < datetime.utcnow()
         ).all()
 
         if not expired_rentals:
-            log_operation(user_id=None, operation="rental_expiry", status="info", details="No expired rentals found.")
-        
+            log_operation(user_id=None, operation="rental_expiry", details="No expired rentals found.")
+            return jsonify({"success": True, "message": "No expired rentals"}), 200
+
         for rental in expired_rentals:
-            # 标记为到期
             rental.status = 'expired'
 
             # 删除用户的容器
@@ -472,7 +477,6 @@ def check_expiry():
             log_operation(
                 user_id=rental.user_id,
                 operation="rental_expiry",
-                status="success",
                 details=f"Rental expired for user {rental.user_id} and resources released"
             )
 
@@ -483,7 +487,6 @@ def check_expiry():
         log_operation(
             user_id=None,
             operation="rental_expiry",
-            status="failed",
             details=f"Error processing expired rentals: {str(e)}"
         )
         return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
