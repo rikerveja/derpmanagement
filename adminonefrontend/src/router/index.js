@@ -31,7 +31,9 @@ const routes = [
   },
   {
     path: '/',
-    redirect: '/login'
+    redirect: to => {
+      return { path: '/login' }
+    }
   },
   {
     path: '/servers/list',
@@ -241,29 +243,33 @@ const router = createRouter({
   routes
 })
 
-// 添加路由守卫
+// 修改路由守卫
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
   const user = JSON.parse(localStorage.getItem('user'))
   
+  // 处理根路径
+  if (to.path === '/adminonefrontend/') {
+    next('/adminonefrontend/login')
+    return
+  }
+
   if (to.meta.requiresAuth) {
     if (!token) {
-      // 没有 token，重定向到登录页
-      next('/login')
+      next('/adminonefrontend/login')
       return
     }
     
     // 检查角色权限
     if (to.meta.roles && !to.meta.roles.includes(user?.role)) {
       console.warn('权限不足')
-      next('/dashboard') // 或者跳转到无权限页面
+      next('/adminonefrontend/dashboard')
       return
     }
     
     next()
-  } else if (to.path === '/login' && token) {
-    // 已登录用户访问登录页，重定向到仪表盘
-    next('/dashboard')
+  } else if (to.path === '/adminonefrontend/login' && token) {
+    next('/adminonefrontend/dashboard')
   } else {
     next()
   }
