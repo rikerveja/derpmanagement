@@ -95,15 +95,12 @@ def validate_verification_code(email, code):
         return False
 
 # 发送续费提醒邮件
-def send_expiry_notification(email, days_to_expiry, expiry_date, **kwargs):
+def send_expiry_notification(email, days_to_expiry, expiry_date):
     """
     发送续费提醒邮件 - 纯通知功能，不需要验证码
-    :param email: 收件邮箱
-    :param days_to_expiry: 剩余天数
-    :param expiry_date: 到期时间
     """
     try:
-        subject = "您的服务即将到期"
+        subject = "【重要】您的服务即将到期"  # 更醒目的主题
         body = f"""
 尊敬的用户：
 
@@ -111,11 +108,20 @@ def send_expiry_notification(email, days_to_expiry, expiry_date, **kwargs):
 
 - 到期时间：{expiry_date}
 - 剩余天数：{days_to_expiry}天
++ 续费方式：
++ 1. 登录管理面板直接续费
++ 2. 联系管理员：278557855@qq.com
++ 3. 联系客服：18057153331
 
-请登录管理面板或者联系管理员278557855@qq.com完成续费操作。
-如已续费请忽略此提醒。
+- 请登录管理面板或者联系管理员278557855@qq.com完成续费操作。
+- 如已续费请忽略此提醒。
++ 温馨提示：
++ - 如您已完成续费，请忽略此提醒
++ - 为避免服务中断，建议提前3天续费
++ - 如有任何问题，请及时联系我们
 
-若有任何问题，请随时联系客服18057153331。
+- 若有任何问题，请随时联系客服18057153331。
++ 祝您使用愉快！
         """
 
         msg = Message(
@@ -125,12 +131,10 @@ def send_expiry_notification(email, days_to_expiry, expiry_date, **kwargs):
         )
         msg.body = body
 
-        # 直接发送邮件，不涉及验证码和 Redis
         mail.send(msg)
         logger.info(f"Expiry notification sent to {email}")
         return True
 
     except Exception as e:
         logger.error(f"Error sending expiry notification to {email}: {e}")
-        logger.error(traceback.format_exc())
         return False
