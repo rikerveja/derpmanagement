@@ -12,31 +12,33 @@ const settings = ref({
   dockerHealthCheck: true,
   trafficAlert: true,
   emailNotification: true,
-  checkInterval: 5
+  checkInterval: 5,
+  thresholds: {
+    traffic: 90,
+    cpu: 80,
+    memory: 80,
+    disk: 85
+  }
 })
 
 // 加载设置
 const loadSettings = async () => {
   try {
     const response = await api.getAlertSettings()
-    if (response.success) {
-      settings.value = response.settings
-    }
+    settings.value = response.settings
   } catch (error) {
     console.error('加载告警设置失败:', error)
-    alert('加载告警设置失败')
+    alert(error.message || '加载告警设置失败')
   }
 }
 
 const saveSettings = async () => {
   try {
     const response = await api.updateAlertSettings(settings.value)
-    if (response.success) {
-      alert('设置保存成功')
-    }
+    alert('告警设置已成功保存')
   } catch (error) {
     console.error('保存设置失败:', error)
-    alert('保存设置失败')
+    alert(error.message || '保存设置失败')
   }
 }
 
@@ -115,6 +117,52 @@ onMounted(() => {
             min="1"
             max="60"
           >
+        </div>
+
+        <div class="mt-8">
+          <h3 class="text-lg font-medium mb-4">告警阈值设置</h3>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="form-group">
+              <label>流量使用阈值 (%)</label>
+              <input 
+                type="number" 
+                v-model="settings.thresholds.traffic"
+                class="form-input w-full px-3 py-2 border rounded"
+                min="0"
+                max="100"
+              >
+            </div>
+            <div class="form-group">
+              <label>CPU使用率阈值 (%)</label>
+              <input 
+                type="number" 
+                v-model="settings.thresholds.cpu"
+                class="form-input w-full px-3 py-2 border rounded"
+                min="0"
+                max="100"
+              >
+            </div>
+            <div class="form-group">
+              <label>内存使用率阈值 (%)</label>
+              <input 
+                type="number" 
+                v-model="settings.thresholds.memory"
+                class="form-input w-full px-3 py-2 border rounded"
+                min="0"
+                max="100"
+              >
+            </div>
+            <div class="form-group">
+              <label>磁盘使用率阈值 (%)</label>
+              <input 
+                type="number" 
+                v-model="settings.thresholds.disk"
+                class="form-input w-full px-3 py-2 border rounded"
+                min="0"
+                max="100"
+              >
+            </div>
+          </div>
         </div>
       </div>
     </CardBox>
