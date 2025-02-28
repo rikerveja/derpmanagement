@@ -419,6 +419,7 @@ def send_expiry_notifications():
             log_operation(
                 user_id=user_id,
                 operation="send_expiry_notification",
+                status="failed",
                 details=f"Failed to send expiry notification to {email}"
             )
             return jsonify({"success": False, "message": "Failed to send reminder"}), 500
@@ -426,6 +427,7 @@ def send_expiry_notifications():
         log_operation(
             user_id=user_id,
             operation="send_expiry_notification",
+            status="success",
             details=f"Expiry notification sent to {email}"
         )
 
@@ -435,6 +437,7 @@ def send_expiry_notifications():
         log_operation(
             user_id=None,
             operation="send_expiry_notification",
+            status="failed",
             details=f"Error sending expiry notification: {str(e)}"
         )
         return jsonify({"success": False, "message": f"Error sending notification: {str(e)}"}), 500
