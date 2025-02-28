@@ -4,10 +4,6 @@ import { computed } from 'vue'
 const props = defineProps({
   username: {
     type: String,
-    required: true
-  },
-  avatar: {
-    type: String,
     default: null
   },
   api: {
@@ -16,25 +12,32 @@ const props = defineProps({
   }
 })
 
-const avatar = computed(
-  () =>
-    props.avatar ??
-    `https://api.dicebear.com/7.x/${props.api}/svg?seed=${props.username.replace(
+// 生成统一的头像 URL
+const avatarUrl = computed(() => {
+  // 如果用户名存在，则生成头像
+  if (props.username) {
+    return `https://api.dicebear.com/7.x/${props.api}/svg?seed=${props.username.replace(
       /[^a-z0-9]+/gi,
       '-'
     )}.svg`
-)
-
-const username = computed(() => props.username)
+  }
+  // 如果没有用户名，返回默认头像
+  return `https://api.dicebear.com/7.x/${props.api}/svg?seed=default`
+})
 </script>
 
 <template>
-  <div>
-    <img
-      :src="avatar"
+  <div class="relative inline-block">
+    <img 
+      :src="avatarUrl" 
       :alt="username"
-      class="rounded-full block h-auto w-full max-w-full bg-gray-100 dark:bg-slate-800"
+      class="rounded-full w-full h-full object-cover bg-gray-100 dark:bg-gray-800"
     />
-    <slot />
   </div>
 </template>
+
+<style scoped>
+.relative {
+  aspect-ratio: 1;
+}
+</style>

@@ -1,58 +1,64 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useMainStore } from '@/stores/main'
-import { mdiCheckDecagram } from '@mdi/js'
+import { useAuthStore } from '@/stores/auth'
 import BaseLevel from '@/components/BaseLevel.vue'
-import UserAvatarCurrentUser from '@/components/UserAvatarCurrentUser.vue'
+import BaseButtons from '@/components/BaseButtons.vue'
+import BaseButton from '@/components/BaseButton.vue'
+import UserAvatar from '@/components/UserAvatar.vue'
 import CardBox from '@/components/CardBox.vue'
-import FormCheckRadio from '@/components/FormCheckRadio.vue'
-import PillTag from '@/components/PillTag.vue'
+import { mdiCheck, mdiAccount } from '@mdi/js'
 
 const mainStore = useMainStore()
+const authStore = useAuthStore()
+const user = computed(() => authStore.user)
 
-const userName = computed(() => mainStore.userName)
+// 格式化日期时间
+const formatDateTime = (dateStr) => {
+  if (!dateStr) return '未登录'
+  const date = new Date(dateStr)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
+}
 
-const lastLogin = computed(() => {
-  const lastLoginTime = localStorage.getItem('last_login')
-  if (!lastLoginTime) return '未登录'
-  
-  // 计算距离上次登录的时间
-  const lastLoginDate = new Date(lastLoginTime)
-  const now = new Date()
-  const diff = Math.floor((now - lastLoginDate) / 1000 / 60) // 转换为分钟
-  
-  if (diff < 1) return '刚刚'
-  if (diff < 60) return `${diff}分钟前`
-  if (diff < 1440) return `${Math.floor(diff / 60)}小时前`
-  return lastLoginDate.toLocaleString()
-})
-
-const lastLoginIp = computed(() => localStorage.getItem('last_login_ip') || '未知')
-
-const userSwitchVal = ref(false)
+// 获取登录位置（如果后端没有提供，可以先写"本地登录"）
+const getLoginLocation = () => {
+  return '本地登录'
+}
 </script>
 
 <template>
   <CardBox>
-    <BaseLevel type="justify-around lg:justify-center">
-      <UserAvatarCurrentUser class="lg:mx-12" />
-      <div class="space-y-3 text-center md:text-left lg:mx-12">
-        <div class="flex justify-center md:block">
-          <FormCheckRadio
-            v-model="userSwitchVal"
-            name="notifications-switch"
-            type="switch"
-            label="通知"
-            :input-value="true"
+    <BaseLevel>
+      <div class="flex items-center justify-start">
+        <UserAvatar 
+          class="w-12 h-12 md:w-16 md:h-16" 
+          :username="user?.username"
+        />
+        <div class="ml-4">
+          <h4 class="text-xl font-semibold">{{ user?.username }}</h4>
+          <p class="text-gray-500">{{ user?.email }}</p>
+          <div class="text-sm text-gray-500 mt-1">
+            <div>最近登录时间: {{ formatDateTime(user?.last_login) }}</div>
+            <div>来自: {{ getLoginLocation() }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="flex">
+        <BaseButtons>
+          <BaseButton
+            :icon="mdiCheck"
+            :label="user?.is_verified ? '已验证' : '未验证'"
+            :color="user?.is_verified ? 'success' : 'warning'"
+            small
           />
-        </div>
-        <h1 class="text-2xl">
-          你好, <b>{{ userName }}</b>!
-        </h1>
-        <p>最近登录时间 <b>{{ lastLogin }}</b> 来自 <b>{{ lastLoginIp }}</b></p>
-        <div class="flex justify-center md:block">
-          <PillTag label="已验证" color="info" :icon="mdiCheckDecagram" />
-        </div>
+        </BaseButtons>
       </div>
     </BaseLevel>
   </CardBox>
