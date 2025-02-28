@@ -44,7 +44,7 @@ api.interceptors.response.use(
   error => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token')
-      window.location.href = '/#/login'
+      window.location.href = '/adminonefrontend/login'
     }
     return Promise.reject(error)
   }
@@ -644,13 +644,21 @@ export default {
 
   // 获取告警设置
   getAlertSettings() {
-    return api.get('/alerts/settings')
-      .then(response => response.data)
+    return api.get('/alerts/settings').then(response => {
+      if (response.success === false) {
+        throw new Error(response.message || '获取设置失败')
+      }
+      return response
+    })
   },
   
   // 更新告警设置
   updateAlertSettings(settings) {
-    return api.post('/alerts/settings/update', settings)
-      .then(response => response.data)
+    return api.post('/alerts/settings', settings).then(response => {
+      if (response.success === false) {
+        throw new Error(response.message || '保存设置失败')
+      }
+      return response
+    })
   },
 } 
