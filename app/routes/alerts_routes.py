@@ -7,12 +7,15 @@ from app.utils.notifications_utils import send_notification_email
 from app.utils.docker_utils import check_docker_health, get_docker_traffic
 from app.utils.monitoring_utils import check_server_health
 from flask_jwt_extended import jwt_required, get_jwt_identity
+import redis
+import json
+import os
 
 # 定义蓝图
-alerts_bp = Blueprint('alerts', __name__)
+alerts_bp = Blueprint('alerts', __name__, url_prefix='/api')
 
 # 实时告警
-@alerts_bp.route('/api/alerts/realtime', methods=['GET'])
+@alerts_bp.route('/alerts/realtime', methods=['GET'])
 @jwt_required()  # 需要身份验证
 def get_realtime_alerts():
     """
@@ -38,7 +41,7 @@ def get_realtime_alerts():
 
 
 # 添加告警
-@alerts_bp.route('/api/alerts/add', methods=['POST'])
+@alerts_bp.route('/alerts/add', methods=['POST'])
 @jwt_required()  # 需要身份验证
 def add_alert():
     """
@@ -83,7 +86,7 @@ def add_alert():
 
 
 # 增加月度流量不足告警
-@alerts_bp.route('/api/alerts/traffic', methods=['POST'])
+@alerts_bp.route('/alerts/traffic', methods=['POST'])
 def check_monthly_traffic():
     """
     检查用户是否月度流量不足，并触发告警
@@ -121,7 +124,7 @@ def check_monthly_traffic():
 
 
 # 服务器健康状况告警
-@alerts_bp.route('/api/alerts/server_health', methods=['POST'])
+@alerts_bp.route('/alerts/server_health', methods=['POST'])
 def check_server_health_status():
     """
     检查服务器健康状态并触发告警
@@ -159,7 +162,7 @@ def check_server_health_status():
 
 
 # Docker 流量获取异常告警
-@alerts_bp.route('/api/alerts/docker_traffic', methods=['POST'])
+@alerts_bp.route('/alerts/docker_traffic', methods=['POST'])
 def check_docker_traffic_health():
     """
     检查 Docker 容器流量获取是否正常，并触发告警
@@ -193,7 +196,7 @@ def check_docker_traffic_health():
 
 
 # Docker 容器异常告警
-@alerts_bp.route('/api/alerts/docker_container', methods=['POST'])
+@alerts_bp.route('/alerts/docker_container', methods=['POST'])
 def check_docker_container_status():
     """
     检查 Docker 容器的状态并触发告警
@@ -227,7 +230,7 @@ def check_docker_container_status():
 
 
 # 删除告警
-@alerts_bp.route('/api/alerts/delete/<int:id>', methods=['DELETE'])
+@alerts_bp.route('/alerts/delete/<int:id>', methods=['DELETE'])
 def delete_alert(id):
     """
     删除指定告警
@@ -239,16 +242,16 @@ def delete_alert(id):
     try:
         db.session.delete(alert)
         db.session.commit()
-        log_operation(user_id=None, operation="delete_alert", status="success", details=f"Alert {id} deleted successfully")
+        log_operation(user_id=None, operation="delete_alert", details=f"Alert {id} deleted successfully")
         return jsonify({"success": True, "message": "Alert deleted successfully"}), 200
     except Exception as e:
         db.session.rollback()
-        log_operation(user_id=None, operation="delete_alert", status="failed", details=f"Error deleting alert: {str(e)}")
+        log_operation(user_id=None, operation="delete_alert", details=f"Error deleting alert: {str(e)}")
         return jsonify({"success": False, "message": f"Error deleting alert: {str(e)}"}), 500
 
 
 # 查询所有告警
-@alerts_bp.route('/api/alerts', methods=['GET'])
+@alerts_bp.route('/alerts', methods=['GET'])
 def get_all_alerts():
     """
     查询所有告警
@@ -267,3 +270,92 @@ def get_all_alerts():
     ]
 
     return jsonify({"success": True, "alerts": alert_data}), 200
+
+
+@alerts_bp.route('/alerts/settings', methods=['GET'])
+def get_alert_settings():
+    """获取告警设置"""
+    try:
+        redis_client = redis.StrictRedis(
+            host=os.getenv('REDIS_HOST', 'localhost'),
+            port=6379,
+            db=0
+        )
+        
+        # 从 Redis 获取设置
+        settings_json = redis_client.get('alert_settings')
+        if settings_json:
+            settings = json.loads(settings_json)
+        else:
+            # 默认设置
+            settings = {
+                "serverHealthCheck": True,
+                "dockerHealthCheck": True,
+                "trafficAlert": True,
+                "emailNotification": True,
+                "checkInterval": 5,
+                "thresholds": {
+                    "traffic": 90,
+                    "cpu": 80,
+                    "memory": 80,
+                    "disk": 85
+                }
+            }
+            # 保存默认设置
+            redis_client.set('alert_settings', json.dumps(settings))
+            
+        return jsonify({
+            "success": True,
+            "settings": settings
+        })
+    except Exception as e:
+        print("Error getting settings:", str(e))
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@alerts_bp.route('/alerts/settings', methods=['POST'])
+def update_alert_settings():
+    """更新告警设置"""
+    try:
+        data = request.json
+        if not data:
+            return jsonify({
+                "success": False,
+                "message": "未接收到设置数据"
+            }), 400
+
+        print("Received settings data:", data)  # 调试日志
+        
+        redis_client = redis.StrictRedis(
+            host=os.getenv('REDIS_HOST', 'localhost'),
+            port=6379,
+            db=0
+        )
+        
+        # 验证数据格式
+        required_fields = ['serverHealthCheck', 'dockerHealthCheck', 'trafficAlert', 
+                          'emailNotification', 'checkInterval', 'thresholds']
+        if not all(field in data for field in required_fields):
+            return jsonify({
+                "success": False,
+                "message": "设置数据格式不正确"
+            }), 400
+        
+        # 保存设置到 Redis
+        redis_client.set('alert_settings', json.dumps(data))
+        
+        return jsonify({
+            "success": True,
+            "message": "设置已更新"
+        })
+    except redis.RedisError as e:
+        print(f"Redis error: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": "保存设置失败：数据库错误"
+        }), 500
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": f"保存设置失败：{str(e)}"
+        }), 500
