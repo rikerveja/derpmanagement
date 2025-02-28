@@ -10,6 +10,8 @@ import logging
 from logging.handlers import RotatingFileHandler
 from dotenv import load_dotenv
 import os
+from flask_jwt_extended import JWTManager
+from flask import Blueprint
 
 # 加载环境变量
 load_dotenv()
@@ -50,6 +52,11 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
     
+    # JWT配置
+    app.config['JWT_TOKEN_LOCATION'] = ['headers']
+    app.config['JWT_HEADER_NAME'] = 'Authorization'
+    app.config['JWT_HEADER_TYPE'] = 'Bearer'
+    
     # 设置日志
     setup_logging(app)
 
@@ -62,6 +69,7 @@ def create_app(config_class=Config):
         db.init_app(app)
         mail.init_app(app)
         migrate.init_app(app, db)
+        jwt = JWTManager(app)
 
         # 初始化 Celery
         global celery
@@ -105,7 +113,7 @@ def create_app(config_class=Config):
     app.register_blueprint(notifications_bp, url_prefix='')
     app.register_blueprint(admin_bp, url_prefix='')  # 管理员模块
     app.register_blueprint(traffic_bp, url_prefix='')  # 流量模块
-    app.register_blueprint(alerts_bp, url_prefix='')  # 告警模块
+    app.register_blueprint(alerts_bp)  # 告警模块，不设置 url_prefix，因为在蓝图定义时已设置
     app.register_blueprint(monitoring_bp, url_prefix='')  # 新增：监控模块
     app.register_blueprint(serial_bp, url_prefix='')  # 新增：序列号管理模块
     app.register_blueprint(security_bp, url_prefix='')  # 新增：安全与设备绑定模块
