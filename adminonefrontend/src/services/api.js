@@ -323,9 +323,145 @@ const saveTrafficData = async (data) => {
   }
 }
 
+export const alarmRuleApi = {
+  // 获取告警规则列表
+  getRules: async (category = '') => {
+    const url = category ? `/alerts/rules?category=${category}` : '/alerts/rules';
+    return await api.get(url);
+  },
+
+  // 创建新的告警规则
+  createRule: async (ruleData) => {
+    return await api.post('/alerts/rules', ruleData);
+  },
+
+  // 更新告警规则
+  updateRule: async (ruleId, ruleData) => {
+    return await api.put(`/alerts/rules/${ruleId}`, ruleData);
+  },
+
+  // 删除告警规则
+  deleteRule: async (ruleId) => {
+    return await api.delete(`/alerts/rules/${ruleId}`);
+  }
+};
+
+// 修改原有的告警相关 API
+const alertApi = {
+  // 获取告警列表
+  getAlerts: () => {
+    return api.get('/alerts')
+  },
+
+  // 获取实时告警
+  getRealtimeAlerts: () => {
+    return api.get('/alerts/realtime')
+  },
+
+  // 删除告警
+  deleteAlert: (alertId) => {
+    return api.delete(`/alerts/${alertId}`)
+  },
+
+  // 更新告警状态
+  updateAlertStatus: (alertId, status, resolution_note = '') => {
+    return api.put(`/alerts/${alertId}/status`, {
+      status,
+      resolution_note
+    })
+  },
+
+  // 更新告警优先级
+  updateAlertSeverity: (alertId, severity, reason = '') => {
+    return api.put(`/alerts/${alertId}/severity`, {
+      severity,
+      reason
+    })
+  },
+
+  // 创建告警
+  createAlert: (data) => {
+    const alertData = {
+      ...data,
+      timestamp: new Date().toISOString(),
+      status: 'pending',  // 添加默认状态
+      severity: data.severity || 'medium'  // 添加默认严重程度
+    }
+    console.log('Creating alert with data:', alertData)  // 添加日志
+    return api.post('/alerts/add', alertData)  // 修正路径
+  },
+
+  // 获取告警设置
+  getAlertSettings: () => {
+    return api.get('/alerts/settings')
+  },
+
+  // 更新告警设置
+  updateAlertSettings: (settings) => {
+    return api.post('/alerts/settings', settings)
+  },
+
+  // 检查服务器健康状态
+  checkServerHealth: (serverId) => {
+    return api.post('/alerts/server_health', { server_id: serverId })
+  },
+
+  // 检查Docker容器状态
+  checkDockerStatus: (containerId) => {
+    return api.post('/alerts/docker_container', { container_id: containerId })
+  },
+
+  // 检查流量告警
+  checkTrafficAlert: (userId, limit) => {
+    return api.post('/alerts/traffic', {
+      user_id: userId,
+      monthly_traffic_limit: limit
+    })
+  }
+};
+
+// 告警设置相关 API
+const getAlertSettings = () => {
+  return api.get('/alerts/settings')
+}
+
+const updateAlertSettings = (data) => {
+  return api.post('/alerts/settings', data)
+}
+
+// 容器相关 API
+const containerApi = {
+  // 获取所有容器
+  getContainers() {
+    return api.get('/containers').then(response => response.data || [])
+  },
+  
+  // 创建容器
+  createContainer(data) {
+    return api.post('/containers', data)
+  },
+  
+  // 获取容器状态
+  getContainerStatus(containerName) {
+    return api.get(`/containers/${containerName}/status`)
+  },
+  
+  // 停止容器
+  stopContainer(containerName) {
+    return api.post(`/containers/${containerName}/stop`)
+  },
+  
+  // 更新容器
+  updateContainer(containerName, data) {
+    return api.put(`/containers/${containerName}`, data)
+  }
+}
+
 export default {
   ...dashboardApi,
-  trafficApi,  // 直接导出 trafficApi 对象
+  trafficApi,
+  alertApi,
+  containerApi,  // 确保 containerApi 被正确导出
   // 用户相关 API
   login(email, password) {
     return api.post('/login', { email, password })
@@ -388,27 +524,6 @@ export default {
     return api.delete(`/logs/delete/${id}`)
   },
 
-  // 容器相关 API
-  getContainers() {
-    return api.get('/containers')
-  },
-  
-  createContainer(data) {
-    return api.post('/containers', data)
-  },
-  
-  getContainerStatus(containerName) {
-    return api.get(`/containers/${containerName}/status`)
-  },
-  
-  stopContainer(containerName) {
-    return api.post(`/containers/${containerName}/stop`)
-  },
-  
-  updateContainer(containerName, data) {
-    return api.put(`/containers/${containerName}`, data)
-  },
-
   // ACL 相关 API
   generateAcl,
   getAclLogs,
@@ -467,44 +582,6 @@ export default {
   
   deleteRental(serialId) {
     return api.delete(`/rental/delete/${serialId}`)
-  },
-
-  // 告警相关 API
-  getAlerts() {
-    return api.get('/alerts/all')
-      .then(response => response.data)
-  },
-  
-  getRealtimeAlerts() {
-    return api.get('/alerts/realtime')
-      .then(response => response.data)
-  },
-  
-  addAlert(data) {
-    return api.post('/alerts/add', data)
-      .then(response => response.data)
-  },
-  
-  deleteAlert(id) {
-    return api.delete(`/alerts/delete/${id}`)
-      .then(response => response.data)
-  },
-  
-  checkServerHealth(serverId) {
-    return api.post('/alerts/server_health', { server_id: serverId })
-      .then(response => response.data)
-  },
-  
-  checkDockerStatus(containerId) {
-    return api.post('/alerts/docker_container', { container_id: containerId })
-      .then(response => response.data)
-  },
-  
-  checkTrafficAlert(userId, limit) {
-    return api.post('/alerts/traffic', {
-      user_id: userId,
-      monthly_traffic_limit: limit
-    }).then(response => response.data)
   },
 
   // 序列号相关 API
@@ -643,22 +720,8 @@ export default {
   },
 
   // 获取告警设置
-  getAlertSettings() {
-    return api.get('/alerts/settings').then(response => {
-      if (response.success === false) {
-        throw new Error(response.message || '获取设置失败')
-      }
-      return response
-    })
-  },
+  getAlertSettings,
   
   // 更新告警设置
-  updateAlertSettings(settings) {
-    return api.post('/alerts/settings', settings).then(response => {
-      if (response.success === false) {
-        throw new Error(response.message || '保存设置失败')
-      }
-      return response
-    })
-  },
+  updateAlertSettings,
 } 
