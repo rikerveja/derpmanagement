@@ -1,4 +1,5 @@
 import { fileURLToPath, URL } from "node:url";
+import path from 'path'
 
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
@@ -9,7 +10,15 @@ export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@": path.resolve(__dirname, 'src'),
+      'ant-design-vue': path.resolve(__dirname, 'node_modules/ant-design-vue'),
+    },
+  },
+  css: {
+    preprocessorOptions: {
+      less: {
+        javascriptEnabled: true,
+      },
     },
   },
   server: {
@@ -25,6 +34,12 @@ export default defineConfig({
       rewrites: [
         { from: /^\/adminonefrontend\/.*$/, to: '/adminonefrontend/index.html' }
       ]
-    }
+    },
+    allowedHosts: [
+      'localhost',
+      'hcss',
+      '.local',
+      '.localhost'
+    ]
   }
 });
