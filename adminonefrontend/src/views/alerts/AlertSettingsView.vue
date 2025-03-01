@@ -25,20 +25,77 @@ const settings = ref({
 const loadSettings = async () => {
   try {
     const response = await api.getAlertSettings()
-    settings.value = response.settings
+    console.log('获取到的设置数据:', response)
+    
+    if (!response.success) {
+      throw new Error(response.message || '加载设置失败')
+    }
+    
+    const data = response.settings || {}
+    
+    // 转换数据格式
+    settings.value = {
+      serverHealthCheck: data.serverHealthCheck ?? true,
+      dockerHealthCheck: data.dockerHealthCheck ?? true,
+      trafficAlert: data.trafficAlert ?? true,
+      emailNotification: data.emailNotification ?? true,
+      checkInterval: data.checkInterval ?? 5,
+      thresholds: {
+        traffic: data.thresholds?.traffic ?? 90,
+        cpu: data.thresholds?.cpu ?? 80,
+        memory: data.thresholds?.memory ?? 80,
+        disk: data.thresholds?.disk ?? 85
+      }
+    }
+    
+    console.log('转换后的设置数据:', settings.value)
   } catch (error) {
     console.error('加载告警设置失败:', error)
-    alert(error.message || '加载告警设置失败')
+    if (error.response?.data) {
+      console.error('错误详情:', error.response.data)
+      alert('加载设置失败: ' + (error.response.data.message || '数据格式不正确'))
+    } else {
+      alert('加载设置失败: ' + error.message)
+    }
   }
 }
 
 const saveSettings = async () => {
   try {
-    const response = await api.updateAlertSettings(settings.value)
-    alert('告警设置已成功保存')
+    // 构造与后端匹配的数据格式
+    const requestData = {
+      serverHealthCheck: settings.value.serverHealthCheck,
+      dockerHealthCheck: settings.value.dockerHealthCheck,
+      trafficAlert: settings.value.trafficAlert,
+      emailNotification: settings.value.emailNotification,
+      checkInterval: parseInt(settings.value.checkInterval),
+      thresholds: {
+        traffic: parseInt(settings.value.thresholds.traffic),
+        cpu: parseInt(settings.value.thresholds.cpu),
+        memory: parseInt(settings.value.thresholds.memory),
+        disk: parseInt(settings.value.thresholds.disk)
+      }
+    }
+    
+    // 添加调试日志
+    console.log('发送的设置数据:', requestData)
+    
+    const response = await api.updateAlertSettings(requestData)
+    console.log('服务器响应:', response)
+    
+    if (response.success) {
+      alert('告警设置已成功保存')
+    } else {
+      throw new Error(response.message || '保存失败')
+    }
   } catch (error) {
     console.error('保存设置失败:', error)
-    alert(error.message || '保存设置失败')
+    if (error.response?.data) {
+      console.error('错误详情:', error.response.data)
+      alert('设置保存失败: ' + (error.response.data.message || '数据格式不正确'))
+    } else {
+      alert('保存设置失败: ' + error.message)
+    }
   }
 }
 
