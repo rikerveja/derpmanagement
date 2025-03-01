@@ -499,11 +499,23 @@ class AlarmRule(db.Model):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255), nullable=False)
+    category = Column(String(50))  # 规则类别
     alert_condition = Column(String(1024))
     threshold = Column(DECIMAL(10, 2))
+    severity = Column(Enum('low', 'medium', 'high', 'critical', name='rule_severity'), default='medium')
     is_active = Column(Boolean, default=True)
+    description = Column(String(1024))  # 规则描述
+    created_by = Column(Integer, ForeignKey('users.id'))
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    created_by_user = relationship("User", foreign_keys=[created_by])
+
+    __table_args__ = (
+        Index('idx_rule_category', 'category'),
+        Index('idx_rule_severity', 'severity'),
+        Index('idx_rule_active', 'is_active'),
+    )
 
 
 class AlarmLog(db.Model):
@@ -1120,18 +1132,20 @@ class SystemAlert(db.Model):
     __tablename__ = 'system_alerts'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    alert_type = Column(Enum('server', 'container', 'traffic', 'security', name='alert_type'), nullable=False)
-    severity = Column(Enum('low', 'medium', 'high', 'critical', name='alert_severity'), nullable=False)
+    alert_type = Column(Enum('server', 'container', 'traffic', 'security', 'docker', name='alert_type'), nullable=False)
+    severity = Column(Enum('low', 'medium', 'high', 'critical', name='alert_severity'), nullable=False, default='medium')
     target_id = Column(Integer)  # 可以是服务器ID、容器ID等
     target_type = Column(String(50))  # 标识target_id的类型
     message = Column(String(1024), nullable=False)
-    details = Column(JSON, default=dict)
+    details = Column(JSON, default=dict)  # 存储详细信息
     status = Column(Enum('active', 'acknowledged', 'resolved', name='alert_status'), default='active')
+    rule_id = Column(Integer, ForeignKey('alarm_rules.id', ondelete='SET NULL'), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     resolved_at = Column(DateTime)
     resolved_by = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
 
+    rule = relationship("AlarmRule")
     resolved_by_user = relationship("User", foreign_keys=[resolved_by])
 
     __table_args__ = (
@@ -1139,6 +1153,7 @@ class SystemAlert(db.Model):
         Index('idx_alert_severity', 'severity'),
         Index('idx_alert_status', 'status'),
         Index('idx_alert_created', 'created_at'),
+        Index('idx_alert_target', 'target_type', 'target_id'),
     )
 
 
