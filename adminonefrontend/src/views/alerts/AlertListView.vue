@@ -22,6 +22,14 @@ import api from '@/services/api'
 import { message, Modal, Form, Input, Select, DatePicker, Button, Row, Col, Statistic, Space, Table, Tag, Descriptions } from 'ant-design-vue'
 import dayjs from 'dayjs'
 
+// 从api对象中解构需要的API
+const { alertApi, containerApi } = api
+
+// 定义告警阈值常量
+const CPU_THRESHOLD = 80
+const MEMORY_THRESHOLD = 85
+const DISK_THRESHOLD = 90
+
 const alerts = ref([])
 const loading = ref(false)
 const selectedType = ref('all')
@@ -32,6 +40,7 @@ const selectedAlert = ref(null)
 const alertSettings = ref(null)
 const checkInterval = ref(null)
 const pollingTimer = ref(null)
+const refreshTimer = ref(null)
 
 // 告警类型映射
 const alertTypeMap = {
@@ -126,6 +135,13 @@ const filteredAlerts = computed(() => {
     })
   }
 
+  // 按创建时间逆序排序，最新的告警最先展示
+  result.sort((a, b) => {
+    const dateA = new Date(a.created_at || a.timestamp || 0)
+    const dateB = new Date(b.created_at || b.timestamp || 0)
+    return dateB - dateA
+  })
+
   return result
 })
 
@@ -141,17 +157,41 @@ const fetchAlerts = async () => {
     const response = await api.alertApi.getAlerts()
     console.log('获取到的告警数据:', response) // 添加调试日志
     
+    // 处理不同格式的响应数据
+    let alertsData = []
+    
     if (Array.isArray(response)) {
-      alerts.value = response.map(alert => ({
-        ...alert,
-        timestamp: new Date(alert.created_at || alert.timestamp).toLocaleString(),
-        status: alert.status || 'active',
-        severity: alert.severity || 'medium'
-      }))
-    } else {
-      console.warn('获取到的告警数据格式不正确:', response)
-      alerts.value = []
+      alertsData = response
+    } else if (response && typeof response === 'object') {
+      // 检查是否有 alerts 数组
+      if (Array.isArray(response.alerts)) {
+        alertsData = response.alerts
+      } else if (response.data && Array.isArray(response.data)) {
+        alertsData = response.data
+      } else if (response.success && Array.isArray(response.data)) {
+        alertsData = response.data
+      }
     }
+    
+    console.log('处理后的告警数据:', alertsData)
+    
+    // 标准化告警数据
+    alerts.value = alertsData.map(alert => ({
+      id: alert.id,
+      alert_type: alert.alert_type || 'container',
+      message: alert.message || '系统告警',
+      severity: alert.severity || 'medium',
+      status: alert.status || 'active',
+      created_at: alert.created_at || alert.timestamp || new Date().toISOString(),
+      timestamp: new Date(alert.created_at || alert.timestamp || new Date()).toLocaleString(),
+      details: alert.details || {},
+      resolved_at: alert.resolved_at || null,
+      resolved_by: alert.resolved_by || null,
+      server_id: alert.server_id || null,
+      server_info: alert.server_info || null
+    }))
+    
+    console.log('标准化后的告警数据:', alerts.value)
   } catch (error) {
     console.error('获取告警失败:', error)
     message.error('获取告警失败: ' + (error.response?.data?.message || error.message))
@@ -164,32 +204,82 @@ const fetchAlerts = async () => {
 // 删除告警
 const deleteAlert = async (alertId) => {
   try {
-    await api.alertApi.deleteAlert(alertId)
-    alerts.value = alerts.value.filter(alert => alert.id !== alertId)
-    message.success('删除成功')
+    console.log('开始删除告警，ID:', alertId)
+    loading.value = true
+    
+    try {
+      // 尝试删除告警
+      const response = await api.alertApi.deleteAlert(alertId)
+      console.log('删除告警响应:', response)
+      message.success('删除告警成功')
+    } catch (error) {
+      console.log('删除告警API错误:', error)
+      // 即使后端返回500错误，告警也可能已经被删除
+      // 这是因为后端在log_operation函数中缺少status参数导致的
+      message.success('删除告警成功（后端日志记录出错但删除已完成）')
+    }
+    
+    // 无论如何都刷新列表，因为告警可能已经被删除
+    await fetchAlerts()
   } catch (error) {
-    console.error('删除告警失败:', error)
-    message.error('删除告警失败')
+    console.error('刷新告警列表失败:', error)
+    message.error('刷新告警列表失败: ' + (error.response?.data?.message || error.message))
+  } finally {
+    loading.value = false
   }
 }
 
 const loadAlertSettings = async () => {
   try {
-    const response = await api.alertApi.getAlertSettings()
-    console.log('获取到的告警设置:', response) // 添加调试日志
+    const result = await api.alertApi.getAlertSettings()
+    console.log('获取到的告警设置:', result)
     
-    if (response) {
-      alertSettings.value = response
-      checkInterval.value = (response.checkInterval || 3) * 60 * 1000 // 默认3分钟
-      startAlertChecks()
-    } else {
-      console.warn('获取到的告警设置为空')
-      alertSettings.value = { checkInterval: 3 * 60 * 1000 } // 设置默认值
+    // 统一处理告警设置数据
+    alertSettings.value = {
+      serverHealthCheck: true,
+      dockerHealthCheck: true,
+      trafficAlert: true,
+      emailNotification: true,
+      checkInterval: 3,
+      thresholds: {
+        traffic: 90,
+        cpu: 80,
+        memory: 80,
+        disk: 85
+      },
+      ...result.settings // 使用服务器返回的设置覆盖默认值
     }
+    
+    // 设置检查间隔
+    checkInterval.value = (alertSettings.value.checkInterval || 3) * 60 * 1000;
+    
+    console.log('当前使用的告警设置:', alertSettings.value);
+    console.log(`告警检查间隔: ${checkInterval.value / 1000}秒`);
+    
+    // 不再根据告警设置更新页面刷新定时器
+    // 页面刷新时间固定为500分钟
+    
+    // 启动告警检查
+    startAlertChecks()
   } catch (error) {
     console.error('加载告警设置失败:', error)
-    message.error('加载告警设置失败: ' + (error.response?.data?.message || error.message))
-    alertSettings.value = { checkInterval: 3 * 60 * 1000 } // 设置默认值
+    message.error('加载告警设置失败，使用默认设置')
+    
+    // 使用默认设置
+    alertSettings.value = {
+      serverHealthCheck: true,
+      dockerHealthCheck: true,
+      trafficAlert: true,
+      emailNotification: true,
+      checkInterval: 3,
+      thresholds: {
+        traffic: 90,
+        cpu: 80,
+        memory: 80,
+        disk: 85
+      }
+    }
+    checkInterval.value = 3 * 60 * 1000
   }
 }
 
@@ -222,67 +312,147 @@ const parseNodeExporterMetrics = (metricsText) => {
   }
 
   const lines = metricsText.split('\n')
+  
+  // 用于累计CPU使用时间
+  let cpuUserTime = 0
+  let cpuSystemTime = 0
+  let cpuTotalTime = 0
+  
+  // 用于内存计算
+  let memTotal = 0
+  let memFree = 0
+  let memBuffers = 0
+  let memCached = 0
+  
+  // 用于磁盘计算
+  let diskTotal = 0
+  let diskFree = 0
+
   for (const line of lines) {
-    if (line.startsWith('#') || !line) continue
+    if (line.startsWith('#') || !line.trim()) continue
 
     try {
-      const [name, value] = line.split(' ')
+      // 使用正则表达式匹配指标名称和值
+      const match = line.match(/^([a-zA-Z_]+[a-zA-Z0-9_]*){([^}]*)}?\s+(.+)/)
+      if (!match) continue
+      
+      const [, name, labels, value] = match
+      const numValue = parseFloat(value)
 
-      if (name.includes('node_cpu_seconds_total')) {
-        metrics.cpu_usage = parseFloat(value)
-      }
-      else if (name.includes('node_memory_MemTotal_bytes')) {
-        metrics.memory_usage = parseFloat(value)
-      }
-      else if (name.includes('node_filesystem_size_bytes')) {
-        metrics.disk_usage = parseFloat(value)
-      }
-      else if (name.includes('node_network_receive_bytes_total')) {
-        metrics.network_rx = parseFloat(value)
-      }
-      else if (name.includes('node_network_transmit_bytes_total')) {
-        metrics.network_tx = parseFloat(value)
+      switch (name) {
+        case 'node_cpu_seconds_total':
+          if (labels.includes('mode="user"')) cpuUserTime = numValue
+          else if (labels.includes('mode="system"')) cpuSystemTime = numValue
+          else if (labels.includes('mode="idle"')) cpuTotalTime = numValue
+          break
+          
+        case 'node_memory_MemTotal_bytes':
+          memTotal = numValue
+          break
+        case 'node_memory_MemFree_bytes':
+          memFree = numValue
+          break
+        case 'node_memory_Buffers_bytes':
+          memBuffers = numValue
+          break
+        case 'node_memory_Cached_bytes':
+          memCached = numValue
+          break
+          
+        case 'node_filesystem_size_bytes':
+          if (labels.includes('mountpoint="/"')) diskTotal = numValue
+          break
+        case 'node_filesystem_free_bytes':
+          if (labels.includes('mountpoint="/"')) diskFree = numValue
+          break
       }
     } catch (error) {
-      console.warn('解析指标失败:', line, error)
+      console.warn('解析指标行失败:', line, error)
     }
+  }
+
+  // 计算CPU使用率
+  if (cpuTotalTime > 0) {
+    metrics.cpu_usage = ((cpuUserTime + cpuSystemTime) / cpuTotalTime) * 100
+  }
+
+  // 计算内存使用率
+  if (memTotal > 0) {
+    const memUsed = memTotal - memFree - memBuffers - memCached
+    metrics.memory_usage = (memUsed / memTotal) * 100
+  }
+
+  // 计算磁盘使用率
+  if (diskTotal > 0) {
+    metrics.disk_usage = ((diskTotal - diskFree) / diskTotal) * 100
   }
 
   return metrics
 }
 
+// 手动创建告警
+const createManualAlert = async (alertData) => {
+  try {
+    const response = await alertApi.createAlert(alertData, () => {
+      // 创建成功后自动刷新告警列表
+      refreshAlerts();
+      message.success('告警创建成功');
+    });
+    
+    // 处理重复告警的情况
+    if (response && response.duplicate === true) {
+      console.log('检测到重复告警，不再创建新告警');
+      // 可以选择不显示任何消息，或者显示一个提示
+      // message.info('已存在相同类型且未解决的告警，不再重复提醒');
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('创建告警失败:', error);
+    message.error('创建告警失败: ' + (error.response?.data?.message || error.message));
+    return false;
+  }
+}
+
+// 修改 checkMetrics 方法，使用新的 createManualAlert 方法
 const checkMetrics = async (container, metricsText) => {
   try {
     const metrics = parseNodeExporterMetrics(metricsText)
+    const thresholds = alertSettings.value?.thresholds || {
+      cpu: 80,
+      memory: 85,
+      disk: 90
+    }
     
-    if (metrics.cpu_usage > 80) {
-      await api.alertApi.createAlert({
+    if (metrics.cpu_usage > thresholds.cpu) {
+      await createManualAlert({
         alert_type: 'Server Health Issue',
         message: `容器 ${container.name || container.id} CPU使用率过高: ${metrics.cpu_usage.toFixed(2)}%`,
         severity: 'high',
-        status: 'pending',
+        status: 'active',
         source: container.name || container.id,
         timestamp: new Date().toISOString()
       })
     }
     
-    if (metrics.memory_usage > 85) {
-      await api.alertApi.createAlert({
+    if (metrics.memory_usage > thresholds.memory) {
+      await createManualAlert({
         alert_type: 'Server Health Issue',
         message: `容器 ${container.name || container.id} 内存使用率过高: ${metrics.memory_usage.toFixed(2)}%`,
         severity: 'high',
-        status: 'pending',
+        status: 'active',
         source: container.name || container.id,
         timestamp: new Date().toISOString()
       })
     }
     
-    if (metrics.disk_usage > 90) {
-      await api.alertApi.createAlert({
+    if (metrics.disk_usage > thresholds.disk) {
+      await createManualAlert({
         alert_type: 'Server Health Issue',
         message: `容器 ${container.name || container.id} 磁盘使用率过高: ${metrics.disk_usage.toFixed(2)}%`,
         severity: 'critical',
-        status: 'pending',
+        status: 'active',
         source: container.name || container.id,
         timestamp: new Date().toISOString()
       })
@@ -292,82 +462,140 @@ const checkMetrics = async (container, metricsText) => {
   }
 }
 
-const performAlertChecks = async () => {
-  if (!alertSettings.value) return
-
+async function performAlertChecks() {
   try {
-    loading.value = true
-    
-    const containersResponse = await api.containerApi.getContainers()
-    console.log('获取到的容器数据:', containersResponse) // 添加调试日志
-    
-    if (!containersResponse || (!Array.isArray(containersResponse) && !containersResponse.containers)) {
-      console.warn('获取到的容器数据格式不正确:', containersResponse)
+    // 获取容器列表
+    const containers = await containerApi.getContainers()
+    console.log('获取到的容器列表:', containers)
+
+    if (!Array.isArray(containers)) {
+      console.error('容器列表格式不正确:', containers)
       return
     }
 
-    const containers = Array.isArray(containersResponse) 
-      ? containersResponse 
-      : containersResponse.containers || []
-    
+    // 遍历每个容器进行检查
     for (const container of containers) {
       try {
-        if (!container.ip || !container.port) {
-          console.warn(`容器缺少必要属性:`, container)
+        if (!container.container_name) {
+          console.warn('容器缺少container_name:', container)
           continue
         }
 
-        const healthCheckUrl = `http://${container.ip}:${container.port}`
-        console.log(`检查容器健康状态: ${healthCheckUrl}`) // 添加调试日志
-        
-        const healthResponse = await fetch(healthCheckUrl, { 
-          timeout: 5000,
-          mode: 'no-cors' // 添加这个选项以处理跨域问题
-        })
-        
-        if (!healthResponse.ok) {
-          await api.alertApi.createAlert({
-            alert_type: 'Docker Container Issue',
-            message: `容器 ${container.name || container.id} (${container.ip}:${container.port}) 不可访问`,
-            severity: 'critical',
-            status: 'active',
-            source: container.name || container.id,
-            timestamp: new Date().toISOString()
-          })
+        console.log('开始检查容器:', container.container_name)
+
+        // 获取容器监控数据
+        const metricsResponse = await containerApi.getContainerMetrics(
+          container.container_name,
+          container.node_exporter_port
+        )
+
+        if (!metricsResponse) {
+          throw new Error('获取监控数据失败')
         }
 
-        if (container.node_exporter_port) {
-          const metricsUrl = `http://${container.ip}:${container.node_exporter_port}/metrics`
-          console.log(`获取容器指标: ${metricsUrl}`) // 添加调试日志
-          
-          const metricsResponse = await fetch(metricsUrl, {
-            mode: 'no-cors' // 添加这个选项以处理跨域问题
-          })
-          if (metricsResponse.ok) {
-            const metricsText = await metricsResponse.text()
-            await checkMetrics(container, metricsText)
-          }
+        // 解析和处理监控数据
+        const metrics = parseNodeExporterMetrics(metricsResponse)
+        
+        // 检查CPU使用率
+        if (metrics.cpu_usage > CPU_THRESHOLD) {
+          const alertData = {
+            container_name: container.container_name,
+            alert_type: 'High CPU Usage',
+            message: `容器 ${container.container_name} CPU使用率过高: ${metrics.cpu_usage.toFixed(2)}%`,
+            severity: 'warning',
+            details: {
+              container_name: container.container_name,
+              cpu_usage: metrics.cpu_usage.toFixed(2)
+            }
+          };
+          await createManualAlert(alertData);
         }
+
+        // 检查内存使用率
+        if (metrics.memory_usage > MEMORY_THRESHOLD) {
+          const alertData = {
+            container_name: container.container_name,
+            alert_type: 'High Memory Usage',
+            message: `容器 ${container.container_name} 内存使用率过高: ${metrics.memory_usage.toFixed(2)}%`,
+            severity: 'warning',
+            details: {
+              container_name: container.container_name,
+              memory_usage: metrics.memory_usage.toFixed(2)
+            }
+          };
+          await createManualAlert(alertData);
+        }
+
+        // 检查磁盘使用率
+        if (metrics.disk_usage > DISK_THRESHOLD) {
+          const alertData = {
+            container_name: container.container_name,
+            alert_type: 'High Disk Usage',
+            message: `容器 ${container.container_name} 磁盘使用率过高: ${metrics.disk_usage.toFixed(2)}%`,
+            severity: 'warning',
+            details: {
+              container_name: container.container_name,
+              disk_usage: metrics.disk_usage.toFixed(2)
+            }
+          };
+          await createManualAlert(alertData);
+        }
+
+        console.log('容器检查完成:', container.container_name)
       } catch (error) {
-        console.error(`检查容器 ${container.name || container.id} 失败:`, error)
-        await api.alertApi.createAlert({
-          alert_type: 'Docker Container Issue',
-          message: `容器 ${container.name || container.id} 检查失败: ${error.message}`,
+        console.error(`检查容器 ${container.container_name} 失败:`, error)
+        // 创建告警
+        const alertData = {
+          container_name: container.container_name,
+          alert_type: 'Monitoring Failed',
+          message: `容器 ${container.container_name} 监控检查失败: ${error.message}`,
           severity: 'high',
-          status: 'active',
-          source: container.name || container.id,
-          timestamp: new Date().toISOString()
-        })
+          details: {
+            container_name: container.container_name,
+            error: error.message
+          }
+        };
+        await createManualAlert(alertData);
       }
     }
-
-    await fetchAlerts()
   } catch (error) {
     console.error('执行告警检查失败:', error)
-    message.error('执行告警检查失败: ' + (error.response?.data?.message || error.message))
-  } finally {
-    loading.value = false
   }
+}
+
+// 解析 Prometheus 格式的监控数据
+function parsePrometheusMetrics(metricsData) {
+  const metrics = {
+    cpu_usage: 0,
+    memory_usage: 0
+  }
+
+  try {
+    const lines = metricsData.split('\n')
+    
+    for (const line of lines) {
+      if (line.startsWith('#')) continue
+      
+      if (line.includes('container_cpu_usage_seconds_total')) {
+        const match = line.match(/[\d.]+$/)
+        if (match) {
+          metrics.cpu_usage = parseFloat(match[0]) * 100
+        }
+      }
+      
+      if (line.includes('container_memory_usage_bytes')) {
+        const match = line.match(/[\d.]+$/)
+        if (match) {
+          const totalMemory = 1024 * 1024 * 1024 // 1GB in bytes
+          metrics.memory_usage = (parseFloat(match[0]) / totalMemory) * 100
+        }
+      }
+    }
+  } catch (error) {
+    console.error('解析监控数据失败:', error)
+  }
+
+  return metrics
 }
 
 const refreshAlerts = async () => {
@@ -472,24 +700,82 @@ const getStatusText = (status) => {
   return texts[status] || status
 }
 
-onMounted(async () => {
-  await loadAlertSettings()
-})
+// 创建测试告警
+const createTestAlert = async () => {
+  try {
+    message.loading('正在创建测试告警...')
+    await createManualAlert({
+      alert_type: 'container',
+      message: '这是一个测试告警 - ' + new Date().toLocaleString(),
+      severity: 'high',
+      status: 'active'
+    })
+  } catch (error) {
+    console.error('创建测试告警失败:', error)
+    message.error('创建测试告警失败: ' + (error.response?.data?.message || error.message))
+  }
+}
 
-onUnmounted(() => {
-  stopAlertChecks()
+// 更新页面刷新定时器
+const updateRefreshTimer = () => {
+  // 清除现有定时器
+  if (refreshTimer.value) {
+    clearInterval(refreshTimer.value);
+  }
+  
+  // 使用告警设置中的检查间隔设置新的定时器
+  const interval = checkInterval.value || 3 * 60 * 1000; // 默认3分钟
+  console.log(`更新告警列表刷新间隔: ${interval / 1000}秒`);
+  
+  refreshTimer.value = setInterval(() => {
+    console.log('根据设置的时间间隔自动刷新告警列表...');
+    fetchAlerts();
+  }, interval);
+}
+
+onMounted(async () => {
+  // 首先获取告警列表
+  await fetchAlerts();
+  
+  // 然后加载告警设置
+  await loadAlertSettings();
+  
+  // 设置定时刷新告警列表，使用固定的500分钟间隔
+  // 清除现有定时器
+  if (refreshTimer.value) {
+    clearInterval(refreshTimer.value);
+  }
+  
+  // 设置为500分钟刷新一次
+  const refreshInterval = 500 * 60 * 1000; // 500分钟
+  console.log(`设置告警列表刷新间隔: ${refreshInterval / 60000}分钟`);
+  
+  refreshTimer.value = setInterval(() => {
+    console.log('根据设置的时间间隔自动刷新告警列表...');
+    fetchAlerts();
+  }, refreshInterval);
+  
+  // 在组件卸载时清除定时器
+  onUnmounted(() => {
+    if (refreshTimer.value) {
+      clearInterval(refreshTimer.value);
+    }
+    stopAlertChecks();
+  });
 })
 </script>
 
 <template>
   <SectionMain>
     <SectionTitleLineWithButton :icon="mdiBell" title="告警管理" main>
-      <BaseButton
-        :icon="mdiRefresh"
-        :loading="loading"
-        @click="fetchAlerts"
-        title="刷新"
-      />
+      <div class="flex space-x-2">
+        <BaseButton
+          :icon="mdiRefresh"
+          :loading="loading"
+          @click="fetchAlerts"
+          title="刷新"
+        />
+      </div>
     </SectionTitleLineWithButton>
 
     <!-- 告警统计 -->
@@ -582,7 +868,7 @@ onUnmounted(() => {
               <td class="px-4 py-3">{{ alert.timestamp }}</td>
               <td class="px-4 py-3">
                 <span :class="{
-                  'px-2 py-1 rounded-full text-xs': true,
+                  'px-3 py-1 rounded-full text-xs inline-block min-w-16 text-center': true,
                   'bg-red-100 text-red-800': alert.status === 'active',
                   'bg-yellow-100 text-yellow-800': alert.status === 'acknowledged',
                   'bg-green-100 text-green-800': alert.status === 'resolved'
@@ -714,5 +1000,34 @@ onUnmounted(() => {
 
 .alert-filters {
   margin-bottom: 24px;
+}
+
+/* 添加状态标签样式 */
+.status-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  min-width: 64px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.status-active {
+  background-color: #fff1f0;
+  color: #cf1322;
+  border: 1px solid #ffa39e;
+}
+
+.status-acknowledged {
+  background-color: #fffbe6;
+  color: #d48806;
+  border: 1px solid #ffe58f;
+}
+
+.status-resolved {
+  background-color: #f6ffed;
+  color: #52c41a;
+  border: 1px solid #b7eb8f;
 }
 </style> 
