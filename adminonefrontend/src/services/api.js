@@ -350,7 +350,33 @@ export const alarmRuleApi = {
 const alertApi = {
   // 获取告警列表
   getAlerts: () => {
+    console.log('开始获取告警列表...')
     return api.get('/alerts')
+      .then(response => {
+        console.log('原始告警响应:', response)
+        
+        // 尝试从不同的响应结构中获取告警数据
+        let alerts = []
+        
+        if (Array.isArray(response)) {
+          alerts = response
+        } else if (response && typeof response === 'object') {
+          if (Array.isArray(response.alerts)) {
+            alerts = response.alerts
+          } else if (response.data && Array.isArray(response.data)) {
+            alerts = response.data
+          } else if (response.success && Array.isArray(response.data)) {
+            alerts = response.data
+          }
+        }
+        
+        console.log('处理后的告警数据:', alerts)
+        return alerts
+      })
+      .catch(error => {
+        console.error('获取告警列表失败:', error)
+        throw error
+      })
   },
 
   // 获取实时告警
@@ -380,20 +406,83 @@ const alertApi = {
   },
 
   // 创建告警
-  createAlert: (data) => {
-    const alertData = {
-      ...data,
-      timestamp: new Date().toISOString(),
-      status: 'pending',  // 添加默认状态
-      severity: data.severity || 'medium'  // 添加默认严重程度
+  createAlert: (data, onSuccess) => {
+    // 获取用户信息和token
+    const token = localStorage.getItem('token')
+    if (!token) {
+      console.error('未找到token，请先登录')
+      return Promise.reject(new Error('未找到token，请先登录'))
     }
-    console.log('Creating alert with data:', alertData)  // 添加日志
-    return api.post('/alerts/add', alertData)  // 修正路径
+
+    // 构造最简单的告警数据，确保alert_type是数据库枚举中的有效值
+    const alertData = {
+      alert_type: 'container', // 使用数据库枚举中的有效值
+      message: data.message || '系统告警',
+      severity: 'high', // 枚举值: 'low', 'medium', 'high', 'critical'
+      status: 'active', // 枚举值: 'active', 'acknowledged', 'resolved'
+      details: JSON.stringify({timestamp: new Date().toISOString().substring(0, 19)})
+    }
+    
+    console.log('创建告警 - 请求数据:', alertData)
+    
+    // 确保设置正确的headers
+    return api.post('/alerts', alertData, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+      .then(response => {
+        console.log('创建告警成功:', response)
+        // 如果提供了成功回调函数，则调用它
+        if (typeof onSuccess === 'function') {
+          onSuccess(response);
+        }
+        return response
+      })
+      .catch(error => {
+        console.error('创建告警失败:', error.response?.data || error)
+        throw error
+      })
   },
 
   // 获取告警设置
   getAlertSettings: () => {
+    console.log('正在获取告警设置...')
     return api.get('/alerts/settings')
+      .then(response => {
+        console.log('获取到的告警设置:', response)
+        if (response.success) {
+          const settings = response.settings
+          console.log(`数据来源: ${response.source}`)
+          console.log(`CPU阈值: ${settings.thresholds.cpu}%`)
+          console.log(`检查间隔: ${settings.checkInterval}分钟`)
+          return {
+            success: true,
+            settings: settings,
+            source: response.source
+          }
+        } else if (!response || !response.settings) {
+          console.warn('告警设置为空，尝试从数据库获取...')
+          return api.get('/alerts/settings/db')
+            .then(dbResponse => {
+              if (dbResponse.success) {
+                console.log(`从数据库获取成功，数据来源: ${dbResponse.source}`)
+                return {
+                  success: true,
+                  settings: dbResponse.settings,
+                  source: 'mysql'
+                }
+              }
+              throw new Error('无法获取告警设置')
+            })
+        }
+        throw new Error('无效的响应格式')
+      })
+      .catch(error => {
+        console.error('获取告警设置失败:', error)
+        throw error
+      })
   },
 
   // 更新告警设置
@@ -431,29 +520,92 @@ const updateAlertSettings = (data) => {
 
 // 容器相关 API
 const containerApi = {
-  // 获取所有容器
-  getContainers() {
-    return api.get('/containers').then(response => response.data || [])
+  getContainers: () => {
+    console.log('开始请求容器列表...')
+    return api.get('/containers')
+      .then(response => {
+        console.log('原始API响应:', response)
+        
+        // 尝试从不同的响应结构中获取容器数据
+        let containers = []
+        
+        if (Array.isArray(response)) {
+          containers = response
+        } else if (response && typeof response === 'object') {
+          if (Array.isArray(response.data)) {
+            containers = response.data
+          } else if (response.containers && Array.isArray(response.containers)) {
+            containers = response.containers
+          } else if (response.result && Array.isArray(response.result)) {
+            containers = response.result
+          }
+        }
+
+        // 处理每个容器数据
+        const processedContainers = containers.map(container => {
+          try {
+            if (!container.container_name) {
+              console.warn('容器缺少container_name:', container)
+              return null
+            }
+
+            // 从container_name中提取IP地址（仅用于日志）
+            const ipMatch = container.container_name.match(/^(\d+)_(\d+)_(\d+)_(\d+)/)
+            const ip = ipMatch ? ipMatch.slice(1, 5).join('.') : null
+            
+            if (!ip) {
+              console.warn(`无法从容器名称提取IP地址: ${container.container_name}`)
+              return null
+            }
+
+            // 确保容器有node_exporter_port
+            if (!container.node_exporter_port) {
+              console.warn(`容器缺少node_exporter_port: ${container.container_name}`)
+              return null
+            }
+
+            return {
+              ...container,
+              ip: ip,
+              metrics_port: container.node_exporter_port,
+              // 使用后端代理路由，添加端口参数
+              metrics_url: `/api/proxy/metrics/${encodeURIComponent(container.container_name)}?port=${container.node_exporter_port}`
+            }
+          } catch (err) {
+            console.error('处理容器数据时出错:', err, container)
+            return null
+          }
+        }).filter(Boolean)
+
+        console.log('处理后的容器列表:', processedContainers)
+        return processedContainers
+      })
+      .catch(error => {
+        console.error('获取容器列表失败:', error)
+        throw error
+      })
   },
-  
-  // 创建容器
-  createContainer(data) {
-    return api.post('/containers', data)
-  },
-  
-  // 获取容器状态
-  getContainerStatus(containerName) {
-    return api.get(`/containers/${containerName}/status`)
-  },
-  
-  // 停止容器
-  stopContainer(containerName) {
-    return api.post(`/containers/${containerName}/stop`)
-  },
-  
-  // 更新容器
-  updateContainer(containerName, data) {
-    return api.put(`/containers/${containerName}`, data)
+
+  // 获取容器监控数据
+  getContainerMetrics: (containerName, port) => {
+    console.log('开始获取容器监控数据:', containerName)
+    // 使用后端代理路由获取监控数据，包含端口参数
+    return api.get(`/proxy/metrics/${encodeURIComponent(containerName)}?port=${port}`, {
+      headers: {
+        'Accept': 'text/plain,*/*'  // 接受纯文本响应
+      }
+    })
+      .then(response => {
+        console.log('获取到监控数据:', response)
+        if (!response || response.error) {
+          throw new Error(response?.error || '获取监控数据失败')
+        }
+        return response
+      })
+      .catch(error => {
+        console.error('获取监控数据失败:', error)
+        throw error
+      })
   }
 }
 
