@@ -675,7 +675,26 @@ export default {
   deleteLog(id) {
     return api.delete(`/logs/delete/${id}`)
   },
-
+  // 容器相关 API
+  getContainers() {
+    return api.get('/containers')
+  },
+  
+  createContainer(data) {
+    return api.post('/containers', data)
+  },
+  
+  getContainerStatus(containerName) {
+    return api.get(`/containers/${containerName}/status`)
+  },
+  
+  stopContainer(containerName) {
+    return api.post(`/containers/${containerName}/stop`)
+  },
+  
+  updateContainer(containerName, data) {
+    return api.put(`/containers/${containerName}`, data)
+  },
   // ACL 相关 API
   generateAcl,
   getAclLogs,
