@@ -18,10 +18,10 @@ PyJWT>=2.3.0,<3.0  # JSON Web Token，用于认证
 # 环境变量管理
 python-dotenv>=1.0.0  # 加载 .env 文件
 
-# HTTP 请求处理（如果项目需要与外部 API 交互）
+# HTTP 请求处理
 requests>=2.28.0,<3.0  # HTTP 请求库
 
-# 测试工具（如果需要）
+# 测试工具
 pytest>=7.0.0  # 单元测试工具
 pytest-flask>=1.2.0  # 用于 Flask 项目的测试集成
 
@@ -29,4 +29,35 @@ pytest-flask>=1.2.0  # 用于 Flask 项目的测试集成
 celery>=5.0.0,<6.0  # 异步任务队列
 redis>=4.0.0,<5.0  # Celery 使用的消息代理
 
-docker>=6.0.0,<7.0
+# Docker 支持
+docker>=6.0.0,<7.0  # Docker API 客户端
+
+# 前端依赖
+vue>=3.0.0  # Vue.js 框架
+dayjs>=1.11.0  # 日期处理库
+ant-design-vue>=3.0.0  # Ant Design Vue 组件库
+
+# 数据处理和可视化
+pandas>=1.5.0  # 数据分析库
+numpy>=1.23.0  # 科学计算库
+matplotlib>=3.6.0  # 绘图库
+
+# 监控和指标收集
+prometheus-client>=0.16.0  # Prometheus 客户端
+node-exporter>=0.18.0  # Node Exporter 指标收集
+
+# 网络和系统工具
+psutil>=5.9.0  # 系统监控
+netifaces>=0.11.0  # 网络接口信息
+
+# 日志和监控
+loguru>=0.6.0  # 更好的日志记录
+sentry-sdk>=1.14.0  # 错误跟踪
+
+# API 文档
+flask-restx>=1.0.0  # RESTful API 框架
+swagger-ui>=4.15.0  # API 文档界面
+
+# 其他工具
+pyyaml>=6.0  # YAML 解析
+jsonschema>=4.17.0  # JSON Schema 验证
