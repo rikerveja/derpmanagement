@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, Response
 from datetime import datetime
 from app.models import SystemAlert, User, Server, db, AlarmRule
 from app import db
@@ -10,6 +10,8 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 import redis
 import json
 import os
+import requests
+import re
 
 # 定义蓝图
 alerts_bp = Blueprint('alerts', __name__, url_prefix='/api')
@@ -335,32 +337,37 @@ def get_all_alerts():
 
 @alerts_bp.route('/alerts/settings', methods=['GET'])
 def get_alert_settings():
-    """获取告警设置"""
+    """获取告警设置，优先从Redis获取，没有则从MySQL读取并缓存到Redis"""
     try:
-        print("Fetching alert settings...")
+        print("开始获取告警设置...")
         
-        # 1. 首先尝试从 Redis 获取设置
+        # 1. 首先从 Redis 获取设置
         redis_client = redis.StrictRedis(
             host=os.getenv('REDIS_HOST', 'localhost'),
             port=6379,
-            db=0
+            db=0,
+            decode_responses=True  # 确保返回的数据是字符串而不是字节
         )
+        
         settings_json = redis_client.get('alert_settings')
         
         if settings_json:
-            print("Found settings in Redis")
+            print("从Redis中成功获取到设置")
             return jsonify({
                 "success": True,
-                "settings": json.loads(settings_json)
+                "settings": json.loads(settings_json),
+                "source": "redis"
             })
         
-        # 2. 从数据库获取
-        print("Fetching settings from database...")
-        rules = AlarmRule.query.filter_by(category='global').all()
-        print(f"Found {len(rules)} rules in database")
+        print("Redis中没有找到设置，从MySQL数据库获取...")
         
+        # 2. 从MySQL数据库的derp_system.alarm_rules表获取
+        rules = AlarmRule.query.filter_by(is_active=True).all()
+        print(f"从数据库中找到{len(rules)}条规则")
+        
+        # 3. 构造设置对象
         settings = {
-            'serverHealthCheck': True,
+            'serverHealthCheck': True,  # 默认值
             'dockerHealthCheck': True,
             'trafficAlert': True,
             'emailNotification': True,
@@ -370,12 +377,13 @@ def get_alert_settings():
                 'cpu': 80,
                 'memory': 80,
                 'disk': 85
-            }
+            },
+            'lastUpdated': datetime.utcnow().isoformat()
         }
         
-        # 从规则中更新设置
+        # 4. 从规则中更新设置
         for rule in rules:
-            print(f"Processing rule: {rule.name}, threshold: {rule.threshold}, condition: {rule.alert_condition}")
+            print(f"处理规则: {rule.name}, 阈值: {rule.threshold}")
             if rule.alert_condition == 'cpu_usage':
                 settings['thresholds']['cpu'] = float(rule.threshold)
             elif rule.alert_condition == 'memory_usage':
@@ -395,18 +403,59 @@ def get_alert_settings():
             elif rule.alert_condition == 'email_notify':
                 settings['emailNotification'] = rule.threshold > 0
         
-        # 将数据同步到 Redis
-        print("Syncing settings to Redis...")
-        redis_client.set('alert_settings', json.dumps(settings))
+        # 5. 将设置缓存到Redis（设置1小时过期）
+        print("将设置缓存到Redis中...")
+        redis_client.setex(
+            'alert_settings',
+            3600,  # 1小时过期
+            json.dumps(settings)
+        )
+        print("设置已成功缓存到Redis")
         
         return jsonify({
             "success": True,
-            "settings": settings
+            "settings": settings,
+            "source": "mysql"
         })
+        
+    except redis.RedisError as e:
+        print(f"Redis错误: {str(e)}")
+        # Redis出错时直接从MySQL读取
+        try:
+            rules = AlarmRule.query.filter_by(is_active=True).all()
+            settings = {
+                'serverHealthCheck': True,
+                'dockerHealthCheck': True,
+                'trafficAlert': True,
+                'emailNotification': True,
+                'checkInterval': 5,
+                'thresholds': {
+                    'traffic': 90,
+                    'cpu': 80,
+                    'memory': 80,
+                    'disk': 85
+                },
+                'lastUpdated': datetime.utcnow().isoformat()
+            }
+            return jsonify({
+                "success": True,
+                "settings": settings,
+                "source": "mysql_fallback"
+            })
+        except Exception as db_error:
+            print(f"数据库错误: {str(db_error)}")
+            return jsonify({
+                "success": False,
+                "message": f"获取设置失败: {str(db_error)}"
+            }), 500
+            
     except Exception as e:
         error_msg = str(e)
-        print(f"Error getting settings: {error_msg}")
-        return jsonify({"success": False, "message": error_msg}), 500
+        print(f"获取设置时发生错误: {error_msg}")
+        return jsonify({
+            "success": False,
+            "message": f"获取设置失败: {error_msg}"
+        }), 500
 
 @alerts_bp.route('/alerts/settings', methods=['POST'])
 def update_alert_settings():
@@ -811,3 +860,166 @@ def update_alert_severity(id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"success": False, "message": str(e)}), 500
+
+# 修改代理路由实现
+@alerts_bp.route('/proxy/metrics/<container_name>', methods=['GET', 'OPTIONS'])
+def proxy_metrics(container_name):
+    """
+    代理获取容器的监控数据
+    """
+    # 处理 OPTIONS 请求
+    if request.method == 'OPTIONS':
+        response = Response()
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', '*')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        return response
+
+    try:
+        # 从容器名称中提取IP
+        ip_match = re.match(r'^(\d+)_(\d+)_(\d+)_(\d+)', container_name)
+        if not ip_match:
+            return jsonify({"error": "Invalid container name format"}), 400
+            
+        ip = '.'.join(ip_match.groups())
+        
+        # 从请求参数中获取端口
+        port = request.args.get('port')
+        if not port:
+            return jsonify({"error": "Missing port parameter"}), 400
+
+        # 构建实际的metrics URL
+        metrics_url = f"http://{ip}:{port}/metrics"
+        print(f"Fetching metrics from: {metrics_url}")
+        
+        # 发送请求获取metrics数据
+        response = requests.get(metrics_url, timeout=5)
+        response.raise_for_status()
+
+        # 返回数据，保持原始格式并添加CORS头
+        return Response(
+            response.text,
+            status=200,
+            mimetype='text/plain',
+            headers={
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': '*',
+                'Access-Control-Allow-Methods': 'GET, OPTIONS',
+                'Cache-Control': 'no-cache'
+            }
+        )
+
+    except requests.Timeout:
+        print(f"Timeout while fetching metrics from {metrics_url}")
+        return jsonify({"error": "Metrics endpoint timeout"}), 504
+    except requests.RequestException as e:
+        print(f"Failed to fetch metrics from {metrics_url}: {str(e)}")
+        return jsonify({"error": f"Failed to fetch metrics: {str(e)}"}), 502
+    except Exception as e:
+        print(f"Unexpected error while fetching metrics: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+# 添加告警路由
+@alerts_bp.route('/alerts', methods=['POST', 'OPTIONS'])
+def create_alert():
+    """
+    创建新的告警
+    """
+    # 处理 OPTIONS 请求
+    if request.method == 'OPTIONS':
+        response = Response()
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', '*')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        return response
+
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "message": "未提供告警数据"}), 400
+
+        # 获取当前用户 - 不再强制要求
+        current_user = None
+        try:
+            # 尝试获取用户ID，但不强制要求
+            token = request.headers.get('Authorization', '').replace('Bearer ', '')
+            if token:
+                from flask_jwt_extended import decode_token
+                decoded = decode_token(token)
+                current_user = decoded.get('sub')
+        except Exception as e:
+            print(f"获取用户信息失败，但继续处理: {str(e)}")
+        
+        # 验证必需字段
+        required_fields = ['alert_type', 'message']
+        missing_fields = [field for field in required_fields if not data.get(field)]
+        if missing_fields:
+            return jsonify({
+                "success": False,
+                "message": f"缺少必需字段: {', '.join(missing_fields)}"
+            }), 400
+            
+        # 验证severity值
+        severity = data.get('severity', 'high')
+        if severity not in ['low', 'medium', 'high', 'critical']:
+            severity = 'high'  # 使用默认值
+        
+        # 处理 details 字段，防止数据过大被截断
+        details = data.get('details', {})
+        # 如果 details 太大，只保留基本信息
+        if len(json.dumps(details)) > 1000:  # 假设数据库字段限制为1000字符
+            details = {
+                'timestamp': datetime.utcnow().isoformat(),
+                'note': '原始数据太大，已被截断'
+            }
+        
+        # 创建告警
+        alert = SystemAlert(
+            target_type='container',
+            target_id=None,
+            alert_type=data['alert_type'],
+            message=data['message'],
+            severity=severity,
+            status=data.get('status', 'pending'),
+            created_at=datetime.utcnow(),
+            details=details  # 使用处理后的 details
+        )
+        
+        db.session.add(alert)
+        db.session.commit()
+        
+        # 记录操作日志
+        log_operation(
+            user_id=current_user,
+            operation="create_alert",
+            status="success",
+            details=f"Alert created: {alert.id}"
+        )
+        
+        return jsonify({
+            "success": True,
+            "message": "告警创建成功",
+            "alert": {
+                "id": alert.id,
+                "type": alert.alert_type,
+                "message": alert.message,
+                "severity": alert.severity,
+                "status": alert.status,
+                "created_at": alert.created_at.isoformat(),
+                "details": alert.details
+            }
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"创建告警时出错: {str(e)}")
+        log_operation(
+            user_id=current_user if 'current_user' in locals() else None,
+            operation="create_alert",
+            status="failed",
+            details=f"Error: {str(e)}"
+        )
+        return jsonify({
+            "success": False,
+            "message": f"创建告警失败: {str(e)}"
+        }), 500
